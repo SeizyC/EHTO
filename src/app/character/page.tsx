@@ -105,13 +105,13 @@ export default function CharacterPage() {
         </h1>
       </header>
 
-      {/* preview: round platform + character */}
+      {/* preview: round platform + character — Platform first so it sits behind */}
       <div className="relative mx-auto flex h-[290px] w-full items-end justify-center">
-        <div className="absolute left-1/2 -translate-x-1/2" style={{ bottom: 30 }}>
-          <Character kind={kind} presence="active" outfit={outfit} size={5} />
+        <div className="absolute left-1/2 z-0 -translate-x-1/2" style={{ bottom: -6 }}>
+          <Platform width={220} />
         </div>
-        <div className="absolute left-1/2 -translate-x-1/2" style={{ bottom: -6 }}>
-          <Platform width={200} />
+        <div className="absolute left-1/2 z-10 -translate-x-1/2" style={{ bottom: 28 }}>
+          <Character kind={kind} presence="active" outfit={outfit} size={5} />
         </div>
       </div>
 

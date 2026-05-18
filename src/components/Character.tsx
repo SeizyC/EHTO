@@ -3,10 +3,6 @@ import type { BodyType, CreatureKind, Outfit, OutfitStyle, Presence } from "@/ty
 import { darken, lighten } from "@/lib/color";
 
 // ─── grid ──────────────────────────────────────────────────────────────
-//   24 wide × 39 tall
-//   y 0..13   head region (hair + hat + face)
-//   y 14..38  body region (25 rows)
-
 const GRID_W = 24;
 const GRID_H = 39;
 const FACE_X = 5;
@@ -16,26 +12,33 @@ const FACE_H = 11;
 const BODY_Y = 14;
 
 // ─── body sprites by style ─────────────────────────────────────────────
-//   region letters:
-//     . transparent     S skin    C shirt   c shirt-shadow   H shirt-highlight
-//     W white (suit shirt)        T tie/chain/accent
-//     K pocket (slightly darker shirt — uses shirtShadow at render)
-//     P pants   p pants-shadow    Z shoes   z shoes-shadow
+//   Letter palette
+//     . transparent
+//     S skin
+//     C shirt main      c shirt shadow     H shirt highlight
+//     L lapel/collar    N collar shadow    B button (dark)
+//     W white shirt     T tie / chain / stripe
+//     K kangaroo pocket (shirt shadow)     D drawstring (highlight)
+//     P pants main      p pants shadow
+//     M pocket flap (pants darker)         F pant cuff fold
+//     U belt buckle (gold)                 R belt strap
+//     Z shoes main      z shoes shadow     Y sole highlight
 
 const BODY_CASUAL: string[] = [
   "........SSSSSSSS........",
   "........SSSSSSSS........",
-  "......CCCCCCCCCCCC......",
-  ".....cCCCCHCCCHCCCCc....",
+  "......CCLLLLLLLLCC......",
+  ".....cCCCCCHCCCCCCCc....",
   ".....cCCCCCCCCCCCCc.....",
+  ".....cCCCHCCCCCCCCCc....",
+  ".....cCCCCCBCCCCCCc.....",
   ".....cCCCCCCCCCCCCc.....",
-  ".....cCCCCCCCCCCCCc.....",
-  ".....cCCCCCCCCCCCCc.....",
-  ".....cCCCCCCCCCCCCc.....",
+  ".....cCCCCCBCCCCCCc.....",
   "....SSCCCCCCCCCCCCSS....",
   "....SSCCCCCCCCCCCCSS....",
   ".....cCCCCCCCCCCCCc.....",
-  "......pPPPPPPPPPPp......",
+  "......RPPPPUUUPPPPR.....",
+  "......pPMPP..PPMMp......",
   "......pPPPP..PPPPp......",
   "......pPPPP..PPPPp......",
   "......pPPPP..PPPPp......",
@@ -43,28 +46,27 @@ const BODY_CASUAL: string[] = [
   "......pPPPP..PPPPp......",
   "......pPPPP..PPPPp......",
   "......pPPPP..PPPPp......",
-  "......pPPPP..PPPPp......",
-  "......pPPPP..PPPPp......",
+  "......pPPFP..PFPPp......",
   ".....zZZZZZZ.ZZZZZZz....",
   "....zZZZZZZZ.ZZZZZZZz...",
-  "....ZZZZZZZZ.ZZZZZZZZ...",
+  "....YYYYYYYY.YYYYYYYY...",
 ];
 
-// fem-casual — narrower shoulders, slight waist taper
 const BODY_CASUAL_FEM: string[] = [
   "........SSSSSSSS........",
   "........SSSSSSSS........",
-  ".......CCCCCCCCCC.......",
-  "......cCCCCHCHCCCCc.....",
+  ".......CCLLLLLLCC.......",
+  "......cCCCCHHCCCCcc.....",
   "......cCCCCCCCCCCCc.....",
+  ".......cCCCBCCCCCc......",
   ".......cCCCCCCCCCc......",
-  ".......cCCCCCCCCCc......",
-  ".......cCCCCCCCCCc......",
+  ".......cCCCBCCCCCc......",
   "......cCCCCCCCCCCCc.....",
   "....SSCCCCCCCCCCCCSS....",
   "....SSCCCCCCCCCCCCSS....",
   ".....cCCCCCCCCCCCCc.....",
-  "......pPPPPPPPPPPp......",
+  "......RPPPPUUUPPPPR.....",
+  "......pPMPP..PPMMp......",
   "......pPPPP..PPPPp......",
   "......pPPPP..PPPPp......",
   "......pPPPP..PPPPp......",
@@ -72,28 +74,26 @@ const BODY_CASUAL_FEM: string[] = [
   "......pPPPP..PPPPp......",
   "......pPPPP..PPPPp......",
   "......pPPPP..PPPPp......",
-  "......pPPPP..PPPPp......",
-  "......pPPPP..PPPPp......",
+  "......pPPFP..PFPPp......",
   ".....zZZZZZZ.ZZZZZZz....",
   "....zZZZZZZZ.ZZZZZZZz...",
-  "....ZZZZZZZZ.ZZZZZZZZ...",
+  "....YYYYYYYY.YYYYYYYY...",
 ];
 
-// suit — V-neck with white shirt and tie, slacks, dress shoes
 const BODY_SUIT: string[] = [
   "........SSSSSSSS........",
-  "......CCWWWWWWWWCC......",
-  ".....cCCWWWTTWWWCCc.....",
-  ".....cCCCWTTTTWCCCc.....",
-  ".....cCCCCTTTTCCCCc.....",
-  ".....cCCCCCTTTCCCCCc....",
-  ".....cCCCCCTTTCCCCCc....",
-  ".....cCCCCCCTCCCCCCc....",
+  "......NWWWWWWWWWWN......",
+  ".....cCLWWWWTTWWWLCc....",
+  ".....cCCLWWTTTTWWLCCc...",
+  ".....cCCCLWTTTTWLCCCc...",
+  ".....cCBCCCCTTCCCCBCc...",
+  ".....cCCCCCCTTCCCCCc....",
+  ".....cCCCCCCCTCCCCCc....",
   ".....cCCCCCCCCCCCCc.....",
   "....SSCCCCCCCCCCCCSS....",
   "....SSCCCCCCCCCCCCSS....",
   ".....cCCCCCCCCCCCCc.....",
-  "......pPPPPPPPPPPp......",
+  "......RPPPPUUUPPPPR.....",
   "......pPPPP..PPPPp......",
   "......pPPPP..PPPPp......",
   "......pPPPP..PPPPp......",
@@ -102,27 +102,27 @@ const BODY_SUIT: string[] = [
   "......pPPPP..PPPPp......",
   "......pPPPP..PPPPp......",
   "......pPPPP..PPPPp......",
-  "......pPPPP..PPPPp......",
-  ".....zZZZZZ...ZZZZZz....",
-  "....zZZZZZZ...ZZZZZZz...",
-  "....ZZZZZZZ...ZZZZZZZ...",
+  "......pPPFP..PFPPp......",
+  ".....zZZZZZZ.ZZZZZZz....",
+  "....zZZZZZZZ.ZZZZZZZz...",
+  "....YYYYYYYY.YYYYYYYY...",
 ];
 
-// hiphop — oversized hoodie with pocket + chain, baggy pants, chunky sneakers
 const BODY_HIPHOP: string[] = [
   "........SSSSSSSS........",
   ".......TTTTTTTTTT.......",
   "...CCCCCCCCCCCCCCCCCC...",
-  "..cCCCCCCCCCCCCCCCCCCc..",
-  "..cCCCCCCCCCCCCCCCCCCc..",
+  "..cCDCCCCCCCCCCCCCCDCc..",
+  "..cCDCCCCCCCCCCCCCCDCc..",
   "..cCCCCCCKKKKKKCCCCCCc..",
   "..cCCCCCKKKKKKKKCCCCCc..",
+  "..cCCCCCKKKKKKKKCCCCCc..",
   "..cCCCCCCKKKKKKCCCCCCc..",
-  "..cCCCCCCCCCCCCCCCCCCc..",
   ".SSCCCCCCCCCCCCCCCCCCSS.",
   ".SSCCCCCCCCCCCCCCCCCCSS.",
   "..cCCCCCCCCCCCCCCCCCCc..",
-  "....pPPPPPPPPPPPPPPpp...",
+  "....pPPPPUUUUUUPPPPpp...",
+  "...pPMPPPP....PPPPMPp...",
   "...pPPPPPP....PPPPPPp...",
   "...pPPPPPP....PPPPPPp...",
   "...pPPPPPP....PPPPPPp...",
@@ -130,61 +130,57 @@ const BODY_HIPHOP: string[] = [
   "...pPPPPPP....PPPPPPp...",
   "...pPPPPPP....PPPPPPp...",
   "...pPPPPPP....PPPPPPp...",
-  "...pPPPPPP....PPPPPPp...",
-  "...pPPPPPP....PPPPPPp...",
+  "...pPPFPPF....FPPFPPp...",
   "..zZZZZZZZZ..ZZZZZZZZz..",
   ".zZZZZZZZZZZ.ZZZZZZZZZz.",
-  ".ZZZZZZZZZZZ.ZZZZZZZZZZ.",
+  ".YYYYYYYYYYY.YYYYYYYYYY.",
 ];
 
-// dress — flowing skirt instead of leg split (fem)
 const BODY_DRESS: string[] = [
   "........SSSSSSSS........",
   "........SSSSSSSS........",
-  ".......CCCCCCCCCC.......",
+  ".......CCLLLLLLCC.......",
   "......cCCCCWCWCCCCc.....",
   "......cCCCCCCCCCCCc.....",
+  ".......cCCCCBCCCCc......",
   ".......cCCCCCCCCCc......",
-  ".......cCCCCCCCCCc......",
-  "......cCCCCCCCCCCCc.....",
+  "......cCCCCCBCCCCCc.....",
   "......cCCCCCCCCCCCc.....",
   "....SSCCCCCCCCCCCCSS....",
   "....SSCCCCCCCCCCCCSS....",
   ".....cCCCCCCCCCCCCc.....",
-  ".....cCCCCCCCCCCCCc.....",
+  ".....cCCCCRRRRCCCCCc....",
   "....pCCCCCCCCCCCCCCp....",
-  "....pCCCCCCCCCCCCCCp....",
+  "....pCCFCCCCCCCCFCCp....",
+  "...pCCCCCCFCCCCCCCCCp...",
   "...pCCCCCCCCCCCCCCCCp...",
-  "...pCCCCCCCCCCCCCCCCp...",
-  "..pCCCCCCCCCCCCCCCCCCp..",
-  "..pCCCCCCCCCCCCCCCCCCp..",
-  "..pCCCCCCCCCCCCCCCCCCp..",
+  "..pCCFCCCCCCCCCCCCFCp...",
+  "..pCCCCCCCCCCCCCCCCCp...",
+  "..pCCCCCCFCCCCCFCCCCCp..",
   "..pCCCCCCCCCCCCCCCCCCp..",
   ".pCCCCCCCCCCCCCCCCCCCCp.",
   "........................",
   ".........ZZZ.ZZZ........",
-  ".........ZZZ.ZZZ........",
+  ".........YYY.YYY........",
 ];
 
 const BODY_SPRITES: Record<string, string[]> = {
   "masc-casual": BODY_CASUAL,
   "fem-casual": BODY_CASUAL_FEM,
   "masc-suit": BODY_SUIT,
-  "fem-suit": BODY_SUIT, // shared base for now
+  "fem-suit": BODY_SUIT,
   "masc-hiphop": BODY_HIPHOP,
   "fem-hiphop": BODY_HIPHOP,
-  "masc-dress": BODY_CASUAL, // dress not for masc — fallback
+  "masc-dress": BODY_CASUAL,
   "fem-dress": BODY_DRESS,
 };
 
 // ─── hair ──────────────────────────────────────────────────────────────
-//   h hair main    H hair highlight
 const HAIR_MASC: string[] = [
   "........hhhhhhhh........",
   "......hhhhHHHHhhhhh.....",
   "......hhhhhhhhhhhh......",
   "......hh........hh......",
-  // rest empty (face area)
 ];
 
 const HAIR_FEM: string[] = [
@@ -204,10 +200,7 @@ const HAIR_FEM: string[] = [
   "...hhh............hhh...",
 ];
 
-const HAIR: Record<BodyType, string[]> = {
-  masc: HAIR_MASC,
-  fem: HAIR_FEM,
-};
+const HAIR: Record<BodyType, string[]> = { masc: HAIR_MASC, fem: HAIR_FEM };
 
 // ─── creature faces ────────────────────────────────────────────────────
 interface FaceDef {
@@ -284,7 +277,7 @@ const FACES: Record<CreatureKind, FaceDef> = {
       ".111122111133.",
       "11AddA11AddA13",
       "11111111111113",
-      ".11111111111.",
+      ".11111111111..",
       "..1111111133..",
       "....111111....",
       "..............",
@@ -344,11 +337,16 @@ type ColorMap = {
   shirt: string;
   shirtShadow: string;
   shirtHighlight: string;
+  shirtDeep: string;
   pants: string;
   pantsShadow: string;
+  pantsDeep: string;
   shoes: string;
   shoesShadow: string;
+  shoesHi: string;
   accent: string;
+  belt: string;
+  buckle: string;
 };
 
 function bodyFill(ch: string, c: ColorMap): string | null {
@@ -357,13 +355,22 @@ function bodyFill(ch: string, c: ColorMap): string | null {
     case "C": return c.shirt;
     case "c": return c.shirtShadow;
     case "H": return c.shirtHighlight;
+    case "L": return c.shirtDeep;
+    case "N": return c.shirtDeep;
+    case "B": return c.shirtDeep;
     case "K": return c.shirtShadow;
     case "W": return "#f4f4f8";
     case "T": return c.accent;
+    case "D": return c.shirtHighlight;
     case "P": return c.pants;
     case "p": return c.pantsShadow;
+    case "M": return c.pantsDeep;
+    case "F": return c.pantsDeep;
+    case "R": return c.belt;
+    case "U": return c.buckle;
     case "Z": return c.shoes;
     case "z": return c.shoesShadow;
+    case "Y": return c.shoesHi;
     default: return null;
   }
 }
@@ -393,12 +400,15 @@ export function Character({
   outfit,
   size = 4,
   ringColor,
+  rotate = -16,
 }: {
   kind: CreatureKind;
   presence: Presence;
   outfit: Outfit;
   size?: number;
   ringColor?: string;
+  /** Y-rotation in degrees for 3/4 view. Default -16. Set 0 to disable. */
+  rotate?: number;
 }) {
   const bodyType: BodyType = outfit.bodyType ?? "masc";
   const style: OutfitStyle = outfit.style ?? "casual";
@@ -410,18 +420,22 @@ export function Character({
 
   const colors: ColorMap = {
     shirt,
-    shirtShadow: darken(shirt, 0.32),
-    shirtHighlight: lighten(shirt, 0.18),
+    shirtShadow: darken(shirt, 0.34),
+    shirtHighlight: lighten(shirt, 0.22),
+    shirtDeep: darken(shirt, 0.62),
     pants,
     pantsShadow: darken(pants, 0.32),
+    pantsDeep: darken(pants, 0.6),
     shoes,
-    shoesShadow: darken(shoes, 0.35),
+    shoesShadow: darken(shoes, 0.4),
+    shoesHi: lighten(shoes, 0.45),
     accent,
+    belt: darken(pants, 0.5),
+    buckle: "#d4a83a",
   };
 
   const cells: React.ReactNode[] = [];
 
-  // body sprite
   const bodySprite = BODY_SPRITES[`${bodyType}-${style}`] ?? BODY_CASUAL;
   bodySprite.forEach((row, dy) => {
     const y = BODY_Y + dy;
@@ -431,11 +445,9 @@ export function Character({
     }
   });
 
-  // hair (skip if hood hat is worn)
   if (hairColor && outfit.hat?.kind !== "hood") {
-    const hairHi = lighten(hairColor, 0.2);
-    const hairSprite = HAIR[bodyType];
-    hairSprite.forEach((row, y) => {
+    const hairHi = lighten(hairColor, 0.22);
+    HAIR[bodyType].forEach((row, y) => {
       for (let x = 0; x < row.length; x++) {
         const fill = hairFill(row[x], hairColor, hairHi);
         if (fill) cells.push(<rect key={`hr${x}-${y}`} x={x} y={y} width={1} height={1} fill={fill} />);
@@ -443,7 +455,6 @@ export function Character({
     });
   }
 
-  // face
   const def = FACES[kind];
   const fHi = lighten(def.main, 0.22);
   const fSh = darken(def.main, 0.28);
@@ -455,7 +466,6 @@ export function Character({
     }
   });
 
-  // hat
   if (outfit.hat && outfit.hat.kind !== "none") {
     const hatColor = outfit.hat.color ?? "#202028";
     const hatShadow = darken(hatColor, 0.3);
@@ -478,6 +488,9 @@ export function Character({
     }
   }
 
+  // Apply 3/4 perspective rotation
+  const transform = rotate ? `perspective(${size * 90}px) rotateY(${rotate}deg)` : undefined;
+
   return (
     <div
       className={clsx("pixelated select-none", PRESENCE_ANIM[presence])}
@@ -485,6 +498,8 @@ export function Character({
         width: GRID_W * size,
         height: GRID_H * size,
         filter: ringColor ? `drop-shadow(0 0 ${size * 2}px ${ringColor}90)` : undefined,
+        transform,
+        transformOrigin: "center bottom",
       }}
       aria-hidden
     >
@@ -502,7 +517,7 @@ export function Character({
   );
 }
 
-// ─── face-only renderer ─────────────────────────────────────────────────
+// ─── face-only renderer ────────────────────────────────────────────────
 export function CreatureFace({ kind, size = 4 }: { kind: CreatureKind; size?: number }) {
   const def = FACES[kind];
   const fHi = lighten(def.main, 0.22);
