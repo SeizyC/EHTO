@@ -35,7 +35,11 @@ export const useProfile = create<ProfileState>()(
 );
 
 export const DEFAULT_OUTFIT: Outfit = {
+  bodyType: "masc",
+  style: "casual",
   shirt: "#2a4ac8",
   pants: "#1a1f3a",
+  hair: "#1f1814",
+  accent: "#c8385a",
   hat: { kind: "none" },
 };

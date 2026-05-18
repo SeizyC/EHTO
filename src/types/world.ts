@@ -24,11 +24,19 @@ export interface World {
   updatedAt: string;
 }
 
+export type BodyType = "masc" | "fem";
+export type OutfitStyle = "casual" | "suit" | "hiphop" | "dress";
+export type HatKind = "cap" | "beanie" | "halo" | "hood" | "none";
+
 export interface Outfit {
+  bodyType?: BodyType; // default "masc"
+  style?: OutfitStyle; // default "casual"
   shirt: string;
   pants: string;
   shoes?: string;
-  hat?: { kind: "cap" | "beanie" | "halo" | "none"; color?: string };
+  accent?: string; // tie / chain / stripe color
+  hair?: string; // hex; if undefined no hair drawn
+  hat?: { kind: HatKind; color?: string };
 }
 
 export interface Member {
