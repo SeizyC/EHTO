@@ -7,7 +7,10 @@ export type CreatureKind =
   | "glitch_robot"
   | "floating_ghost"
   | "sleepy_blob"
-  | "tiny_monster";
+  | "tiny_monster"
+  | "shy_bunny"
+  | "pixie_cat"
+  | "mochi_blob";
 
 export type Presence = "active" | "lurking" | "idle" | "away";
 
@@ -25,7 +28,13 @@ export interface World {
 }
 
 export type BodyType = "masc" | "fem";
-export type OutfitStyle = "casual" | "suit" | "hiphop" | "dress";
+export type OutfitStyle =
+  | "casual"
+  | "suit"
+  | "hiphop"
+  | "dress"
+  | "streetwear"
+  | "athletic";
 export type HatKind = "cap" | "beanie" | "halo" | "hood" | "none";
 
 export interface Outfit {
