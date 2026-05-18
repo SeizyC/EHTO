@@ -3,7 +3,7 @@ import type { FeedItem, Member, World } from "@/types/world";
 export const dummyWorld: World = {
   id: "w_001",
   ownerId: "u_001",
-  title: "새벽 음악방",
+  title: "Hallway 1",
   mood: "rainy",
   activeMemberIds: ["m_1", "m_2", "m_3", "m_4", "m_5"],
   socialEnergy: 0.42,
@@ -24,7 +24,8 @@ export const dummyMembers: Member[] = [
     speechStyle: "soft",
     presence: "active",
     activityWeight: 0.7,
-    pos: { x: 0.28, y: 0.45 },
+    tile: { col: 2, row: 3 },
+    outfit: { shirt: "#7a4a2a", pants: "#3a2418", hat: { kind: "beanie", color: "#d09060" } },
   },
   {
     id: "m_2",
@@ -32,11 +33,12 @@ export const dummyMembers: Member[] = [
     name: "404",
     role: "core",
     creature: "glitch_robot",
-    persona: "버그난 말투, 종종 깜빡임",
+    persona: "버그난 말투",
     speechStyle: "glitch",
     presence: "active",
     activityWeight: 0.6,
-    pos: { x: 0.66, y: 0.32 },
+    tile: { col: 5, row: 2 },
+    outfit: { shirt: "#2a4ac8", pants: "#1a1f3a", hat: { kind: "none" } },
   },
   {
     id: "m_3",
@@ -44,11 +46,12 @@ export const dummyMembers: Member[] = [
     name: "lull",
     role: "semi_active",
     creature: "sleepy_blob",
-    persona: "졸린 듯, 한 단어 응답",
+    persona: "졸린 듯",
     speechStyle: "low_energy",
     presence: "idle",
     activityWeight: 0.25,
-    pos: { x: 0.48, y: 0.68 },
+    tile: { col: 4, row: 5 },
+    outfit: { shirt: "#5a7a4a", pants: "#2c3a22" },
   },
   {
     id: "m_4",
@@ -56,11 +59,12 @@ export const dummyMembers: Member[] = [
     name: "veil",
     role: "ghost",
     creature: "floating_ghost",
-    persona: "관찰만 함, 가끔 등장",
+    persona: "관찰자",
     speechStyle: "minimal",
     presence: "lurking",
     activityWeight: 0.1,
-    pos: { x: 0.82, y: 0.78 },
+    tile: { col: 6, row: 6 },
+    outfit: { shirt: "#3a3a4a", pants: "#1a1a26" },
   },
   {
     id: "m_5",
@@ -68,13 +72,22 @@ export const dummyMembers: Member[] = [
     name: "muz",
     role: "core",
     creature: "tiny_monster",
-    persona: "리액션 많고 빠른 박자",
+    persona: "playful",
     speechStyle: "playful",
     presence: "active",
     activityWeight: 0.55,
-    pos: { x: 0.18, y: 0.78 },
+    tile: { col: 1, row: 6 },
+    outfit: { shirt: "#c8385a", pants: "#3a1a26", hat: { kind: "cap", color: "#ffd55a" } },
   },
 ];
+
+export const dummyBubbles: Record<string, string | null> = {
+  m_1: "이 노래 좋네",
+  m_2: "나 아직 안 잠",
+  m_3: null,
+  m_4: null,
+  m_5: null,
+};
 
 export const dummyFeed: FeedItem[] = [
   {
@@ -116,11 +129,3 @@ export const dummyFeed: FeedItem[] = [
     createdAt: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
   },
 ];
-
-export const dummyBubbles: Record<string, string | null> = {
-  m_1: "이 노래 좋네",
-  m_2: "나 아직 안 잠",
-  m_3: null,
-  m_4: null,
-  m_5: null,
-};

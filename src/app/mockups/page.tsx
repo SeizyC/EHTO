@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SpatialRoom } from "@/components/SpatialRoom";
+import { IsoRoom } from "@/components/IsoRoom";
 import { mockupGroups } from "@/data/mockups";
 
 export const metadata = { title: "Mockups · ehto.world" };
@@ -17,6 +17,15 @@ export default function MockupsIndex() {
 
       <Section title="Mood 4종" items={mockupGroups.mood} />
       <Section title="Social state 4종" items={mockupGroups.social} />
+
+      <div className="mt-8 flex gap-3 text-[11px]">
+        <Link href="/signup" className="rounded border border-white/15 px-3 py-2 hover:border-white/40">
+          ← signup
+        </Link>
+        <Link href="/world" className="rounded border border-white/15 px-3 py-2 hover:border-white/40">
+          /world
+        </Link>
+      </div>
     </main>
   );
 }
@@ -38,12 +47,12 @@ function Section({
             href={`/mockups/${s.id}`}
             className="group relative overflow-hidden rounded-md border border-white/10 transition hover:border-white/30"
           >
-            <div className="aspect-square w-full overflow-hidden">
-              <div className="origin-top-left scale-[0.52]" style={{ width: "192%", height: "192%" }}>
-                <SpatialRoom
+            <div className="aspect-[9/11] w-full overflow-hidden">
+              <div className="origin-top-left scale-[0.55]" style={{ width: "182%", height: "182%" }}>
+                <IsoRoom
                   mood={s.mood}
                   members={s.members}
-                  bubbles={s.bubbles}
+                  bubbles={{}}
                   ambient={s.ambient}
                 />
               </div>

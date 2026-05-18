@@ -1,4 +1,4 @@
-import type { FeedItem, Member, Mood } from "@/types/world";
+import type { FeedItem, Member, Mood, Outfit } from "@/types/world";
 
 export interface MockupScenario {
   id: string;
@@ -21,11 +21,22 @@ export interface MockupScenario {
 
 const W = "w_mock";
 
+const OUTFITS: Record<string, Outfit> = {
+  earth: { shirt: "#7a4a2a", pants: "#3a2418", hat: { kind: "beanie", color: "#d09060" } },
+  cyan: { shirt: "#2a4ac8", pants: "#1a1f3a" },
+  green: { shirt: "#5a7a4a", pants: "#2c3a22" },
+  grey: { shirt: "#3a3a4a", pants: "#1a1a26" },
+  pink: { shirt: "#c8385a", pants: "#3a1a26", hat: { kind: "cap", color: "#ffd55a" } },
+  yellow: { shirt: "#d4a83a", pants: "#5a3e15", hat: { kind: "halo" } },
+  purple: { shirt: "#6a3aa8", pants: "#2c1858" },
+};
+
 function m(
   id: string,
   name: string,
   creature: Member["creature"],
-  pos: { x: number; y: number },
+  tile: { col: number; row: number },
+  outfit: Outfit,
   overrides: Partial<Member> = {},
 ): Member {
   return {
@@ -38,7 +49,8 @@ function m(
     speechStyle: "",
     presence: "active",
     activityWeight: 0.5,
-    pos,
+    tile,
+    outfit,
     ...overrides,
   };
 }
@@ -63,67 +75,66 @@ function f(
 // --- Mood scenarios -------------------------------------------------------
 
 const cozyMembers: Member[] = [
-  m("c1", "moss", "cozy_spirit", { x: 0.32, y: 0.5 }),
-  m("c2", "muz", "tiny_monster", { x: 0.45, y: 0.55 }),
-  m("c3", "lull", "sleepy_blob", { x: 0.7, y: 0.65 }, { presence: "idle" }),
-  m("c4", "404", "glitch_robot", { x: 0.6, y: 0.35 }),
+  m("c1", "moss", "cozy_spirit", { col: 2, row: 3 }, OUTFITS.earth),
+  m("c2", "muz", "tiny_monster", { col: 4, row: 4 }, OUTFITS.pink),
+  m("c3", "lull", "sleepy_blob", { col: 5, row: 6 }, OUTFITS.green, { presence: "idle" }),
+  m("c4", "404", "glitch_robot", { col: 6, row: 2 }, OUTFITS.cyan),
 ];
 
 const rainyMembers: Member[] = [
-  m("r1", "moss", "cozy_spirit", { x: 0.28, y: 0.45 }),
-  m("r2", "404", "glitch_robot", { x: 0.66, y: 0.32 }),
-  m("r3", "lull", "sleepy_blob", { x: 0.48, y: 0.68 }, { presence: "idle" }),
-  m("r4", "veil", "floating_ghost", { x: 0.82, y: 0.78 }, { presence: "lurking" }),
-  m("r5", "muz", "tiny_monster", { x: 0.18, y: 0.78 }),
+  m("r1", "moss", "cozy_spirit", { col: 2, row: 3 }, OUTFITS.earth),
+  m("r2", "404", "glitch_robot", { col: 5, row: 2 }, OUTFITS.cyan),
+  m("r3", "lull", "sleepy_blob", { col: 4, row: 5 }, OUTFITS.green, { presence: "idle" }),
+  m("r4", "veil", "floating_ghost", { col: 6, row: 6 }, OUTFITS.grey, { presence: "lurking" }),
+  m("r5", "muz", "tiny_monster", { col: 1, row: 6 }, OUTFITS.pink),
 ];
 
 const chaoticMembers: Member[] = [
-  m("h1", "muz", "tiny_monster", { x: 0.22, y: 0.42 }),
-  m("h2", "404", "glitch_robot", { x: 0.55, y: 0.28 }),
-  m("h3", "moss", "cozy_spirit", { x: 0.78, y: 0.45 }),
-  m("h4", "snap", "tiny_monster", { x: 0.4, y: 0.7 }),
-  m("h5", "lull", "sleepy_blob", { x: 0.7, y: 0.78 }),
-  m("h6", "veil", "floating_ghost", { x: 0.18, y: 0.78 }),
+  m("h1", "muz", "tiny_monster", { col: 2, row: 3 }, OUTFITS.pink),
+  m("h2", "404", "glitch_robot", { col: 5, row: 2 }, OUTFITS.cyan),
+  m("h3", "moss", "cozy_spirit", { col: 6, row: 4 }, OUTFITS.earth),
+  m("h4", "snap", "tiny_monster", { col: 3, row: 5 }, OUTFITS.yellow),
+  m("h5", "lull", "sleepy_blob", { col: 6, row: 6 }, OUTFITS.green),
+  m("h6", "veil", "floating_ghost", { col: 1, row: 6 }, OUTFITS.purple),
 ];
 
 const lonelyMembers: Member[] = [
-  m("l1", "moss", "cozy_spirit", { x: 0.5, y: 0.55 }),
-  m("l2", "veil", "floating_ghost", { x: 0.88, y: 0.85 }, { presence: "lurking" }),
+  m("l1", "moss", "cozy_spirit", { col: 4, row: 4 }, OUTFITS.earth),
+  m("l2", "veil", "floating_ghost", { col: 6, row: 7 }, OUTFITS.grey, { presence: "lurking" }),
 ];
 
 // --- Social state scenarios ----------------------------------------------
 
 const hypeMembers: Member[] = [
-  m("y1", "muz", "tiny_monster", { x: 0.32, y: 0.45 }),
-  m("y2", "404", "glitch_robot", { x: 0.42, y: 0.52 }),
-  m("y3", "snap", "tiny_monster", { x: 0.55, y: 0.45 }),
-  m("y4", "moss", "cozy_spirit", { x: 0.68, y: 0.55 }),
+  m("y1", "muz", "tiny_monster", { col: 3, row: 4 }, OUTFITS.pink),
+  m("y2", "404", "glitch_robot", { col: 4, row: 4 }, OUTFITS.cyan),
+  m("y3", "snap", "tiny_monster", { col: 4, row: 3 }, OUTFITS.yellow),
+  m("y4", "moss", "cozy_spirit", { col: 3, row: 3 }, OUTFITS.earth),
 ];
 
 const awkwardMembers: Member[] = [
-  m("a1", "moss", "cozy_spirit", { x: 0.18, y: 0.4 }),
-  m("a2", "404", "glitch_robot", { x: 0.82, y: 0.42 }),
-  m("a3", "lull", "sleepy_blob", { x: 0.5, y: 0.8 }, { presence: "idle" }),
+  m("a1", "moss", "cozy_spirit", { col: 1, row: 2 }, OUTFITS.earth),
+  m("a2", "404", "glitch_robot", { col: 7, row: 2 }, OUTFITS.cyan),
+  m("a3", "lull", "sleepy_blob", { col: 4, row: 7 }, OUTFITS.green, { presence: "idle" }),
 ];
 
 const lurkingMembers: Member[] = [
-  m("k1", "veil", "floating_ghost", { x: 0.85, y: 0.2 }, { presence: "lurking" }),
-  m("k2", "veil", "floating_ghost", { x: 0.12, y: 0.78 }, { presence: "lurking" }),
-  m("k3", "lull", "sleepy_blob", { x: 0.5, y: 0.5 }, { presence: "idle" }),
+  m("k1", "veil", "floating_ghost", { col: 7, row: 1 }, OUTFITS.grey, { presence: "lurking" }),
+  m("k2", "veil", "floating_ghost", { col: 1, row: 7 }, OUTFITS.grey, { presence: "lurking" }),
+  m("k3", "lull", "sleepy_blob", { col: 4, row: 4 }, OUTFITS.green, { presence: "idle" }),
 ];
 
 const clutterMembers: Member[] = [
-  m("x1", "muz", "tiny_monster", { x: 0.2, y: 0.32 }),
-  m("x2", "snap", "tiny_monster", { x: 0.35, y: 0.62 }),
-  m("x3", "404", "glitch_robot", { x: 0.6, y: 0.3 }),
-  m("x4", "404", "glitch_robot", { x: 0.78, y: 0.6 }),
-  m("x5", "moss", "cozy_spirit", { x: 0.5, y: 0.45 }),
-  m("x6", "veil", "floating_ghost", { x: 0.85, y: 0.85 }, { presence: "lurking" }),
-  m("x7", "lull", "sleepy_blob", { x: 0.15, y: 0.85 }, { presence: "idle" }),
+  m("x1", "muz", "tiny_monster", { col: 2, row: 2 }, OUTFITS.pink),
+  m("x2", "snap", "tiny_monster", { col: 3, row: 5 }, OUTFITS.yellow),
+  m("x3", "404", "glitch_robot", { col: 5, row: 2 }, OUTFITS.cyan),
+  m("x4", "404", "glitch_robot", { col: 6, row: 5 }, OUTFITS.cyan),
+  m("x5", "moss", "cozy_spirit", { col: 4, row: 4 }, OUTFITS.earth),
+  m("x6", "veil", "floating_ghost", { col: 6, row: 7 }, OUTFITS.grey, { presence: "lurking" }),
+  m("x7", "lull", "sleepy_blob", { col: 1, row: 6 }, OUTFITS.green, { presence: "idle" }),
 ];
 
 export const mockups: MockupScenario[] = [
-  // mood 4
   {
     id: "mood-cozy",
     group: "mood",
@@ -198,8 +209,6 @@ export const mockups: MockupScenario[] = [
     ],
     ambient: { void: true },
   },
-
-  // social state 4
   {
     id: "social-hype",
     group: "social",

@@ -24,6 +24,13 @@ export interface World {
   updatedAt: string;
 }
 
+export interface Outfit {
+  shirt: string;
+  pants: string;
+  shoes?: string;
+  hat?: { kind: "cap" | "beanie" | "halo" | "none"; color?: string };
+}
+
 export interface Member {
   id: string;
   worldId: string;
@@ -34,8 +41,10 @@ export interface Member {
   speechStyle: string;
   presence: Presence;
   activityWeight: number; // 0..1
-  // spatial — relative position inside room (0..1 each)
-  pos: { x: number; y: number };
+  // tile coords on isometric floor — (col, row), origin top-left of grid
+  tile: { col: number; row: number };
+  outfit: Outfit;
+  facing?: "sw" | "se" | "nw" | "ne";
 }
 
 export type FeedItemType =
