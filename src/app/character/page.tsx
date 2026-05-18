@@ -2,25 +2,26 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { Character } from "@/components/Character";
+import { Character, CreatureFace } from "@/components/Character";
+import { Pedestal } from "@/components/Pedestal";
 import { useProfile } from "@/lib/profileStore";
 import type { CreatureKind, Outfit } from "@/types/world";
 
-const CREATURES: { kind: CreatureKind; label: string; hint: string }[] = [
-  { kind: "cozy_spirit", label: "spirit", hint: "느린 온기" },
-  { kind: "glitch_robot", label: "glitch", hint: "깜빡이는 신호" },
-  { kind: "floating_ghost", label: "ghost", hint: "조용한 관찰" },
-  { kind: "sleepy_blob", label: "blob", hint: "낮은 에너지" },
-  { kind: "tiny_monster", label: "monster", hint: "리액션 많음" },
+const CREATURES: { kind: CreatureKind; label: string }[] = [
+  { kind: "cozy_spirit", label: "spirit" },
+  { kind: "glitch_robot", label: "glitch" },
+  { kind: "floating_ghost", label: "ghost" },
+  { kind: "sleepy_blob", label: "blob" },
+  { kind: "tiny_monster", label: "monster" },
 ];
 
 const SHIRTS = ["#2a4ac8", "#c8385a", "#7a4a2a", "#5a7a4a", "#6a3aa8", "#d4a83a", "#3a3a4a"];
 const PANTS = ["#1a1f3a", "#3a1a26", "#3a2418", "#2c3a22", "#2c1858", "#5a3e15", "#1a1a26"];
-const HATS: Outfit["hat"][] = [
-  { kind: "none" },
-  { kind: "cap", color: "#ffd55a" },
-  { kind: "beanie", color: "#d09060" },
-  { kind: "halo" },
+const HATS: { hat: Outfit["hat"]; label: string }[] = [
+  { hat: { kind: "none" }, label: "없음" },
+  { hat: { kind: "cap", color: "#d4385a" }, label: "cap" },
+  { hat: { kind: "beanie", color: "#3a3a4a" }, label: "beanie" },
+  { hat: { kind: "halo" }, label: "halo" },
 ];
 
 export default function CharacterPage() {
@@ -36,7 +37,6 @@ export default function CharacterPage() {
   const [pants, setPants] = useState(profile?.outfit.pants ?? PANTS[0]);
   const [hat, setHat] = useState<Outfit["hat"]>(profile?.outfit.hat ?? { kind: "none" });
 
-  // hydrate from store once on mount
   useEffect(() => {
     if (profile) {
       setKind(profile.creature);
@@ -49,102 +49,116 @@ export default function CharacterPage() {
   const outfit: Outfit = useMemo(() => ({ shirt, pants, hat }), [shirt, pants, hat]);
 
   if (hydrated && !profile) {
-    // came here without signup — redirect
     router.replace("/signup");
     return null;
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-[420px] flex-col bg-black text-white/85">
-      <header className="px-5 pt-6 pb-3">
-        <p className="text-[10px] tracking-[0.3em] text-white/35 uppercase">Step 2 / 3</p>
-        <h1 className="mt-1 text-lg">너의 모습을 정해</h1>
-        <p className="mt-1 text-[11px] text-white/40">사람 얼굴은 없어. 너는 이 세계 속 존재야.</p>
+    <main
+      className="mx-auto flex min-h-dvh max-w-[420px] flex-col text-white"
+      style={{
+        background:
+          "linear-gradient(180deg, #ff8a3d 0%, #d96528 38%, #1f1108 56%, #0a0506 100%)",
+      }}
+    >
+      {/* header */}
+      <header className="px-5 pt-6 pb-3 text-center">
+        <p className="text-[10px] tracking-[0.35em] text-white/75 uppercase">Step 2 / 3</p>
+        <h1 className="mt-2 text-[20px] font-semibold drop-shadow-md">
+          당신의 모습을 선택하세요
+        </h1>
       </header>
 
-      {/* preview */}
-      <div className="relative mx-5 my-3 flex h-52 items-end justify-center overflow-hidden rounded-md border border-white/10 bg-gradient-to-b from-slate-900 to-black">
-        <div
-          className="absolute inset-x-0 bottom-0 h-16"
-          style={{
-            background:
-              "linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.05) 50%, rgba(0,0,0,0.6) 100%)",
-          }}
-        />
-        <div className="relative pb-4">
-          <Character kind={kind} presence="active" outfit={outfit} size={5} ringColor="#7dd3fc" />
+      {/* preview stage — fixed height, character on pedestal */}
+      <div className="relative mx-auto flex h-[280px] w-full items-end justify-center">
+        <div className="absolute left-1/2 -translate-x-1/2" style={{ bottom: 38 }}>
+          <Character kind={kind} presence="active" outfit={outfit} size={5} />
+        </div>
+        <div className="absolute left-1/2 -translate-x-1/2" style={{ bottom: 4 }}>
+          <Pedestal width={180} />
         </div>
       </div>
 
-      <section className="px-5 mt-1">
-        <h2 className="mb-2 text-[10px] tracking-[0.3em] text-white/40 uppercase">얼굴</h2>
-        <div className="grid grid-cols-5 gap-2">
-          {CREATURES.map((c) => {
-            const active = c.kind === kind;
-            return (
-              <button
-                key={c.kind}
-                onClick={() => setKind(c.kind)}
-                className={
-                  "flex flex-col items-center gap-1 rounded border px-1 py-2 text-[10px] " +
-                  (active
-                    ? "border-sky-300 bg-sky-300/10 text-white"
-                    : "border-white/10 text-white/55 hover:border-white/30")
-                }
-              >
-                <div className="h-10 w-10 flex items-end justify-center">
-                  <Character kind={c.kind} presence="active" outfit={outfit} size={2} />
-                </div>
-                <span>{c.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+      {/* bottom control card */}
+      <div className="rounded-t-2xl bg-black/65 px-5 pt-5 pb-6 backdrop-blur-sm">
+        <Section label="얼굴">
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+            {CREATURES.map((c) => {
+              const active = c.kind === kind;
+              return (
+                <button
+                  key={c.kind}
+                  type="button"
+                  onClick={() => setKind(c.kind)}
+                  className={
+                    "flex h-[78px] w-[64px] shrink-0 flex-col items-center justify-between rounded-md border px-1 py-1.5 text-[10px] transition " +
+                    (active
+                      ? "border-sky-300 bg-sky-300/15 text-white"
+                      : "border-white/15 bg-white/5 text-white/65 hover:border-white/35")
+                  }
+                >
+                  <div className="grid h-12 w-12 place-items-center">
+                    <CreatureFace kind={c.kind} size={3} />
+                  </div>
+                  <span className="leading-none">{c.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </Section>
 
-      <section className="px-5 mt-5">
-        <h2 className="mb-2 text-[10px] tracking-[0.3em] text-white/40 uppercase">상의</h2>
-        <Swatch values={SHIRTS} value={shirt} onChange={setShirt} />
-      </section>
+        <Section label="상의">
+          <Swatch values={SHIRTS} value={shirt} onChange={setShirt} />
+        </Section>
 
-      <section className="px-5 mt-4">
-        <h2 className="mb-2 text-[10px] tracking-[0.3em] text-white/40 uppercase">하의</h2>
-        <Swatch values={PANTS} value={pants} onChange={setPants} />
-      </section>
+        <Section label="하의">
+          <Swatch values={PANTS} value={pants} onChange={setPants} />
+        </Section>
 
-      <section className="px-5 mt-4">
-        <h2 className="mb-2 text-[10px] tracking-[0.3em] text-white/40 uppercase">머리 위</h2>
-        <div className="flex gap-2">
-          {HATS.map((h, i) => {
-            const active = JSON.stringify(h) === JSON.stringify(hat);
-            return (
-              <button
-                key={i}
-                onClick={() => setHat(h)}
-                className={
-                  "rounded border px-3 py-2 text-[11px] " +
-                  (active ? "border-sky-300 bg-sky-300/10" : "border-white/10 text-white/55")
-                }
-              >
-                {h?.kind === "none" ? "없음" : h?.kind}
-              </button>
-            );
-          })}
-        </div>
-      </section>
+        <Section label="머리 위">
+          <div className="grid grid-cols-4 gap-2">
+            {HATS.map((h, i) => {
+              const active = JSON.stringify(h.hat) === JSON.stringify(hat);
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setHat(h.hat)}
+                  className={
+                    "rounded-md border py-2 text-[11px] transition " +
+                    (active
+                      ? "border-sky-300 bg-sky-300/15 text-white"
+                      : "border-white/15 bg-white/5 text-white/65 hover:border-white/35")
+                  }
+                >
+                  {h.label}
+                </button>
+              );
+            })}
+          </div>
+        </Section>
 
-      <div className="px-5 mt-auto pb-8 pt-8">
         <button
+          type="button"
           onClick={() => {
             patch({ creature: kind, outfit });
             router.push("/world");
           }}
-          className="w-full border border-white/20 bg-white/5 py-3 text-[13px] tracking-widest text-white/90 hover:bg-white/10"
+          className="mt-6 w-full rounded-md bg-emerald-500 py-3 text-[14px] font-medium tracking-wider text-white shadow-lg shadow-emerald-900/40 transition hover:bg-emerald-400"
         >
           내 세상으로 →
         </button>
       </div>
     </main>
+  );
+}
+
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <section className="mb-4">
+      <h2 className="mb-2 text-[10px] tracking-[0.3em] text-white/55 uppercase">{label}</h2>
+      {children}
+    </section>
   );
 }
 
@@ -158,16 +172,17 @@ function Swatch({
   onChange: (v: string) => void;
 }) {
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-2">
       {values.map((v) => {
         const active = v === value;
         return (
           <button
             key={v}
+            type="button"
             onClick={() => onChange(v)}
             className={
-              "h-7 w-7 rounded-sm border-2 " +
-              (active ? "border-white" : "border-white/15 hover:border-white/40")
+              "h-8 w-8 rounded-md border-2 transition " +
+              (active ? "border-white scale-110 shadow-md" : "border-white/15 hover:border-white/50")
             }
             style={{ background: v }}
             aria-label={v}
