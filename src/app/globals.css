@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  background: #0a0a0f;
+  color: #e9e9f0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  image-rendering: pixelated;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* pixel grid feel */
+.pixelated {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* ambient room vignette */
+.room-vignette {
+  background:
+    radial-gradient(120% 80% at 50% 40%, transparent 0%, rgba(0, 0, 0, 0.45) 70%, rgba(0, 0, 0, 0.85) 100%);
+}
