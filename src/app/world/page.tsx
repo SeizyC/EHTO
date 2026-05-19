@@ -59,7 +59,7 @@ export default function WorldPage() {
         </div>
       </div>
       <RoomChatInput
-        kind={profile?.creature ?? "cozy_spirit"}
+        kind={profile?.creature ?? "cheerful"}
         outfit={profile?.outfit ?? { shirt: "#2a4ac8", pants: "#1a1f3a" }}
       />
       <BottomTabs active="explore" />

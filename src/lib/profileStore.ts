@@ -39,7 +39,7 @@ export const DEFAULT_OUTFIT: Outfit = {
   style: "casual",
   shirt: "#2a4ac8",
   pants: "#1a1f3a",
-  hair: "#1f1814",
+  hair: "#2a1810",
   accent: "#c8385a",
   hat: { kind: "none" },
 };

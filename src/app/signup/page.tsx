@@ -30,7 +30,7 @@ export default function SignupPage() {
           setProfile({
             email: email.trim(),
             handle: handle.trim(),
-            creature: "cozy_spirit",
+            creature: "cheerful",
             outfit: DEFAULT_OUTFIT,
             createdAt: new Date().toISOString(),
           });

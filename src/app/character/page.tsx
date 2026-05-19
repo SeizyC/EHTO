@@ -13,11 +13,14 @@ import type {
 } from "@/types/world";
 
 const CREATURES: { kind: CreatureKind; label: string }[] = [
-  { kind: "cozy_spirit", label: "spirit" },
-  { kind: "glitch_robot", label: "glitch" },
-  { kind: "floating_ghost", label: "ghost" },
-  { kind: "sleepy_blob", label: "blob" },
-  { kind: "tiny_monster", label: "monster" },
+  { kind: "cheerful", label: "cheerful" },
+  { kind: "cool", label: "cool" },
+  { kind: "shy", label: "shy" },
+  { kind: "sleepy", label: "sleepy" },
+  { kind: "geek", label: "geek" },
+  { kind: "playful", label: "playful" },
+  { kind: "soft", label: "soft" },
+  { kind: "mysterious", label: "mystery" },
 ];
 
 const BODY_TYPES: { value: BodyType; label: string }[] = [
@@ -53,7 +56,7 @@ export default function CharacterPage() {
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
 
-  const [kind, setKind] = useState<CreatureKind>(profile?.creature ?? "cozy_spirit");
+  const [kind, setKind] = useState<CreatureKind>(profile?.creature ?? "cheerful");
   const [bodyType, setBodyType] = useState<BodyType>(profile?.outfit.bodyType ?? "masc");
   const [style, setStyle] = useState<OutfitStyle>(profile?.outfit.style ?? "casual");
   const [shirt, setShirt] = useState(profile?.outfit.shirt ?? SHIRTS[0]);

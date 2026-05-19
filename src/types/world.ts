@@ -2,15 +2,20 @@ export type Mood = "cozy" | "rainy" | "chaotic" | "lonely";
 
 export type MemberRole = "core" | "semi_active" | "ghost";
 
+export type SkinTone = "porcelain" | "fair" | "warm" | "tan" | "deep";
+export type EyeShape = "round" | "narrow" | "wide" | "closed";
+export type MouthShape = "smile" | "neutral" | "smirk" | "pout";
+
+// Kept name for back-compat; now represents a *face style preset* (human).
 export type CreatureKind =
-  | "cozy_spirit"
-  | "glitch_robot"
-  | "floating_ghost"
-  | "sleepy_blob"
-  | "tiny_monster"
-  | "shy_bunny"
-  | "pixie_cat"
-  | "mochi_blob";
+  | "cheerful"
+  | "cool"
+  | "shy"
+  | "sleepy"
+  | "geek"
+  | "playful"
+  | "soft"
+  | "mysterious";
 
 export type Presence = "active" | "lurking" | "idle" | "away";
 
