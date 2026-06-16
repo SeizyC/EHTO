@@ -1,6 +1,7 @@
 "use client";
 
 import { useEnergy } from "@/lib/members-store";
+import { useTickets, spendTicket } from "@/lib/tickets-store";
 
 // Gamified daily life-energy meter for the /world top bar (spec §6.1).
 // A small segmented pip bar that depletes as ambient "moments" are spent.
@@ -12,6 +13,7 @@ const SEGMENTS = 10;
 
 export function EnergyMeter() {
   const e = useEnergy();
+  const { balances } = useTickets();
   if (!e) return null; // nothing fetched yet — render nothing (no layout jump)
 
   const ratio = e.cap > 0 ? e.remaining / e.cap : 0;
@@ -22,9 +24,19 @@ export function EnergyMeter() {
   return (
     <button
       type="button"
-      onClick={() => {
-        // Rest note — full Plus sheet lands in a later increment.
-        alert("오늘은 여기까지. 자정에 다시 이어져요.");
+      onClick={async () => {
+        if (!empty) return;
+        // Resting: if the owner holds a "이어서 보기" ticket, offer to spend
+        // it to wake the plaza now; otherwise the calm rest note.
+        const refills = balances?.refill ?? 0;
+        if (refills > 0) {
+          if (window.confirm(`이어서 보기 한 장 쓸까요? (남은 ${refills}장)`)) {
+            const err = await spendTicket("refill");
+            if (err) alert(err);
+          }
+        } else {
+          alert("오늘은 여기까지. 자정에 다시 이어져요.");
+        }
       }}
       aria-label={`오늘 남은 분량 ${e.remaining}/${e.cap}`}
       title={empty ? `오늘은 여기까지 · 약 ${hours}시간 후 다시` : `${e.remaining} / ${e.cap}`}
