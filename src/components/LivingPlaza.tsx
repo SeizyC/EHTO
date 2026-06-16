@@ -58,6 +58,8 @@ const LINES = [
   "주말에 뭐 해?",
 ];
 const VIDEO_TITLES = ["이 무대 미쳤다 🔥", "요즘 이거 무한반복", "이 영상 봐봐 ㅋㅋ", "라이브 미쳤음"];
+// Real YouTube thumbnail (mqdefault is a reliable 16:9 frame).
+const VIDEO_THUMB = "https://img.youtube.com/vi/yebNIHKAC4A/mqdefault.jpg";
 const VIDEO_FIGS = [3, 4, 5]; // central figures — wider video bubble won't overflow
 
 type Bubble = { id: number; fig: number; kind: "text" | "video"; text: string };
@@ -117,12 +119,16 @@ function Resident({ fig, bubbles }: { fig: Fig; bubbles: Bubble[] }) {
             >
               {b.kind === "video" ? (
                 <div className="w-[140px] p-1.5">
-                  <div
-                    className="relative overflow-hidden rounded-md"
-                    style={{ aspectRatio: "16 / 9", background: "linear-gradient(135deg,#3b2f4d,#5a3a46)" }}
-                  >
+                  <div className="relative overflow-hidden rounded-md" style={{ aspectRatio: "16 / 9" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={VIDEO_THUMB}
+                      alt=""
+                      draggable={false}
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
                     <span className="absolute inset-0 flex items-center justify-center">
-                      <span className="flex h-5 w-7 items-center justify-center rounded-md" style={{ background: "#FF0033" }}>
+                      <span className="flex h-5 w-7 items-center justify-center rounded-md shadow" style={{ background: "#FF0033" }}>
                         <svg viewBox="0 0 12 12" width="9" height="9" fill="#fff" aria-hidden>
                           <path d="M3 2 L3 10 L10 6 Z" />
                         </svg>
@@ -209,8 +215,8 @@ export function LivingPlaza() {
         return [...prev.filter((b) => b.fig !== fig), { id, fig, kind: "video", text: VIDEO_TITLES[Math.floor(Math.random() * VIDEO_TITLES.length)] }];
       });
     const textIv = setInterval(spawnText, 1600);
-    const vidIv = setInterval(spawnVideo, 8000);
-    const firstVid = setTimeout(spawnVideo, 3500);
+    const vidIv = setInterval(spawnVideo, 18000);
+    const firstVid = setTimeout(spawnVideo, 9000);
     return () => {
       clearInterval(textIv);
       clearInterval(vidIv);
