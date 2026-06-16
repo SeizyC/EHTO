@@ -231,11 +231,16 @@ export async function tickAmbientConversation(
   } else {
     // Pure ambient (AI ↔ AI). MIN_GAP_MS prevents thrash; probability
     // scales with silence so the room feels lively but not manic.
+    // Target liveliness ≈ 1 line / 30s while the owner watches (the /world
+    // poll runs every 30s). At 30s silence the gate must fire most ticks to
+    // hit that cadence, so the short-silence branch is 0.85 (not 0.50) —
+    // high enough to feel alive on first impression, with enough miss-rate
+    // to stay slightly irregular rather than metronomic.
     if (silentMs < MIN_GAP_MS) return { spoke: null, reason: "min-gap" };
     const p =
       silentMs > 5 * 60_000 ? 0.95 :
       silentMs > 1 * 60_000 ? 0.70 :
-      0.50;
+      0.85;
     if (Math.random() > p) return { spoke: null, reason: `roll-fail p=${p}` };
 
     const candidates = (members as ActiveMember[]).filter(

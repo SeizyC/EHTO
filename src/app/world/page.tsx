@@ -191,14 +191,15 @@ export default function WorldPage() {
   // narrower purposes:
   //   1. boot fetch — get the initial roster + transcript, and learn the
   //      worldId so the realtime channels can bind.
-  //   2. safety poll — every 60s + on tab re-visibility, re-fetch in case
-  //      we missed a websocket event (sleep/wake, network blip). 60s also
-  //      keeps the server-side ambient tick warm in case nobody sends
-  //      anything for a while (the tick is gated to a no-op when silent).
+  //   2. poll — every 30s + on tab re-visibility, re-fetch in case we missed
+  //      a websocket event (sleep/wake, network blip). 30s is also the
+  //      ambient-tick cadence: paired with the engine's short-silence gate
+  //      it targets ~1 ambient line / 30s so the room reads as alive on
+  //      first impression (the tick is a cheap no-op when gated/exhausted).
   useEffect(() => {
     const tick = () => { refreshMembers(); refreshChat(); refreshPlazaObjects(); };
     tick();
-    const id = window.setInterval(tick, 60_000);
+    const id = window.setInterval(tick, 30_000);
     const onVis = () => { if (document.visibilityState === "visible") tick(); };
     document.addEventListener("visibilitychange", onVis);
     return () => {

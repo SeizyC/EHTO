@@ -15,7 +15,10 @@ export type EnergyKind = "moment" | "interject";
 
 // Starting hypotheses (spec §6). "plus" is a large finite number rather than
 // Infinity so it serializes as JSON and compares with plain `<`.
-export const MOMENT_CAP: Record<Plan, number> = { free: 80, plus: 100_000 };
+// free 120 ≈ 60 min/day of viewing at the ~30s/line ambient cadence
+// (120 lines × 30s = 3600s). Tuned with the engine's short-silence gate
+// in ambient-loop.ts — change them together.
+export const MOMENT_CAP: Record<Plan, number> = { free: 120, plus: 100_000 };
 export const INTERJECT_CAP: Record<Plan, number> = { free: 15, plus: 100_000 };
 
 export function planCap(plan: Plan, kind: EnergyKind): number {

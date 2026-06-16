@@ -27,11 +27,14 @@ assert.equal(remaining(90, 80), 0);
 const ms = msUntilKstMidnight(Date.parse("2026-06-14T00:00:00Z")); // 09:00 KST → 15h left
 assert.equal(ms, 15 * 3600_000);
 
-// energyView math
-const v = energyView("free", 80, Date.parse("2026-06-14T00:00:00Z"));
+// energyView math — cap-agnostic: spending the whole cap leaves 0.
+const v = energyView("free", MOMENT_CAP.free, Date.parse("2026-06-14T00:00:00Z"));
 assert.deepEqual(
   { plan: v.plan, used: v.used, cap: v.cap, remaining: v.remaining },
-  { plan: "free", used: 80, cap: MOMENT_CAP.free, remaining: 0 },
+  { plan: "free", used: MOMENT_CAP.free, cap: MOMENT_CAP.free, remaining: 0 },
 );
+// partial spend leaves the difference.
+const v2 = energyView("free", 80, Date.parse("2026-06-14T00:00:00Z"));
+assert.equal(v2.remaining, MOMENT_CAP.free - 80);
 
 console.log("energy: all assertions passed");
