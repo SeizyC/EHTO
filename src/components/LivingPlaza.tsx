@@ -3,18 +3,20 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
-// Landing hero: a plaza "window" that is already alive when you arrive.
-// Natural aspect (no cover-zoom), bright. Residents wander the floor (stroll
-// to random spots, flipping to face their heading) with an idle bob; a dog
-// hangs out; sample text bubbles + the occasional YouTube-share bubble
-// surface and fade; a music-share card sits bottom-right like in /world.
-// Time-of-day art follows the visitor's local hour.
+// Landing hero: a layered, living plaza. The floor is an empty tiled
+// background; the fountain / trees / benches / lamp are separate sprites,
+// and residents roam between them. Everything (objects, residents, dog) is
+// painted in feet-depth order (further back = drawn first) so residents pass
+// IN FRONT of nearer objects and get OCCLUDED behind further ones (e.g. the
+// fountain) — no more tunnelling through painted-in furniture.
+// Time-of-day floor follows the visitor's local hour.
 
+const ROOM = "/sprites/rooms";
 const SCENES = {
-  morning: "/sprites/rooms/plaza_morning.png",
-  afternoon: "/sprites/rooms/plaza_afternoon.png",
-  evening: "/sprites/rooms/plaza_evening.png",
-  night: "/sprites/rooms/plaza_night.png",
+  morning: `${ROOM}/states/empty_morning.png`,
+  afternoon: `${ROOM}/states/empty_afternoon.png`,
+  evening: `${ROOM}/states/empty_evening.png`,
+  night: `${ROOM}/states/empty_night.png`,
 } as const;
 type Scene = keyof typeof SCENES;
 
@@ -25,31 +27,31 @@ function sceneForHour(h: number): Scene {
   return "night";
 }
 
-type Fig = {
-  src: string;
-  y: number; // bottom %, the floor line
-  h: number; // height % of the stage
-  dur: number; // idle-bob period
-  start: number;
-  min: number;
-  max: number; // roam band (left %)
-};
-// Listed back-to-front (DOM order = z-order). Lanes are separated so
-// same-row residents never share an x (no body overlap). The far-back pair
-// strolls the rear walkway behind the fountain; their lanes skip the centre
-// (the fountain's x ≈ 44–56) so they never clip it. Front-center may pass in
-// front of the mids — natural depth since it renders last (on top).
-const FIGURES: Fig[] = [
-  { src: "/sprites/hero/test_01.png", y: 41, h: 9, dur: 3.0, start: 28, min: 16, max: 42 }, // far-back (behind fountain)
-  { src: "/sprites/hero/test_02.png", y: 20, h: 13, dur: 2.6, start: 18, min: 12, max: 28 }, // back-left
-  { src: "/sprites/hero/test_04.png", y: 19, h: 14, dur: 2.9, start: 80, min: 72, max: 90 }, // back-right
-  { src: "/sprites/hero/test_01.png", y: 11, h: 17, dur: 2.3, start: 36, min: 30, max: 46 }, // mid-left
-  { src: "/sprites/hero/test_05.png", y: 10, h: 18, dur: 2.7, start: 62, min: 54, max: 70 }, // mid-right
-  { src: "/sprites/hero/test_03.png", y: 5, h: 21, dur: 2.4, start: 49, min: 40, max: 60 }, // front-center
+// Static plaza furniture. x = centre %, y = feet bottom %, h = height % of
+// the stage. (Used for both placement and the depth sort.)
+type Obj = { key: string; src: string; x: number; y: number; h: number; flip?: boolean };
+const OBJECTS: Obj[] = [
+  { key: "tree-l", src: `${ROOM}/objects/tree.png`, x: 14, y: 52, h: 27 },
+  { key: "tree-r", src: `${ROOM}/objects/tree.png`, x: 87, y: 50, h: 27, flip: true },
+  { key: "lamp", src: `${ROOM}/objects/lamp.png`, x: 72, y: 45, h: 26 },
+  { key: "fountain", src: `${ROOM}/objects/fountain.png`, x: 50, y: 31, h: 28 },
+  { key: "bench-l", src: `${ROOM}/objects/bench.png`, x: 13, y: 13, h: 13 },
+  { key: "bench-r", src: `${ROOM}/objects/bench.png`, x: 88, y: 12, h: 13, flip: true },
 ];
 
-// Dog rests in the front-left corner, clear of every resident's lane.
-const DOG = { src: "/sprites/rooms/objects/dog_maltese_wagging.png", x: 9, y: 2, h: 8 };
+const DOG = { src: `${ROOM}/objects/dog_maltese_wagging.png`, x: 9, y: 2, h: 8 };
+
+type Fig = { src: string; y: number; h: number; dur: number; start: number; min: number; max: number };
+// Listed in any order; depth sort handles z. Lanes mostly avoid object
+// footprints, but the depth sort makes any crossing read correctly anyway.
+const FIGURES: Fig[] = [
+  { src: "/sprites/hero/test_01.png", y: 42, h: 9, dur: 3.0, start: 30, min: 20, max: 44 }, // far-back (passes behind fountain)
+  { src: "/sprites/hero/test_02.png", y: 24, h: 12, dur: 2.6, start: 22, min: 14, max: 32 }, // back-left
+  { src: "/sprites/hero/test_04.png", y: 23, h: 13, dur: 2.9, start: 80, min: 70, max: 90 }, // back-right
+  { src: "/sprites/hero/test_01.png", y: 13, h: 16, dur: 2.3, start: 38, min: 30, max: 46 }, // mid-left
+  { src: "/sprites/hero/test_05.png", y: 12, h: 17, dur: 2.7, start: 62, min: 54, max: 70 }, // mid-right
+  { src: "/sprites/hero/test_03.png", y: 5, h: 20, dur: 2.4, start: 50, min: 40, max: 60 }, // front
+];
 
 const LINES = [
   "오늘 비 올 것 같지 않아?",
@@ -64,11 +66,27 @@ const LINES = [
   "주말에 뭐 해?",
 ];
 const VIDEO_TITLES = ["이 무대 미쳤다 🔥", "요즘 이거 무한반복", "이 영상 봐봐 ㅋㅋ", "라이브 미쳤음"];
-// central figures (mid-left, mid-right, front) — a wider video bubble on
-// these won't overflow the plaza edges
-const VIDEO_FIGS = [3, 4, 5];
+const VIDEO_FIGS = [3, 4, 5]; // mid-left, mid-right, front
 
 type Bubble = { id: number; fig: number; kind: "text" | "video"; text: string };
+
+function PlazaObject({ o }: { o: Obj }) {
+  return (
+    <div
+      className="absolute"
+      style={{ left: `${o.x}%`, bottom: `${o.y}%`, height: `${o.h}%`, transform: "translateX(-50%)" }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={o.src}
+        alt=""
+        draggable={false}
+        className="pixelated h-full w-auto object-contain object-bottom drop-shadow-[0_4px_7px_rgba(0,0,0,0.3)]"
+        style={o.flip ? { transform: "scaleX(-1)" } : undefined}
+      />
+    </div>
+  );
+}
 
 function Resident({ fig, bubbles }: { fig: Fig; bubbles: Bubble[] }) {
   const [x, setX] = useState(fig.start);
@@ -81,12 +99,11 @@ function Resident({ fig, bubbles }: { fig: Fig; bubbles: Bubble[] }) {
     const step = () => {
       const cur = xRef.current;
       const target = fig.min + Math.random() * (fig.max - fig.min);
-      const t = Math.max(2.5, Math.abs(target - cur) * 0.3); // gentle stroll
+      const t = Math.max(2.5, Math.abs(target - cur) * 0.3);
       setFacing(target >= cur ? 1 : -1);
       setTravel(t);
       setX(target);
       xRef.current = target;
-      // long, varied rest between strolls so the plaza feels calm, not busy
       timer = window.setTimeout(step, t * 1000 + 4500 + Math.random() * 6000);
     };
     timer = window.setTimeout(step, 800 + Math.random() * 3500);
@@ -96,8 +113,6 @@ function Resident({ fig, bubbles }: { fig: Fig; bubbles: Bubble[] }) {
   return (
     <motion.div
       className="absolute"
-      // x:"-50%" centers via framer's transform (a raw `transform` string
-      // would be overwritten by framer once it manages this element).
       style={{ bottom: `${fig.y}%`, height: `${fig.h}%`, x: "-50%" }}
       initial={false}
       animate={{ left: `${x}%` }}
@@ -133,10 +148,7 @@ function Resident({ fig, bubbles }: { fig: Fig; bubbles: Bubble[] }) {
                     style={{ aspectRatio: "16 / 9", background: "linear-gradient(135deg,#3b2f4d,#5a3a46)" }}
                   >
                     <span className="absolute inset-0 flex items-center justify-center">
-                      <span
-                        className="flex h-5 w-7 items-center justify-center rounded-md"
-                        style={{ background: "#FF0033" }}
-                      >
+                      <span className="flex h-5 w-7 items-center justify-center rounded-md" style={{ background: "#FF0033" }}>
                         <svg viewBox="0 0 12 12" width="9" height="9" fill="#fff" aria-hidden>
                           <path d="M3 2 L3 10 L10 6 Z" />
                         </svg>
@@ -156,23 +168,35 @@ function Resident({ fig, bubbles }: { fig: Fig; bubbles: Bubble[] }) {
   );
 }
 
+function Dog() {
+  return (
+    <motion.div
+      className="absolute"
+      style={{ left: `${DOG.x}%`, bottom: `${DOG.y}%`, height: `${DOG.h}%`, x: "-50%" }}
+      animate={{ y: [0, -2, 0] }}
+      transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={DOG.src}
+        alt=""
+        draggable={false}
+        className="pixelated h-full w-auto object-contain object-bottom drop-shadow-[0_2px_5px_rgba(0,0,0,0.35)]"
+      />
+    </motion.div>
+  );
+}
+
 function MusicCard() {
   return (
     <div className="pointer-events-none absolute bottom-3 right-3 z-20">
-      <div
-        className="border-line overflow-hidden rounded-2xl border shadow-md"
-        style={{ background: "#141014", maxWidth: 230 }}
-      >
+      <div className="border-line overflow-hidden rounded-2xl border shadow-md" style={{ background: "#141014", maxWidth: 230 }}>
         <div className="flex items-center gap-2 px-2.5 py-1.5">
           <span aria-hidden style={{ color: "#E8C067" }} className="text-[12px] leading-none">♪</span>
           <span className="text-ink shrink-0 text-[11px] font-medium leading-none">하루</span>
           <span className="text-dim text-[10px] leading-none">·</span>
           <span className="text-sub truncate text-[11px] leading-none">밤 산책하기 좋은 곡</span>
-          <span
-            className="ml-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
-            style={{ background: "#1DB954" }}
-            aria-hidden
-          >
+          <span className="ml-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full" style={{ background: "#1DB954" }} aria-hidden>
             <svg viewBox="0 0 12 12" width="9" height="9" fill="#0a0a0a">
               <path d="M2.5 1.5 L2.5 10.5 L10 6 Z" />
             </svg>
@@ -193,8 +217,6 @@ export function LivingPlaza() {
   useEffect(() => {
     let seq = 0;
     const allFigs = FIGURES.map((_, i) => i);
-
-    // Text bubbles are capped (≤3) and only fill figures that are free.
     const spawnText = () =>
       setBubbles((prev) => {
         if (prev.length >= 3) return prev;
@@ -205,9 +227,6 @@ export function LivingPlaza() {
         window.setTimeout(() => setBubbles((p) => p.filter((b) => b.id !== id)), 3200);
         return [...prev, { id, fig, kind: "text", text: LINES[Math.floor(Math.random() * LINES.length)] }];
       });
-
-    // Video share is guaranteed: it ignores the text cap and evicts whatever
-    // bubble is on its chosen figure, so it always surfaces.
     const spawnVideo = () =>
       setBubbles((prev) => {
         const fig = VIDEO_FIGS[Math.floor(Math.random() * VIDEO_FIGS.length)];
@@ -215,7 +234,6 @@ export function LivingPlaza() {
         window.setTimeout(() => setBubbles((p) => p.filter((b) => b.id !== id)), 5200);
         return [...prev.filter((b) => b.fig !== fig), { id, fig, kind: "video", text: VIDEO_TITLES[Math.floor(Math.random() * VIDEO_TITLES.length)] }];
       });
-
     const textIv = setInterval(spawnText, 1600);
     const vidIv = setInterval(spawnVideo, 8000);
     const firstVid = setTimeout(spawnVideo, 3500);
@@ -226,40 +244,26 @@ export function LivingPlaza() {
     };
   }, []);
 
+  // Depth order: larger feet-bottom% = further away = painted first (behind).
+  const entities = [
+    ...OBJECTS.map((o) => ({ key: o.key, y: o.y, el: <PlazaObject key={o.key} o={o} /> })),
+    ...FIGURES.map((f, i) => ({
+      key: `fig-${i}`,
+      y: f.y,
+      el: <Resident key={`fig-${i}`} fig={f} bubbles={bubbles.filter((b) => b.fig === i)} />,
+    })),
+    { key: "dog", y: DOG.y, el: <Dog key="dog" /> },
+  ].sort((a, b) => b.y - a.y);
+
   return (
     <div className="relative mx-auto w-full max-w-[680px]">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={SCENES[scene]}
-        alt=""
-        className="pixelated block h-auto w-full"
-        draggable={false}
-      />
+      <img src={SCENES[scene]} alt="" className="pixelated block h-auto w-full" draggable={false} />
 
-      {/* Dog — placed on the floor with a gentle idle */}
-      <motion.div
-        className="absolute"
-        style={{ left: `${DOG.x}%`, bottom: `${DOG.y}%`, height: `${DOG.h}%`, x: "-50%" }}
-        animate={{ y: [0, -2, 0] }}
-        transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={DOG.src}
-          alt=""
-          draggable={false}
-          className="pixelated h-full w-auto object-contain object-bottom drop-shadow-[0_2px_5px_rgba(0,0,0,0.35)]"
-        />
-      </motion.div>
-
-      {FIGURES.map((f, i) => (
-        <Resident key={i} fig={f} bubbles={bubbles.filter((b) => b.fig === i)} />
-      ))}
+      {entities.map((e) => e.el)}
 
       <MusicCard />
 
-      {/* Thin blend of the plaza's bottom edge into the dark bg — kept low
-          so it never reaches the residents' bodies. */}
       <div className="from-bg pointer-events-none absolute inset-x-0 bottom-0 h-[9%] bg-gradient-to-t to-transparent" />
     </div>
   );

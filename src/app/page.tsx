@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PixelLink } from "@/components/PixelButton";
 import { LivingPlaza } from "@/components/LivingPlaza";
 
@@ -16,9 +17,8 @@ export default function Home() {
         />
       </header>
 
-      {/* Plaza + pitch as one block, vertically centered below the header */}
-      <div className="flex flex-1 flex-col justify-center gap-8 pb-8">
-        {/* Bright, living plaza window (natural aspect, not cover-zoomed) */}
+      {/* Plaza + pitch as one block, vertically centered */}
+      <div className="flex flex-1 flex-col justify-center gap-8 pb-4">
         <LivingPlaza />
 
         <section className="mx-auto w-full max-w-[680px] space-y-7 px-6">
@@ -33,21 +33,20 @@ export default function Home() {
             </p>
           </div>
 
-          <footer className="flex flex-col items-stretch gap-3">
+          <div>
             <PixelLink href="/signup" size="lg" block>
               시작하기 →
             </PixelLink>
-            <PixelLink
-              href="/about"
-              variant="ghost"
-              size="sm"
-              className="self-center"
-            >
-              소개
-            </PixelLink>
-          </footer>
+          </div>
         </section>
       </div>
+
+      <footer className="text-dim mx-auto flex w-full max-w-[680px] items-center justify-between px-6 pb-6 text-[11px]">
+        <Link href="/about" className="hover:text-sub transition">
+          소개
+        </Link>
+        <span>© Fantagram Inc.</span>
+      </footer>
     </main>
   );
 }
