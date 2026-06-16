@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PixelLink } from "@/components/PixelButton";
+import { PlazaShowcase } from "@/components/PlazaShowcase";
 import {
   ABOUT,
   LOCALES,
@@ -77,6 +78,9 @@ export function AboutClient({ initialLocale }: Props) {
           {c.oneLiner}
         </h1>
       </section>
+
+      {/* Real plaza visuals */}
+      <PlazaShowcase locale={locale} />
 
       {/* Prose sections */}
       <div className="flex flex-col gap-10">
