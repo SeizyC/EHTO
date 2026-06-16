@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   MOMENT_CAP, INTERJECT_CAP, planCap, kstDayLabel,
   withDailyReset, remaining, msUntilKstMidnight, energyView,
+  MEMBER_CAP, memberCap,
 } from "../src/lib/energy";
 
 // kstDayLabel: YYYY-MM-DD in Asia/Seoul. 2026-06-14T00:00:00Z is 09:00 KST same day.
@@ -36,5 +37,10 @@ assert.deepEqual(
 // partial spend leaves the difference.
 const v2 = energyView("free", 80, Date.parse("2026-06-14T00:00:00Z"));
 assert.equal(v2.remaining, MOMENT_CAP.free - 80);
+
+// member capacity caps
+assert.equal(memberCap("free"), 6);
+assert.equal(memberCap("plus"), 12);
+assert.equal(MEMBER_CAP.plus, 12); // hard product cap
 
 console.log("energy: all assertions passed");

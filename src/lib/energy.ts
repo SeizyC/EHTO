@@ -25,6 +25,14 @@ export function planCap(plan: Plan, kind: EnergyKind): number {
   return kind === "moment" ? MOMENT_CAP[plan] : INTERJECT_CAP[plan];
 }
 
+// Max simultaneously-active residents per plaza, by plan. The hard product
+// cap is 12 (the promoted promise — "최대 12명이 사는 작은 사회", spec §6.2);
+// free sits at half so it feels alive yet leaves room to grow into Plus.
+export const MEMBER_CAP: Record<Plan, number> = { free: 6, plus: 12 };
+export function memberCap(plan: Plan): number {
+  return MEMBER_CAP[plan];
+}
+
 /** KST calendar date "YYYY-MM-DD" (Asia/Seoul) — the daily-reset key. */
 export function kstDayLabel(nowMs: number): string {
   // en-CA renders as YYYY-MM-DD.
