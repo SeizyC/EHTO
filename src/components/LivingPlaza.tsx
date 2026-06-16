@@ -34,10 +34,14 @@ type Fig = {
   min: number;
   max: number; // roam band (left %)
 };
-// Lanes are separated so same-row residents never share an x (no body
-// overlap). Front-center (test_03) may pass in front of the mids — that
-// reads as natural depth since it renders last (on top).
+// Listed back-to-front (DOM order = z-order). Lanes are separated so
+// same-row residents never share an x (no body overlap). The far-back pair
+// strolls the rear walkway behind the fountain; their lanes skip the centre
+// (the fountain's x ≈ 44–56) so they never clip it. Front-center may pass in
+// front of the mids — natural depth since it renders last (on top).
 const FIGURES: Fig[] = [
+  { src: "/sprites/hero/test_01.png", y: 41, h: 9, dur: 3.0, start: 28, min: 16, max: 42 }, // far-back-left (behind fountain)
+  { src: "/sprites/hero/test_05.png", y: 42, h: 9, dur: 3.2, start: 70, min: 58, max: 84 }, // far-back-right (behind fountain)
   { src: "/sprites/hero/test_02.png", y: 20, h: 13, dur: 2.6, start: 18, min: 12, max: 28 }, // back-left
   { src: "/sprites/hero/test_04.png", y: 19, h: 14, dur: 2.9, start: 80, min: 72, max: 90 }, // back-right
   { src: "/sprites/hero/test_01.png", y: 11, h: 17, dur: 2.3, start: 36, min: 30, max: 46 }, // mid-left
@@ -61,8 +65,9 @@ const LINES = [
   "주말에 뭐 해?",
 ];
 const VIDEO_TITLES = ["이 무대 미쳤다 🔥", "요즘 이거 무한반복", "이 영상 봐봐 ㅋㅋ", "라이브 미쳤음"];
-// figures central enough that a wider video bubble won't overflow the edges
-const VIDEO_FIGS = [2, 3, 4];
+// central figures (mid-left, mid-right, front) — a wider video bubble on
+// these won't overflow the plaza edges
+const VIDEO_FIGS = [4, 5, 6];
 
 type Bubble = { id: number; fig: number; kind: "text" | "video"; text: string };
 
