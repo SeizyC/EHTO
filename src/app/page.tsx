@@ -7,10 +7,10 @@ export default function Home() {
       <header>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/logo_ehto.png"
+          src="/logo_ehto_wordmark.png"
           alt="EHTO"
-          width={280}
-          height={108}
+          width={200}
+          height={78}
           className="pixelated"
           draggable={false}
         />
@@ -32,12 +32,11 @@ export default function Home() {
         <HeroHuddle />
       </section>
 
-      <footer className="flex items-center justify-between gap-3">
-        <PixelLink href="/about" variant="ghost" size="sm">소개</PixelLink>
-        <div className="flex items-center gap-3">
-          <PixelLink href="/login" variant="muted" size="md">로그인</PixelLink>
-          <PixelLink href="/signup" size="md">가입하기 →</PixelLink>
-        </div>
+      <footer className="flex flex-col items-stretch gap-3">
+        <PixelLink href="/signup" size="lg" block>시작하기 →</PixelLink>
+        <PixelLink href="/about" variant="ghost" size="sm" className="self-center">
+          소개
+        </PixelLink>
       </footer>
     </main>
   );

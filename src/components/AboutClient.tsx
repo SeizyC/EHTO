@@ -64,10 +64,10 @@ export function AboutClient({ initialLocale }: Props) {
       <section className="animate-fade-up mb-12">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/logo_ehto.png"
+          src="/logo_ehto_wordmark.png"
           alt="EHTO"
-          width={200}
-          height={77}
+          width={180}
+          height={70}
           className="pixelated mb-6"
           draggable={false}
         />

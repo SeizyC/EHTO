@@ -55,10 +55,10 @@ export default function LoginPage() {
       <header>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/logo_ehto.png"
+          src="/logo_ehto_wordmark.png"
           alt="EHTO"
-          width={280}
-          height={108}
+          width={200}
+          height={78}
           className="pixelated"
           draggable={false}
         />
