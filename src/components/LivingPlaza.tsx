@@ -40,8 +40,7 @@ type Fig = {
 // (the fountain's x ≈ 44–56) so they never clip it. Front-center may pass in
 // front of the mids — natural depth since it renders last (on top).
 const FIGURES: Fig[] = [
-  { src: "/sprites/hero/test_01.png", y: 41, h: 9, dur: 3.0, start: 28, min: 16, max: 42 }, // far-back-left (behind fountain)
-  { src: "/sprites/hero/test_05.png", y: 42, h: 9, dur: 3.2, start: 70, min: 58, max: 84 }, // far-back-right (behind fountain)
+  { src: "/sprites/hero/test_01.png", y: 41, h: 9, dur: 3.0, start: 28, min: 16, max: 42 }, // far-back (behind fountain)
   { src: "/sprites/hero/test_02.png", y: 20, h: 13, dur: 2.6, start: 18, min: 12, max: 28 }, // back-left
   { src: "/sprites/hero/test_04.png", y: 19, h: 14, dur: 2.9, start: 80, min: 72, max: 90 }, // back-right
   { src: "/sprites/hero/test_01.png", y: 11, h: 17, dur: 2.3, start: 36, min: 30, max: 46 }, // mid-left
@@ -67,7 +66,7 @@ const LINES = [
 const VIDEO_TITLES = ["이 무대 미쳤다 🔥", "요즘 이거 무한반복", "이 영상 봐봐 ㅋㅋ", "라이브 미쳤음"];
 // central figures (mid-left, mid-right, front) — a wider video bubble on
 // these won't overflow the plaza edges
-const VIDEO_FIGS = [4, 5, 6];
+const VIDEO_FIGS = [3, 4, 5];
 
 type Bubble = { id: number; fig: number; kind: "text" | "video"; text: string };
 
@@ -97,7 +96,9 @@ function Resident({ fig, bubbles }: { fig: Fig; bubbles: Bubble[] }) {
   return (
     <motion.div
       className="absolute"
-      style={{ bottom: `${fig.y}%`, height: `${fig.h}%`, transform: "translateX(-50%)" }}
+      // x:"-50%" centers via framer's transform (a raw `transform` string
+      // would be overwritten by framer once it manages this element).
+      style={{ bottom: `${fig.y}%`, height: `${fig.h}%`, x: "-50%" }}
       initial={false}
       animate={{ left: `${x}%` }}
       transition={{ duration: travel, ease: "easeInOut" }}
@@ -191,27 +192,37 @@ export function LivingPlaza() {
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   useEffect(() => {
     let seq = 0;
-    const spawn = (kind: "text" | "video", figPool: number[], life: number) =>
+    const allFigs = FIGURES.map((_, i) => i);
+
+    // Text bubbles are capped (≤3) and only fill figures that are free.
+    const spawnText = () =>
       setBubbles((prev) => {
         if (prev.length >= 3) return prev;
-        const free = figPool.filter((f) => !prev.some((b) => b.fig === f));
+        const free = allFigs.filter((f) => !prev.some((b) => b.fig === f));
         if (free.length === 0) return prev;
         const fig = free[Math.floor(Math.random() * free.length)];
-        const text =
-          kind === "video"
-            ? VIDEO_TITLES[Math.floor(Math.random() * VIDEO_TITLES.length)]
-            : LINES[Math.floor(Math.random() * LINES.length)];
         const id = ++seq;
-        window.setTimeout(() => setBubbles((p) => p.filter((b) => b.id !== id)), life);
-        return [...prev, { id, fig, kind, text }];
+        window.setTimeout(() => setBubbles((p) => p.filter((b) => b.id !== id)), 3200);
+        return [...prev, { id, fig, kind: "text", text: LINES[Math.floor(Math.random() * LINES.length)] }];
       });
 
-    const allFigs = FIGURES.map((_, i) => i);
-    const textIv = setInterval(() => spawn("text", allFigs, 3200), 1500);
-    const vidIv = setInterval(() => spawn("video", VIDEO_FIGS, 5200), 9000);
+    // Video share is guaranteed: it ignores the text cap and evicts whatever
+    // bubble is on its chosen figure, so it always surfaces.
+    const spawnVideo = () =>
+      setBubbles((prev) => {
+        const fig = VIDEO_FIGS[Math.floor(Math.random() * VIDEO_FIGS.length)];
+        const id = ++seq;
+        window.setTimeout(() => setBubbles((p) => p.filter((b) => b.id !== id)), 5200);
+        return [...prev.filter((b) => b.fig !== fig), { id, fig, kind: "video", text: VIDEO_TITLES[Math.floor(Math.random() * VIDEO_TITLES.length)] }];
+      });
+
+    const textIv = setInterval(spawnText, 1600);
+    const vidIv = setInterval(spawnVideo, 8000);
+    const firstVid = setTimeout(spawnVideo, 3500);
     return () => {
       clearInterval(textIv);
       clearInterval(vidIv);
+      clearTimeout(firstVid);
     };
   }, []);
 
@@ -228,7 +239,7 @@ export function LivingPlaza() {
       {/* Dog — placed on the floor with a gentle idle */}
       <motion.div
         className="absolute"
-        style={{ left: `${DOG.x}%`, bottom: `${DOG.y}%`, height: `${DOG.h}%`, transform: "translateX(-50%)" }}
+        style={{ left: `${DOG.x}%`, bottom: `${DOG.y}%`, height: `${DOG.h}%`, x: "-50%" }}
         animate={{ y: [0, -2, 0] }}
         transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
       >
