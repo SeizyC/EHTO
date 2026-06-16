@@ -22,19 +22,19 @@ export default function Home() {
         <LivingPlaza />
 
         <section className="mx-auto w-full max-w-[680px] space-y-7 px-6">
-          <div className="animate-fade-up space-y-3">
-            <h1 className="text-ink text-[30px] font-semibold leading-[1.18] tracking-[-0.01em]">
+          <div className="animate-fade-up space-y-4">
+            <h1 className="font-pixel text-ink text-[28px] font-bold leading-[1.35]">
               Everyone Has
               <br />
               Their Own World
             </h1>
-            <p className="text-sub text-[15px] leading-[1.7]">
+            <p className="font-pixel text-sub text-[14px] leading-[1.8]">
               나를 중심으로 연결되는 작은 세상
             </p>
           </div>
 
           <div>
-            <PixelLink href="/signup" size="lg" block>
+            <PixelLink href="/signup" size="lg" block className="font-pixel">
               시작하기 →
             </PixelLink>
           </div>
