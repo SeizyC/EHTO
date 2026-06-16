@@ -1,54 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { PixelLink } from "@/components/PixelButton";
 import { PlazaShowcase } from "@/components/PlazaShowcase";
-import {
-  ABOUT,
-  LOCALES,
-  LOCALE_LABEL,
-  LOCALE_BCP47,
-  isLocale,
-  type Locale,
-} from "@/lib/about-content";
-
-const LS_KEY = "ehto:about-locale";
+import { LangToggle } from "@/components/LangToggle";
+import { useLocale } from "@/lib/use-locale";
+import { ABOUT, type Locale } from "@/lib/about-content";
 
 type Props = { initialLocale: Locale };
 
-// Public /about page body. The server picks an initial locale from the
-// visitor's IP (cf-ipcountry); this client lets a visitor override it via
-// the top-right 한 / 日 / EN toggle and remembers the choice in
-// localStorage (override beats IP on the next visit). Keeping the toggle
-// visible in production doubles as the in-dev language test surface.
+// Public /about page body. Initial locale from the server (IP); the top-right
+// EN / 한 / 日 toggle overrides it and the choice persists (see useLocale).
 export function AboutClient({ initialLocale }: Props) {
-  const [locale, setLocale] = useState<Locale>(initialLocale);
-
-  // On mount, a stored override wins over the IP-derived initial value.
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(LS_KEY);
-      if (isLocale(saved) && saved !== initialLocale) setLocale(saved);
-    } catch {
-      /* private mode — ignore */
-    }
-  }, [initialLocale]);
-
-  // Keep <html lang> in sync so assistive tech / crawlers see the active
-  // language even after a client-side switch.
-  useEffect(() => {
-    document.documentElement.lang = LOCALE_BCP47[locale];
-  }, [locale]);
-
-  function pick(next: Locale) {
-    setLocale(next);
-    try {
-      localStorage.setItem(LS_KEY, next);
-    } catch {
-      /* ignore */
-    }
-  }
-
+  const { locale, pick } = useLocale(initialLocale);
   const c = ABOUT[locale];
 
   return (
@@ -141,38 +104,5 @@ export function AboutClient({ initialLocale }: Props) {
         </PixelLink>
       </footer>
     </main>
-  );
-}
-
-function LangToggle({
-  locale,
-  onPick,
-}: {
-  locale: Locale;
-  onPick: (l: Locale) => void;
-}) {
-  return (
-    <div
-      role="group"
-      aria-label="Language"
-      className="border-line bg-surface flex items-center gap-0.5 rounded-full border p-0.5"
-    >
-      {LOCALES.map((l) => {
-        const active = l === locale;
-        return (
-          <button
-            key={l}
-            onClick={() => onPick(l)}
-            aria-pressed={active}
-            className={[
-              "rounded-full px-2.5 py-1 text-[12px] font-semibold transition",
-              active ? "bg-accent text-bg" : "text-dim active:text-ink",
-            ].join(" ")}
-          >
-            {LOCALE_LABEL[l]}
-          </button>
-        );
-      })}
-    </div>
   );
 }

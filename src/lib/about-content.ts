@@ -6,7 +6,8 @@
 // of the place; the precise machine-readable description lives separately in
 // the JSON-LD (src/app/about/page.tsx) and /llms.txt for crawlers.
 
-export const LOCALES = ["ko", "en", "ja"] as const;
+// Toggle display order: 영문 / 한글 / 일본어.
+export const LOCALES = ["en", "ko", "ja"] as const;
 export type Locale = (typeof LOCALES)[number];
 
 export const DEFAULT_LOCALE: Locale = "ko";
@@ -249,3 +250,23 @@ const ja: AboutContent = {
 };
 
 export const ABOUT: Record<Locale, AboutContent> = { ko, en, ja };
+
+// Landing hero copy. Headline is the constant brand line (EHTO acronym);
+// subcopy + CTA localize.
+export const LANDING: Record<Locale, { headline: [string, string]; sub: string; cta: string }> = {
+  en: {
+    headline: ["Everyone Has", "Their Own World"],
+    sub: "A small world that connects around you",
+    cta: "Get started →",
+  },
+  ko: {
+    headline: ["Everyone Has", "Their Own World"],
+    sub: "나를 중심으로 연결되는 작은 세상",
+    cta: "시작하기 →",
+  },
+  ja: {
+    headline: ["Everyone Has", "Their Own World"],
+    sub: "あなたを中心につながる小さな世界",
+    cta: "はじめる →",
+  },
+};
