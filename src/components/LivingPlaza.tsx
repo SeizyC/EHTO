@@ -34,15 +34,19 @@ type Fig = {
   min: number;
   max: number; // roam band (left %)
 };
+// Lanes are separated so same-row residents never share an x (no body
+// overlap). Front-center (test_03) may pass in front of the mids — that
+// reads as natural depth since it renders last (on top).
 const FIGURES: Fig[] = [
-  { src: "/sprites/hero/test_02.png", y: 20, h: 13, dur: 2.6, start: 16, min: 8, max: 34 },
-  { src: "/sprites/hero/test_04.png", y: 19, h: 14, dur: 2.9, start: 82, min: 62, max: 92 },
-  { src: "/sprites/hero/test_01.png", y: 11, h: 17, dur: 2.3, start: 33, min: 14, max: 48 },
-  { src: "/sprites/hero/test_05.png", y: 10, h: 18, dur: 2.7, start: 65, min: 52, max: 86 },
-  { src: "/sprites/hero/test_03.png", y: 5, h: 21, dur: 2.4, start: 49, min: 30, max: 70 },
+  { src: "/sprites/hero/test_02.png", y: 20, h: 13, dur: 2.6, start: 18, min: 12, max: 28 }, // back-left
+  { src: "/sprites/hero/test_04.png", y: 19, h: 14, dur: 2.9, start: 80, min: 72, max: 90 }, // back-right
+  { src: "/sprites/hero/test_01.png", y: 11, h: 17, dur: 2.3, start: 36, min: 30, max: 46 }, // mid-left
+  { src: "/sprites/hero/test_05.png", y: 10, h: 18, dur: 2.7, start: 62, min: 54, max: 70 }, // mid-right
+  { src: "/sprites/hero/test_03.png", y: 5, h: 21, dur: 2.4, start: 49, min: 40, max: 60 }, // front-center
 ];
 
-const DOG = { src: "/sprites/rooms/objects/dog_maltese_wagging.png", x: 41, y: 3, h: 9 };
+// Dog rests in the front-left corner, clear of every resident's lane.
+const DOG = { src: "/sprites/rooms/objects/dog_maltese_wagging.png", x: 9, y: 2, h: 8 };
 
 const LINES = [
   "오늘 비 올 것 같지 않아?",
