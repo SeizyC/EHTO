@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { PixelLink } from "@/components/PixelButton";
 import { LivingPlaza } from "@/components/LivingPlaza";
+import { SiteFooter } from "@/components/SiteFooter";
 
 export default function Home() {
   return (
@@ -41,12 +41,7 @@ export default function Home() {
         </section>
       </div>
 
-      <footer className="text-dim mx-auto flex w-full max-w-[680px] items-center justify-between px-6 pb-6 text-[11px]">
-        <Link href="/about" className="hover:text-sub transition">
-          소개
-        </Link>
-        <span>© Fantagram Inc.</span>
-      </footer>
+      <SiteFooter />
     </main>
   );
 }
