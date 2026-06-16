@@ -3,22 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
-// Landing hero: the complete plaza art (with buildings, fountain, benches —
-// time-of-day by the visitor's local hour) as the backdrop, with residents
-// strolling the OPEN foreground in front of it. Keeping them in the front
-// band means they never tunnel through the painted furniture (they're simply
-// in front of the whole scene). Depth among residents is by feet-y z-order.
-//
-// Note: true "walk behind the fountain" occlusion isn't done here — the
-// fountain is baked into the backdrop. It would need the fountain overlaid as
-// a separate foreground sprite aligned to the baked one.
+// Landing hero: a layered, living plaza built from sprites (no buildings).
+// Empty tiled floor (time-of-day by local hour) + furniture sprites
+// (fountain / trees / benches / lamp) + roaming residents + a dog, all
+// painted in feet-depth order so residents pass IN FRONT of nearer objects
+// and are OCCLUDED behind further ones (e.g. the fountain). Sample chat
+// bubbles + varied YouTube shares keep it alive.
 
 const ROOM = "/sprites/rooms";
 const SCENES = {
-  morning: `${ROOM}/plaza_morning.png`,
-  afternoon: `${ROOM}/plaza_afternoon.png`,
-  evening: `${ROOM}/plaza_evening.png`,
-  night: `${ROOM}/plaza_night.png`,
+  morning: `${ROOM}/states/empty_morning.png`,
+  afternoon: `${ROOM}/states/empty_afternoon.png`,
+  evening: `${ROOM}/states/empty_evening.png`,
+  night: `${ROOM}/states/empty_night.png`,
 } as const;
 type Scene = keyof typeof SCENES;
 
@@ -29,40 +26,65 @@ function sceneForHour(h: number): Scene {
   return "night";
 }
 
-type Fig = { src: string; y: number; h: number; dur: number; start: number; min: number; max: number };
-// All residents live in the open FOREGROUND (low feet-y, central x) so they
-// stay in front of the baked fountain/benches and never clip them. Lanes are
-// separated within each depth row. Sizes are gently compressed so the nearest
-// isn't huge and the farthest isn't tiny.
-const FIGURES: Fig[] = [
-  { src: "/sprites/hero/test_01.png", y: 22, h: 13, dur: 3.0, start: 34, min: 26, max: 42 }, // far row L
-  { src: "/sprites/hero/test_04.png", y: 21, h: 13, dur: 2.9, start: 66, min: 58, max: 74 }, // far row R
-  { src: "/sprites/hero/test_02.png", y: 13, h: 15, dur: 2.6, start: 32, min: 24, max: 42 }, // mid row L
-  { src: "/sprites/hero/test_05.png", y: 12, h: 15, dur: 2.7, start: 62, min: 54, max: 72 }, // mid row R
-  { src: "/sprites/hero/test_03.png", y: 5, h: 17, dur: 2.4, start: 44, min: 36, max: 52 }, // front L
-  { src: "/sprites/hero/test_01.png", y: 4, h: 17, dur: 2.5, start: 66, min: 58, max: 74 }, // front R
+type Obj = { key: string; src: string; x: number; y: number; h: number; flip?: boolean };
+const OBJECTS: Obj[] = [
+  { key: "tree-l", src: `${ROOM}/objects/tree.png`, x: 14, y: 52, h: 27 },
+  { key: "tree-r", src: `${ROOM}/objects/tree.png`, x: 87, y: 50, h: 27, flip: true },
+  { key: "lamp", src: `${ROOM}/objects/lamp.png`, x: 72, y: 45, h: 26 },
+  { key: "fountain", src: `${ROOM}/objects/fountain.png`, x: 50, y: 31, h: 28 },
+  { key: "bench-l", src: `${ROOM}/objects/bench.png`, x: 13, y: 13, h: 13 },
+  { key: "bench-r", src: `${ROOM}/objects/bench.png`, x: 88, y: 12, h: 13, flip: true },
 ];
 
-const DOG = { src: `${ROOM}/objects/dog_maltese_wagging.png`, x: 16, y: 2, h: 8 };
+const DOG = { src: `${ROOM}/objects/dog_maltese_wagging.png`, x: 24, y: 3, h: 8 };
+
+type Fig = { src: string; y: number; h: number; dur: number; start: number; min: number; max: number };
+const FIGURES: Fig[] = [
+  { src: "/sprites/hero/test_01.png", y: 42, h: 11, dur: 3.0, start: 30, min: 22, max: 44 }, // far-back (behind fountain)
+  { src: "/sprites/hero/test_02.png", y: 24, h: 13, dur: 2.6, start: 20, min: 14, max: 30 }, // back-left
+  { src: "/sprites/hero/test_04.png", y: 23, h: 13, dur: 2.9, start: 80, min: 70, max: 88 }, // back-right
+  { src: "/sprites/hero/test_05.png", y: 14, h: 15, dur: 2.7, start: 38, min: 30, max: 46 }, // mid-left
+  { src: "/sprites/hero/test_03.png", y: 13, h: 15, dur: 2.4, start: 62, min: 54, max: 70 }, // mid-right
+  { src: "/sprites/hero/test_01.png", y: 5, h: 17, dur: 2.5, start: 50, min: 40, max: 60 }, // front
+];
 
 const LINES = [
-  "오늘 비 올 것 같지 않아?",
-  "그 책 마지막이 진짜야",
-  "커피 한 잔 더?",
-  "어제 그 영화 별로였어",
-  "산책 갈 사람?",
-  "오 그거 좋더라",
-  "오늘따라 조용하네",
-  "그 노래 다시 듣는 중",
-  "배고프다 진짜",
-  "주말에 뭐 해?",
+  "오늘 비 올 것 같지 않아?", "그 책 마지막이 진짜야", "커피 한 잔 더?",
+  "어제 그 영화 별로였어", "산책 갈 사람?", "오 그거 좋더라",
+  "오늘따라 조용하네", "그 노래 다시 듣는 중", "배고프다 진짜",
+  "주말에 뭐 해?", "방금 그거 봤어?", "날씨 미쳤다",
+  "이 동네 빵집 어디가 맛있지", "고양이 영상 보다 시간 다 감", "다들 점심 뭐 먹음?",
+  "그 사람 요즘 잘 지내나", "새 플레이리스트 만들었어", "운동 가야 하는데",
+  "ㅋㅋㅋ 그건 좀", "그거 어디서 샀어?",
 ];
-const VIDEO_TITLES = ["이 무대 미쳤다 🔥", "요즘 이거 무한반복", "이 영상 봐봐 ㅋㅋ", "라이브 미쳤음"];
-// Real YouTube thumbnail (mqdefault is a reliable 16:9 frame).
-const VIDEO_THUMB = "https://img.youtube.com/vi/yebNIHKAC4A/mqdefault.jpg";
-const VIDEO_FIGS = [3, 4, 5]; // central figures — wider video bubble won't overflow
 
-type Bubble = { id: number; fig: number; kind: "text" | "video"; text: string };
+const VIDEOS = [
+  { id: "yebNIHKAC4A", title: "이 영상 봐봐 ㅋㅋ" },
+  { id: "VGnOpZhsPk4", title: "이 무대 미쳤다 🔥" },
+  { id: "ImuWa3SJulY", title: "요즘 이거 무한반복" },
+  { id: "gdZLi9oWNZg", title: "이건 명곡이지" },
+];
+const VIDEO_FIGS = [3, 4, 5]; // central figures — a wider video bubble won't overflow
+
+type Bubble = { id: number; fig: number; kind: "text" | "video"; text: string; thumb?: string };
+
+function PlazaObject({ o }: { o: Obj }) {
+  return (
+    <div
+      className="absolute"
+      style={{ left: `${o.x}%`, bottom: `${o.y}%`, height: `${o.h}%`, transform: "translateX(-50%)" }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={o.src}
+        alt=""
+        draggable={false}
+        className="pixelated h-full w-auto object-contain object-bottom drop-shadow-[0_4px_7px_rgba(0,0,0,0.3)]"
+        style={o.flip ? { transform: "scaleX(-1)" } : undefined}
+      />
+    </div>
+  );
+}
 
 function Resident({ fig, bubbles }: { fig: Fig; bubbles: Bubble[] }) {
   const [x, setX] = useState(fig.start);
@@ -121,12 +143,7 @@ function Resident({ fig, bubbles }: { fig: Fig; bubbles: Bubble[] }) {
                 <div className="w-[140px] p-1.5">
                   <div className="relative overflow-hidden rounded-md" style={{ aspectRatio: "16 / 9" }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={VIDEO_THUMB}
-                      alt=""
-                      draggable={false}
-                      className="absolute inset-0 h-full w-full object-cover"
-                    />
+                    <img src={b.thumb} alt="" draggable={false} className="absolute inset-0 h-full w-full object-cover" />
                     <span className="absolute inset-0 flex items-center justify-center">
                       <span className="flex h-5 w-7 items-center justify-center rounded-md shadow" style={{ background: "#FF0033" }}>
                         <svg viewBox="0 0 12 12" width="9" height="9" fill="#fff" aria-hidden>
@@ -199,7 +216,7 @@ export function LivingPlaza() {
     const allFigs = FIGURES.map((_, i) => i);
     const spawnText = () =>
       setBubbles((prev) => {
-        if (prev.length >= 3) return prev;
+        if (prev.length >= 4) return prev;
         const free = allFigs.filter((f) => !prev.some((b) => b.fig === f));
         if (free.length === 0) return prev;
         const fig = free[Math.floor(Math.random() * free.length)];
@@ -210,13 +227,17 @@ export function LivingPlaza() {
     const spawnVideo = () =>
       setBubbles((prev) => {
         const fig = VIDEO_FIGS[Math.floor(Math.random() * VIDEO_FIGS.length)];
+        const v = VIDEOS[Math.floor(Math.random() * VIDEOS.length)];
         const id = ++seq;
-        window.setTimeout(() => setBubbles((p) => p.filter((b) => b.id !== id)), 5200);
-        return [...prev.filter((b) => b.fig !== fig), { id, fig, kind: "video", text: VIDEO_TITLES[Math.floor(Math.random() * VIDEO_TITLES.length)] }];
+        window.setTimeout(() => setBubbles((p) => p.filter((b) => b.id !== id)), 5500);
+        return [
+          ...prev.filter((b) => b.fig !== fig),
+          { id, fig, kind: "video", text: v.title, thumb: `https://img.youtube.com/vi/${v.id}/mqdefault.jpg` },
+        ];
       });
-    const textIv = setInterval(spawnText, 1600);
-    const vidIv = setInterval(spawnVideo, 18000);
-    const firstVid = setTimeout(spawnVideo, 9000);
+    const textIv = setInterval(spawnText, 1300);
+    const vidIv = setInterval(spawnVideo, 14000);
+    const firstVid = setTimeout(spawnVideo, 6000);
     return () => {
       clearInterval(textIv);
       clearInterval(vidIv);
@@ -224,8 +245,9 @@ export function LivingPlaza() {
     };
   }, []);
 
-  // Residents + dog painted in feet-depth order (further back first).
+  // Depth order: larger feet-bottom% = further away = painted first (behind).
   const entities = [
+    ...OBJECTS.map((o) => ({ key: o.key, y: o.y, el: <PlazaObject key={o.key} o={o} /> })),
     ...FIGURES.map((f, i) => ({
       key: `fig-${i}`,
       y: f.y,
