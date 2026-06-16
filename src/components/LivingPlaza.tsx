@@ -3,20 +3,22 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
-// Landing hero: a layered, living plaza. The floor is an empty tiled
-// background; the fountain / trees / benches / lamp are separate sprites,
-// and residents roam between them. Everything (objects, residents, dog) is
-// painted in feet-depth order (further back = drawn first) so residents pass
-// IN FRONT of nearer objects and get OCCLUDED behind further ones (e.g. the
-// fountain) — no more tunnelling through painted-in furniture.
-// Time-of-day floor follows the visitor's local hour.
+// Landing hero: the complete plaza art (with buildings, fountain, benches —
+// time-of-day by the visitor's local hour) as the backdrop, with residents
+// strolling the OPEN foreground in front of it. Keeping them in the front
+// band means they never tunnel through the painted furniture (they're simply
+// in front of the whole scene). Depth among residents is by feet-y z-order.
+//
+// Note: true "walk behind the fountain" occlusion isn't done here — the
+// fountain is baked into the backdrop. It would need the fountain overlaid as
+// a separate foreground sprite aligned to the baked one.
 
 const ROOM = "/sprites/rooms";
 const SCENES = {
-  morning: `${ROOM}/states/empty_morning.png`,
-  afternoon: `${ROOM}/states/empty_afternoon.png`,
-  evening: `${ROOM}/states/empty_evening.png`,
-  night: `${ROOM}/states/empty_night.png`,
+  morning: `${ROOM}/plaza_morning.png`,
+  afternoon: `${ROOM}/plaza_afternoon.png`,
+  evening: `${ROOM}/plaza_evening.png`,
+  night: `${ROOM}/plaza_night.png`,
 } as const;
 type Scene = keyof typeof SCENES;
 
@@ -27,31 +29,21 @@ function sceneForHour(h: number): Scene {
   return "night";
 }
 
-// Static plaza furniture. x = centre %, y = feet bottom %, h = height % of
-// the stage. (Used for both placement and the depth sort.)
-type Obj = { key: string; src: string; x: number; y: number; h: number; flip?: boolean };
-const OBJECTS: Obj[] = [
-  { key: "tree-l", src: `${ROOM}/objects/tree.png`, x: 14, y: 52, h: 27 },
-  { key: "tree-r", src: `${ROOM}/objects/tree.png`, x: 87, y: 50, h: 27, flip: true },
-  { key: "lamp", src: `${ROOM}/objects/lamp.png`, x: 72, y: 45, h: 26 },
-  { key: "fountain", src: `${ROOM}/objects/fountain.png`, x: 50, y: 31, h: 28 },
-  { key: "bench-l", src: `${ROOM}/objects/bench.png`, x: 13, y: 13, h: 13 },
-  { key: "bench-r", src: `${ROOM}/objects/bench.png`, x: 88, y: 12, h: 13, flip: true },
-];
-
-const DOG = { src: `${ROOM}/objects/dog_maltese_wagging.png`, x: 9, y: 2, h: 8 };
-
 type Fig = { src: string; y: number; h: number; dur: number; start: number; min: number; max: number };
-// Listed in any order; depth sort handles z. Lanes mostly avoid object
-// footprints, but the depth sort makes any crossing read correctly anyway.
+// All residents live in the open FOREGROUND (low feet-y, central x) so they
+// stay in front of the baked fountain/benches and never clip them. Lanes are
+// separated within each depth row. Sizes are gently compressed so the nearest
+// isn't huge and the farthest isn't tiny.
 const FIGURES: Fig[] = [
-  { src: "/sprites/hero/test_01.png", y: 42, h: 9, dur: 3.0, start: 30, min: 20, max: 44 }, // far-back (passes behind fountain)
-  { src: "/sprites/hero/test_02.png", y: 24, h: 12, dur: 2.6, start: 22, min: 14, max: 32 }, // back-left
-  { src: "/sprites/hero/test_04.png", y: 23, h: 13, dur: 2.9, start: 80, min: 70, max: 90 }, // back-right
-  { src: "/sprites/hero/test_01.png", y: 13, h: 16, dur: 2.3, start: 38, min: 30, max: 46 }, // mid-left
-  { src: "/sprites/hero/test_05.png", y: 12, h: 17, dur: 2.7, start: 62, min: 54, max: 70 }, // mid-right
-  { src: "/sprites/hero/test_03.png", y: 5, h: 20, dur: 2.4, start: 50, min: 40, max: 60 }, // front
+  { src: "/sprites/hero/test_01.png", y: 22, h: 13, dur: 3.0, start: 34, min: 26, max: 42 }, // far row L
+  { src: "/sprites/hero/test_04.png", y: 21, h: 13, dur: 2.9, start: 66, min: 58, max: 74 }, // far row R
+  { src: "/sprites/hero/test_02.png", y: 13, h: 15, dur: 2.6, start: 32, min: 24, max: 42 }, // mid row L
+  { src: "/sprites/hero/test_05.png", y: 12, h: 15, dur: 2.7, start: 62, min: 54, max: 72 }, // mid row R
+  { src: "/sprites/hero/test_03.png", y: 5, h: 17, dur: 2.4, start: 44, min: 36, max: 52 }, // front L
+  { src: "/sprites/hero/test_01.png", y: 4, h: 17, dur: 2.5, start: 66, min: 58, max: 74 }, // front R
 ];
+
+const DOG = { src: `${ROOM}/objects/dog_maltese_wagging.png`, x: 16, y: 2, h: 8 };
 
 const LINES = [
   "오늘 비 올 것 같지 않아?",
@@ -66,27 +58,9 @@ const LINES = [
   "주말에 뭐 해?",
 ];
 const VIDEO_TITLES = ["이 무대 미쳤다 🔥", "요즘 이거 무한반복", "이 영상 봐봐 ㅋㅋ", "라이브 미쳤음"];
-const VIDEO_FIGS = [3, 4, 5]; // mid-left, mid-right, front
+const VIDEO_FIGS = [3, 4, 5]; // central figures — wider video bubble won't overflow
 
 type Bubble = { id: number; fig: number; kind: "text" | "video"; text: string };
-
-function PlazaObject({ o }: { o: Obj }) {
-  return (
-    <div
-      className="absolute"
-      style={{ left: `${o.x}%`, bottom: `${o.y}%`, height: `${o.h}%`, transform: "translateX(-50%)" }}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={o.src}
-        alt=""
-        draggable={false}
-        className="pixelated h-full w-auto object-contain object-bottom drop-shadow-[0_4px_7px_rgba(0,0,0,0.3)]"
-        style={o.flip ? { transform: "scaleX(-1)" } : undefined}
-      />
-    </div>
-  );
-}
 
 function Resident({ fig, bubbles }: { fig: Fig; bubbles: Bubble[] }) {
   const [x, setX] = useState(fig.start);
@@ -128,7 +102,7 @@ function Resident({ fig, bubbles }: { fig: Fig; bubbles: Bubble[] }) {
           src={fig.src}
           alt=""
           draggable={false}
-          className="pixelated h-full w-auto object-contain object-bottom drop-shadow-[0_3px_6px_rgba(0,0,0,0.35)]"
+          className="pixelated h-full w-auto object-contain object-bottom drop-shadow-[0_3px_6px_rgba(0,0,0,0.4)]"
           style={{ transform: `scaleX(${facing})` }}
         />
         <AnimatePresence>
@@ -181,7 +155,7 @@ function Dog() {
         src={DOG.src}
         alt=""
         draggable={false}
-        className="pixelated h-full w-auto object-contain object-bottom drop-shadow-[0_2px_5px_rgba(0,0,0,0.35)]"
+        className="pixelated h-full w-auto object-contain object-bottom drop-shadow-[0_2px_5px_rgba(0,0,0,0.4)]"
       />
     </motion.div>
   );
@@ -244,9 +218,8 @@ export function LivingPlaza() {
     };
   }, []);
 
-  // Depth order: larger feet-bottom% = further away = painted first (behind).
+  // Residents + dog painted in feet-depth order (further back first).
   const entities = [
-    ...OBJECTS.map((o) => ({ key: o.key, y: o.y, el: <PlazaObject key={o.key} o={o} /> })),
     ...FIGURES.map((f, i) => ({
       key: `fig-${i}`,
       y: f.y,
@@ -264,7 +237,7 @@ export function LivingPlaza() {
 
       <MusicCard />
 
-      <div className="from-bg pointer-events-none absolute inset-x-0 bottom-0 h-[9%] bg-gradient-to-t to-transparent" />
+      <div className="from-bg pointer-events-none absolute inset-x-0 bottom-0 h-[8%] bg-gradient-to-t to-transparent" />
     </div>
   );
 }
