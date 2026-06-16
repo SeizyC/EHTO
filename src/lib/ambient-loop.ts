@@ -437,6 +437,11 @@ export async function tickAmbientConversation(
     // Fail-open: the line already posted; an un-incremented counter just
     // grants one extra moment. Log so a stuck counter is visible in prod.
     console.warn(`[ambient] energy consume failed (${energyKind}):`, consumeErr.message);
+  } else if (counter.used + 1 >= planCap(plan, energyKind)) {
+    // Beta instrumentation: one-time crossing log when a plaza spends its
+    // last unit for the day. The log's own timestamp tells *when* it
+    // depleted → how fast the cap is reached. Parsed by scripts/beta-energy.
+    console.log(`[beta] cap-reached world=${worldId.slice(0, 8)} kind=${energyKind} plan=${plan} used=${counter.used + 1}`);
   }
 
   // Phase 3 relations: if a peer member spoke within the last 5 minutes,
