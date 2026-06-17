@@ -12,6 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { chatComplete, chatCompleteWithVideo, CHAT_MODEL, FILLER_CHAT_MODEL } from "@/lib/claude";
 import type { Locale } from "@/lib/language";
 import { PROMPT_FRAME, languageDirective, joinedAgoLabel } from "@/lib/prompt-i18n";
+import { inWheelhouse } from "@/lib/wheelhouse";
 
 type Member = {
   id: string;
@@ -265,7 +266,7 @@ const SHAPE_GUIDANCE: Record<LineShape, {
   quip: {
     range: "8~15자",
     hint: "직전 흐름에 빠르게 한마디. 짧고 의미 있는 반응. 결론·설명 X.",
-    examples: ["오 그거 별로던데", "아 진짜?", "그건 좀 무리야", "ㅇㅋ 동의", "음 모르겠다"],
+    examples: ["오 그거 별로던데", "아 진짜?", "그건 좀 무리야", "ㅇㅋ 동의", "그거 좋더라"],
   },
   share: {
     range: "18~28자",
@@ -407,6 +408,9 @@ export async function generateAmbientLine(
   // The intent branches used to set temperature 0.85~0.95; tone is now
   // carried entirely by the situation text + shape guidance.)
   const intent = opts.intent;
+  // The user's most recent line (the thing a reply-user turn answers).
+  const lastUserText = recent.filter((t) => !t.isSelf).at(-1)?.text ?? "";
+  const wheelhouse = inWheelhouse(speaker.persona.affinity ?? [], lastUserText);
   let situation: string;
 
   switch (intent.type) {
@@ -415,7 +419,10 @@ export async function generateAmbientLine(
         `${intent.userName}님이 *당신을 직접 불러서* 한마디 했어요.`,
         "받는 방법:",
         "- 그 사람이 *물은 것에 진짜로 답*하세요. 책 추천 물으면 책 한 권 꺼내고, 의견 물으면 의견 내고, 부탁이면 부탁에 답하고.",
-        "- 형태는 자유 (한 줄 추천·짧은 답·되묻기 다 OK) — 단, 사용자 메시지를 *무시한 채 자기 얘기로 새는 건 절대 X*.",
+        wheelhouse
+          ? "- **이건 네 관심사 영역이야 — 아는 티 내며 구체적으로.** '그게 뭐야?'로 빠지지 말 것."
+          : "- 들어봤거나 일반 상식으로 아는 거면 아는 만큼 알맹이로. 정말 생소할 때만 솔직히 모른다고.",
+        "- 형태는 자유(한 줄 추천·짧은 답·되묻기 다 OK) — 단, 사용자 메시지를 *무시한 채 자기 얘기로 새는 건 절대 X*.",
         "- 본인 결대로 답하되, '답' 자체는 사용자 의도에 정렬되어야 함.",
       ].join("\n");
       break;
@@ -423,10 +430,11 @@ export async function generateAmbientLine(
       situation = [
         `${intent.userName}님이 한마디 했어요.`,
         "받는 방법:",
-        "- *질문이면 진짜로 답*. 책 추천 → 책 한 권. 의견 → 의견. 사실 질문 → 사실 (모르면 '잘 모르겠는데').",
-        "- 단순 진술/잡담이면 페르소나 결대로 반응 (동의·반박·되묻기·짧은 정보).",
-        "- 명사 변주·자기 얘기로 새기 금지. 사용자 메시지가 *anchor*임.",
-        "- 자동 농담·맞장구 X. 의미 있는 응답으로.",
+        "- *알맹이로 받아라*. 질문이면 진짜 답(책 추천 → 책 한 권, 의견 → 의견, 사실 질문 → 사실). 진술/잡담이면 그 내용에 대한 진짜 반응(아는 것·의견·되묻기 중 알맹이 있는 쪽).",
+        wheelhouse
+          ? "- **이건 네 관심사 영역이야 — 아는 티 내며 구체적으로 받아라.** 모른 척·되묻기로 빠지지 말 것."
+          : "- 들어봤거나 일반 상식으로 아는 거면 아는 만큼 알맹이로 받아라. '그게 뭐야?'식 되묻기는 *정말 생소하고 네 결과도 무관할 때만*.",
+        "- 명사 변주·자기 얘기로 새기 금지. 사용자 메시지가 *anchor*임. 자동 농담·맞장구 X.",
       ].join("\n");
       break;
     case "reply-peer":
