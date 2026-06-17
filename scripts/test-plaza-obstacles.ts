@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { obstacleRadius, isoDist, clearOfObstacles } from "../src/lib/plaza-obstacles";
+import { pickClearSpot } from "../src/lib/position-drift";
 
 // obstacleRadius: short objects cast no keep-out, tall ones scale up.
 assert.equal(obstacleRadius(4.5), 0);   // dog
@@ -22,7 +23,6 @@ console.log("plaza-obstacles: all assertions passed");
 
 // pickClearSpot must avoid obstacles: with a fountain covering plaza
 // center, 200 picks should ALL land clear of it (clear regions exist).
-import { pickClearSpot } from "../src/lib/position-drift";
 const fountainObstacle = { x: 50, y: 60, radius: obstacleRadius(24) };
 for (let i = 0; i < 200; i++) {
   const spot = pickClearSpot([], [fountainObstacle]);
