@@ -18,8 +18,8 @@ export function LandingClient({ initialLocale }: { initialLocale: Locale }) {
         <img
           src="/logo_ehto_wordmark.png"
           alt="EHTO"
-          width={140}
-          height={54}
+          width={108}
+          height={42}
           className="pixelated"
           draggable={false}
         />
