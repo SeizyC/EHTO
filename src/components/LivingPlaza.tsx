@@ -114,7 +114,8 @@ function PlazaObject({ o, shadow }: { o: Obj; shadow: number }) {
 
 function Resident({ fig, bubbles, shadow }: { fig: Fig; bubbles: Bubble[]; shadow: number }) {
   const [x, setX] = useState(fig.start);
-  const [facing, setFacing] = useState(1);
+  // Sprites face LEFT by default (3/4 view). Heading right → mirror.
+  const [faceRight, setFaceRight] = useState(false);
   const [travel, setTravel] = useState(0);
   const xRef = useRef(fig.start);
 
@@ -124,7 +125,7 @@ function Resident({ fig, bubbles, shadow }: { fig: Fig; bubbles: Bubble[]; shado
       const cur = xRef.current;
       const target = fig.min + Math.random() * (fig.max - fig.min);
       const t = Math.max(2.5, Math.abs(target - cur) * 0.3);
-      setFacing(target >= cur ? 1 : -1);
+      if (Math.abs(target - cur) > 0.5) setFaceRight(target > cur); // ignore tiny nudges
       setTravel(t);
       setX(target);
       xRef.current = target;
@@ -154,8 +155,8 @@ function Resident({ fig, bubbles, shadow }: { fig: Fig; bubbles: Bubble[]; shado
           alt=""
           draggable={false}
           className="pixelated h-full w-auto object-contain object-bottom"
-          // sprites face RIGHT by default → scaleX(facing): right=1 (no flip), left=-1
-          style={{ transform: `scaleX(${facing})` }}
+          // left = default sprite; right = mirrored
+          style={{ transform: `scaleX(${faceRight ? -1 : 1})` }}
         />
         <AnimatePresence>
           {bubbles.map((b) => (
