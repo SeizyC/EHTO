@@ -101,11 +101,13 @@ export async function seedMembersIfEmpty(
         ),
       );
 
-  // members.name is UNIQUE. Localized (en/ja) names may collide with each
-  // other within this batch or with names already present in this world.
-  // De-duplicate only the localized names (ko names are pool-unique and
-  // untouched, preserving the ko path exactly). Existing-name set is fetched
-  // once; a colliding name gets a bounded numeric suffix.
+  // members.name has no DB UNIQUE constraint, but two identically-named
+  // residents in one plaza read as a bug to users — so we de-duplicate
+  // localized (en/ja) display names for quality. Generated names may collide
+  // within this batch or with names already present in this world. De-duplicate
+  // only the localized names (ko names are pool-unique and untouched, preserving
+  // the ko path exactly). Existing-name set is fetched once; a colliding name
+  // gets a bounded numeric suffix.
   const seedNames = new Set<string>();
   if (language !== "ko") {
     const { data: existing } = await sb
