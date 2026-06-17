@@ -5,10 +5,10 @@ import { AnimatePresence, motion } from "framer-motion";
 
 // Landing hero: a layered, living plaza built from sprites (no buildings).
 // Empty tiled floor (time-of-day by local hour) + furniture sprites
-// (fountain / trees / benches / lamp) + roaming residents + a dog, all
-// painted in feet-depth order so residents pass IN FRONT of nearer objects
-// and are OCCLUDED behind further ones (e.g. the fountain). Sample chat
-// bubbles + varied YouTube shares keep it alive.
+// (fountain / trees / benches / lamp) + roaming residents + a dog, painted in
+// feet-depth order so residents pass IN FRONT of nearer objects and are
+// OCCLUDED behind further ones (e.g. the fountain). Some residents stroll the
+// rear walkway behind the fountain. Daytime scenes get soft ground shadows.
 
 const ROOM = "/sprites/rooms";
 const SCENES = {
@@ -26,6 +26,29 @@ function sceneForHour(h: number): Scene {
   return "night";
 }
 
+function shadowFor(scene: Scene): number {
+  if (scene === "night") return 0;
+  if (scene === "evening") return 0.13;
+  return 0.24; // morning / afternoon
+}
+
+function Shadow({ opacity }: { opacity: number }) {
+  if (opacity <= 0) return null;
+  return (
+    <span
+      aria-hidden
+      className="absolute bottom-0 left-1/2 -z-10 rounded-[50%]"
+      style={{
+        width: "66%",
+        height: "15%",
+        transform: "translate(-50%, 38%)",
+        background: "radial-gradient(ellipse at center, rgba(0,0,0,0.5), rgba(0,0,0,0) 70%)",
+        opacity,
+      }}
+    />
+  );
+}
+
 type Obj = { key: string; src: string; x: number; y: number; h: number; flip?: boolean };
 const OBJECTS: Obj[] = [
   { key: "tree-l", src: `${ROOM}/objects/tree.png`, x: 14, y: 52, h: 27 },
@@ -39,13 +62,15 @@ const OBJECTS: Obj[] = [
 const DOG = { src: `${ROOM}/objects/dog_maltese_wagging.png`, x: 24, y: 3, h: 8 };
 
 type Fig = { src: string; y: number; h: number; dur: number; start: number; min: number; max: number };
+// Two far-back residents cross the rear walkway (their lanes span the centre
+// so they pass BEHIND the fountain via depth order). Rest are mid/front.
 const FIGURES: Fig[] = [
-  { src: "/sprites/hero/test_01.png", y: 42, h: 11, dur: 3.0, start: 30, min: 22, max: 44 }, // far-back (behind fountain)
-  { src: "/sprites/hero/test_02.png", y: 24, h: 13, dur: 2.6, start: 20, min: 14, max: 30 }, // back-left
-  { src: "/sprites/hero/test_04.png", y: 23, h: 13, dur: 2.9, start: 80, min: 70, max: 88 }, // back-right
-  { src: "/sprites/hero/test_05.png", y: 14, h: 15, dur: 2.7, start: 38, min: 30, max: 46 }, // mid-left
-  { src: "/sprites/hero/test_03.png", y: 13, h: 15, dur: 2.4, start: 62, min: 54, max: 70 }, // mid-right
-  { src: "/sprites/hero/test_01.png", y: 5, h: 17, dur: 2.5, start: 50, min: 40, max: 60 }, // front
+  { src: "/sprites/hero/test_01.png", y: 43, h: 11, dur: 3.2, start: 30, min: 18, max: 52 }, // far-back (behind fountain)
+  { src: "/sprites/hero/test_05.png", y: 41, h: 11, dur: 3.4, start: 64, min: 48, max: 82 }, // far-back (behind fountain)
+  { src: "/sprites/hero/test_02.png", y: 16, h: 14, dur: 2.6, start: 22, min: 16, max: 40 }, // mid-left
+  { src: "/sprites/hero/test_04.png", y: 15, h: 14, dur: 2.9, start: 64, min: 56, max: 80 }, // mid-right
+  { src: "/sprites/hero/test_03.png", y: 5, h: 17, dur: 2.4, start: 44, min: 34, max: 52 }, // front-left
+  { src: "/sprites/hero/test_01.png", y: 4, h: 17, dur: 2.6, start: 64, min: 56, max: 74 }, // front-right
 ];
 
 const LINES = [
@@ -64,29 +89,30 @@ const VIDEOS = [
   { id: "ImuWa3SJulY", title: "요즘 이거 무한반복" },
   { id: "gdZLi9oWNZg", title: "이건 명곡이지" },
 ];
-const VIDEO_FIGS = [3, 4, 5]; // central figures — a wider video bubble won't overflow
+const VIDEO_FIGS = [2, 3, 4, 5]; // mid/front figures
 
 type Bubble = { id: number; fig: number; kind: "text" | "video"; text: string; thumb?: string };
 
-function PlazaObject({ o }: { o: Obj }) {
+function PlazaObject({ o, shadow }: { o: Obj; shadow: number }) {
   return (
     <div
       className="absolute"
       style={{ left: `${o.x}%`, bottom: `${o.y}%`, height: `${o.h}%`, transform: "translateX(-50%)" }}
     >
+      <Shadow opacity={shadow} />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={o.src}
         alt=""
         draggable={false}
-        className="pixelated h-full w-auto object-contain object-bottom drop-shadow-[0_4px_7px_rgba(0,0,0,0.3)]"
+        className="pixelated h-full w-auto object-contain object-bottom"
         style={o.flip ? { transform: "scaleX(-1)" } : undefined}
       />
     </div>
   );
 }
 
-function Resident({ fig, bubbles }: { fig: Fig; bubbles: Bubble[] }) {
+function Resident({ fig, bubbles, shadow }: { fig: Fig; bubbles: Bubble[]; shadow: number }) {
   const [x, setX] = useState(fig.start);
   const [facing, setFacing] = useState(1);
   const [travel, setTravel] = useState(0);
@@ -121,14 +147,15 @@ function Resident({ fig, bubbles }: { fig: Fig; bubbles: Bubble[] }) {
         animate={{ y: [0, -5, 0] }}
         transition={{ duration: fig.dur, repeat: Infinity, ease: "easeInOut" }}
       >
+        <Shadow opacity={shadow} />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={fig.src}
           alt=""
           draggable={false}
-          className="pixelated h-full w-auto object-contain object-bottom drop-shadow-[0_3px_6px_rgba(0,0,0,0.4)]"
-          // sprites face LEFT by default → mirror so they face their heading
-          style={{ transform: `scaleX(${-facing})` }}
+          className="pixelated h-full w-auto object-contain object-bottom"
+          // sprites face RIGHT by default → scaleX(facing): right=1 (no flip), left=-1
+          style={{ transform: `scaleX(${facing})` }}
         />
         <AnimatePresence>
           {bubbles.map((b) => (
@@ -166,7 +193,7 @@ function Resident({ fig, bubbles }: { fig: Fig; bubbles: Bubble[] }) {
   );
 }
 
-function Dog() {
+function Dog({ shadow }: { shadow: number }) {
   return (
     <motion.div
       className="absolute"
@@ -174,12 +201,13 @@ function Dog() {
       animate={{ y: [0, -2, 0] }}
       transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
     >
+      <Shadow opacity={shadow} />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={DOG.src}
         alt=""
         draggable={false}
-        className="pixelated h-full w-auto object-contain object-bottom drop-shadow-[0_2px_5px_rgba(0,0,0,0.4)]"
+        className="pixelated h-full w-auto object-contain object-bottom"
       />
     </motion.div>
   );
@@ -210,6 +238,7 @@ export function LivingPlaza() {
   useEffect(() => {
     setScene(sceneForHour(new Date().getHours()));
   }, []);
+  const shadow = shadowFor(scene);
 
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   useEffect(() => {
@@ -248,13 +277,13 @@ export function LivingPlaza() {
 
   // Depth order: larger feet-bottom% = further away = painted first (behind).
   const entities = [
-    ...OBJECTS.map((o) => ({ key: o.key, y: o.y, el: <PlazaObject key={o.key} o={o} /> })),
+    ...OBJECTS.map((o) => ({ key: o.key, y: o.y, el: <PlazaObject key={o.key} o={o} shadow={shadow} /> })),
     ...FIGURES.map((f, i) => ({
       key: `fig-${i}`,
       y: f.y,
-      el: <Resident key={`fig-${i}`} fig={f} bubbles={bubbles.filter((b) => b.fig === i)} />,
+      el: <Resident key={`fig-${i}`} fig={f} bubbles={bubbles.filter((b) => b.fig === i)} shadow={shadow} />,
     })),
-    { key: "dog", y: DOG.y, el: <Dog key="dog" /> },
+    { key: "dog", y: DOG.y, el: <Dog key="dog" shadow={shadow} /> },
   ].sort((a, b) => b.y - a.y);
 
   return (
