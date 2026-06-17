@@ -3,6 +3,8 @@ import { userClient, serviceClient } from "@/lib/supabase";
 import { consumeOne, grant } from "@/lib/ticket-balance";
 import { TICKETS, isTicketKind } from "@/lib/tickets";
 import { kstDayLabel, memberCap, type Plan } from "@/lib/energy";
+import { sysMemberJoined } from "@/lib/system-messages";
+import type { Locale } from "@/lib/language";
 
 // POST /api/tickets/use  body: { kind }
 // Spends one ticket of `kind` and performs its action on the caller's plaza.
@@ -37,7 +39,7 @@ export async function POST(req: NextRequest) {
   const svc = serviceClient();
   const { data: world } = await svc
     .from("worlds")
-    .select("id, plan")
+    .select("id, plan, language")
     .eq("owner_id", userId)
     .maybeSingle();
   if (!world) return NextResponse.json({ error: "광장이 아직 없어요" }, { status: 400 });
@@ -94,7 +96,10 @@ export async function POST(req: NextRequest) {
       await svc.from("messages").insert({
         world_id: world.id,
         kind: "system",
-        text: `${benchName} 님이 입장하셨어요`,
+        text: sysMemberJoined(
+          (((world as { language?: string }).language ?? "ko") as Locale),
+          benchName ?? "",
+        ),
       });
     }
   } catch (e) {
