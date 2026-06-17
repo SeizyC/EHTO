@@ -216,12 +216,12 @@ export function LivingPlaza() {
     const allFigs = FIGURES.map((_, i) => i);
     const spawnText = () =>
       setBubbles((prev) => {
-        if (prev.length >= 4) return prev;
+        if (prev.length >= 3) return prev;
         const free = allFigs.filter((f) => !prev.some((b) => b.fig === f));
         if (free.length === 0) return prev;
         const fig = free[Math.floor(Math.random() * free.length)];
         const id = ++seq;
-        window.setTimeout(() => setBubbles((p) => p.filter((b) => b.id !== id)), 3200);
+        window.setTimeout(() => setBubbles((p) => p.filter((b) => b.id !== id)), 3800);
         return [...prev, { id, fig, kind: "text", text: LINES[Math.floor(Math.random() * LINES.length)] }];
       });
     const spawnVideo = () =>
@@ -235,7 +235,7 @@ export function LivingPlaza() {
           { id, fig, kind: "video", text: v.title, thumb: `https://img.youtube.com/vi/${v.id}/mqdefault.jpg` },
         ];
       });
-    const textIv = setInterval(spawnText, 1300);
+    const textIv = setInterval(spawnText, 2600);
     const vidIv = setInterval(spawnVideo, 14000);
     const firstVid = setTimeout(spawnVideo, 6000);
     return () => {
