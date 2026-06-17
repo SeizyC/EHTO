@@ -13,6 +13,7 @@ import {
 import { serviceClient, userClient, publicSpriteUrl } from "@/lib/supabase";
 import { ensureWorld, seedMembersIfEmpty } from "@/lib/world-seed";
 import { IMAGES_GENERATIONS_URL } from "@/lib/openai-urls";
+import { isLocale } from "@/lib/language";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -97,11 +98,16 @@ export async function POST(req: NextRequest) {
   const userId = userData.user.id;
 
   // 2. Validate body
-  let body: Partial<CharacterChoice>;
+  let body: Partial<CharacterChoice> & { language?: unknown };
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
   const { gender, skin, outfit, hairStyle, hairColor, accessory } = body;
+  // Optional plaza language chosen at creation. Only honored on first-time
+  // world creation (ensureWorld is idempotent); invalid/absent → undefined,
+  // letting the worlds.language column default ('ko') stand.
+  const rawLang = typeof body.language === "string" ? body.language : undefined;
+  const language = isLocale(rawLang) ? rawLang : undefined;
   if (
     !gender || !skin || !outfit || !hairStyle || !hairColor || !accessory ||
     !validGender.has(gender) || !validSkin.has(skin) || !validOutfit.has(outfit) ||
@@ -161,7 +167,7 @@ export async function POST(req: NextRequest) {
 
   // Ensure world + member roster exist (idempotent — only seeds first time).
   try {
-    const worldId = await ensureWorld(svc, userId);
+    const worldId = await ensureWorld(svc, userId, undefined, language);
     await seedMembersIfEmpty(svc, worldId);
   } catch (e) {
     // Don't fail character creation if world seed has trouble — just log.

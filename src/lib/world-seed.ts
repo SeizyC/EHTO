@@ -24,6 +24,7 @@ export async function ensureWorld(
   sb: SupabaseClient,
   ownerId: string,
   name?: string,
+  language?: Locale,
 ): Promise<string> {
   const { data: existing } = await sb
     .from("worlds")
@@ -39,9 +40,11 @@ export async function ensureWorld(
     return existing.id;
   }
 
+  // Only first-time creation honors `language`; omit it entirely when not
+  // chosen so the DB column default ('ko') stands — preserving the ko path.
   const { data: created, error } = await sb
     .from("worlds")
-    .insert({ owner_id: ownerId, name: name ?? null })
+    .insert({ owner_id: ownerId, name: name ?? null, ...(language ? { language } : {}) })
     .select("id")
     .single();
   if (error) throw new Error(`world insert: ${error.message}`);

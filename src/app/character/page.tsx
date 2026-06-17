@@ -23,6 +23,7 @@ import { MeGlyph } from "@/components/MeGlyph";
 import { MeSheet } from "@/components/MeSheet";
 import { useRequireSession } from "@/lib/use-require-session";
 import { currentBucket } from "@/lib/time-of-day";
+import { LOCALES, LOCALE_LABEL, DEFAULT_LOCALE, isLocale, type Locale } from "@/lib/about-content";
 
 const MAX_ROLLS = 3;
 
@@ -38,6 +39,11 @@ export default function CharacterPage() {
   const [hairStyle, setHairStyle] = useState<HairStyleId>("short");
   const [hairColor, setHairColor] = useState<HairColorId>("black");
   const [accessory, setAccessory] = useState<AccessoryId>("none");
+  // Plaza language for the world this character founds. Defaults to the
+  // user's current UI locale (the same `ehto:locale` key useLocale reads);
+  // falls back to "ko". Only sent on creation; the owner can change it later
+  // in world settings. SSR renders the default — reconciled on mount below.
+  const [language, setLanguage] = useState<Locale>(DEFAULT_LOCALE);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [characterId, setCharacterId] = useState<string | null>(null);
   const [rolledHair, setRolledHair] = useState<string | undefined>();
@@ -103,6 +109,18 @@ export default function CharacterPage() {
     return () => { cancelled = true; };
   }, [router]);
 
+  // Default the plaza language to the user's current UI locale. useLocale
+  // persists the picked locale to this same localStorage key on the public
+  // pages; if unset (never picked), we keep the "ko" default.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("ehto:locale");
+      if (isLocale(saved)) setLanguage(saved);
+    } catch {
+      /* private mode — keep default */
+    }
+  }, []);
+
   async function generate() {
     // Hard cap — same counter for first-make, re-roll, and re-select paths.
     if (rollsUsed >= MAX_ROLLS) {
@@ -126,7 +144,7 @@ export default function CharacterPage() {
           Authorization: `Bearer ${sess.session!.access_token}`,
         },
         body: JSON.stringify({
-          gender, skin, outfit, hairStyle, hairColor, accessory,
+          gender, skin, outfit, hairStyle, hairColor, accessory, language,
         }),
       });
       const j = await r.json();
@@ -173,8 +191,10 @@ export default function CharacterPage() {
         <SelectView
           gender={gender} skin={skin} outfit={outfit}
           hairStyle={hairStyle} hairColor={hairColor} accessory={accessory}
+          language={language}
           onGender={setGender} onSkin={setSkin} onOutfit={setOutfit}
           onHairStyle={setHairStyle} onHairColor={setHairColor} onAccessory={setAccessory}
+          onLanguage={setLanguage}
           onGenerate={generate}
           canGenerate={canRoll}
           remaining={remaining}
@@ -226,12 +246,14 @@ export default function CharacterPage() {
 function SelectView(props: {
   gender: GenderId; skin: SkinId; outfit: OutfitId;
   hairStyle: HairStyleId; hairColor: HairColorId; accessory: AccessoryId;
+  language: Locale;
   onGender: (g: GenderId) => void;
   onSkin: (s: SkinId) => void;
   onOutfit: (o: OutfitId) => void;
   onHairStyle: (h: HairStyleId) => void;
   onHairColor: (c: HairColorId) => void;
   onAccessory: (a: AccessoryId) => void;
+  onLanguage: (l: Locale) => void;
   onGenerate: () => void;
   canGenerate: boolean;
   remaining: number;
@@ -254,6 +276,39 @@ function SelectView(props: {
         <PillRow label="머리색" options={HAIR_COLORS} value={props.hairColor} onChange={props.onHairColor} />
         <PillRow label="착장"   options={OUTFITS}     value={props.outfit}    onChange={props.onOutfit} />
         <PillRow label="장신구" options={ACCESSORIES} value={props.accessory} onChange={props.onAccessory} />
+
+        {/* Plaza language — sets worlds.language for the world this character
+            founds. Defaults to the user's UI locale; drives native member
+            generation + ambient language. Same pill style as the rows above. */}
+        <div>
+          <div className="text-sub mb-2.5 text-[10px] uppercase tracking-[0.22em]">
+            광장 언어
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {LOCALES.map((l) => {
+              const active = l === props.language;
+              return (
+                <button
+                  key={l}
+                  type="button"
+                  onClick={() => props.onLanguage(l)}
+                  aria-pressed={active}
+                  className={[
+                    "rounded-full border px-4 py-2 text-[13px] font-semibold transition",
+                    active
+                      ? "border-ink bg-ink text-bg"
+                      : "border-line text-sub active:bg-panel hover:border-dim",
+                  ].join(" ")}
+                >
+                  {LOCALE_LABEL[l]}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-sub mt-2 text-[11px] leading-relaxed">
+            머무는 사람들의 언어 · 나중에 광장 설정에서 바꿀 수 있어요
+          </p>
+        </div>
       </section>
 
       <footer className="mt-7 flex flex-col gap-3">

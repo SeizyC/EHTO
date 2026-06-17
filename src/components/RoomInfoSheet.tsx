@@ -7,6 +7,7 @@ import { worldAge } from "@/lib/age";
 import { banMember, useMembers } from "@/lib/members-store";
 import { CURATED_KPOP_ARTISTS, type WorldBias } from "@/lib/world-bias";
 import { browserClient } from "@/lib/supabase";
+import { LOCALES, LOCALE_LABEL, type Locale } from "@/lib/about-content";
 
 type Props = {
   open: boolean;
@@ -71,6 +72,10 @@ export function RoomInfoSheet({ open, onClose }: Props) {
                   artist; planted in the system prompt and as extra news
                   queries so the plaza's chatter tilts toward the theme. */}
               {world?.owner && <BiasSettings bias={world.bias ?? null} />}
+
+              {/* Owner-only: 광장 언어. Single source of truth (worlds.language)
+                  for native member generation, ambient + news language. */}
+              {world?.owner && <LanguageSettings language={world.language} />}
 
               {/* Owner-only: implicit preference transparency panel.
                   Surfaces the top topics the system has captured from
@@ -412,6 +417,56 @@ function BiasSettings({ bias }: { bias: WorldBias | null }) {
         </div>
       )}
 
+      {err && <p className="text-accent mt-2 text-[11px]">{err}</p>}
+    </section>
+  );
+}
+
+function LanguageSettings({ language }: { language: Locale }) {
+  const [saving, setSaving] = useState<Locale | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function pick(next: Locale) {
+    if (next === language || saving) return;
+    setSaving(next);
+    setErr(null);
+    const { error } = await updateWorldSettings({ language: next });
+    setSaving(null);
+    if (error) setErr(error);
+  }
+
+  return (
+    <section className="mb-6">
+      <SectionLabel>광장 언어</SectionLabel>
+      <p className="text-sub mt-1 text-[10.5px]">
+        머무는 사람들과 흐르는 화제의 언어
+      </p>
+      <div
+        role="group"
+        aria-label="광장 언어"
+        className="mt-2.5 flex flex-wrap gap-1.5"
+      >
+        {LOCALES.map((l) => {
+          const active = l === language;
+          return (
+            <button
+              key={l}
+              type="button"
+              onClick={() => pick(l)}
+              disabled={saving !== null}
+              aria-pressed={active}
+              className={
+                "rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition disabled:opacity-50 " +
+                (active
+                  ? "border-ink bg-ink text-bg"
+                  : "border-line text-sub hover:border-dim hover:bg-panel")
+              }
+            >
+              {LOCALE_LABEL[l]}
+            </button>
+          );
+        })}
+      </div>
       {err && <p className="text-accent mt-2 text-[11px]">{err}</p>}
     </section>
   );
