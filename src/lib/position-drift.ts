@@ -133,12 +133,20 @@ async function buildObstacles(
   if (!objRows || objRows.length === 0) return [];
   const cat = await catalogAll(sb);
   const heightByVariant = new Map<string, number>();
-  for (const t of cat) for (const v of t.variants) heightByVariant.set(v.id, t.nativeHeightPct);
+  const heightByTypeKey = new Map<string, number>();
+  for (const t of cat) {
+    heightByTypeKey.set(t.typeKey, t.nativeHeightPct);
+    for (const v of t.variants) heightByVariant.set(v.id, t.nativeHeightPct);
+  }
   const obstacles: Obstacle[] = [];
   for (const r of objRows as Array<{ x: number; y: number; scale: number | null; type: string; variant_id: string | null }>) {
+    // Resolve display height: static TS catalog → DB variant → DB type key
+    // → 0. The type-key fallback mirrors the render enrich path
+    // (api/world/objects) so tall dynamic objects with a null variant_id
+    // still register as obstacles instead of being silently dropped.
     const staticH = OBJECT_CATALOG[r.type as PlazaObjectType]?.nativeHeightPct;
     const dynH = r.variant_id ? heightByVariant.get(r.variant_id) : undefined;
-    const h = (staticH ?? dynH ?? 0) * (r.scale ?? 1);
+    const h = (staticH ?? dynH ?? heightByTypeKey.get(r.type) ?? 0) * (r.scale ?? 1);
     const radius = obstacleRadius(h);
     if (radius > 0) obstacles.push({ x: r.x, y: r.y, radius });
   }
