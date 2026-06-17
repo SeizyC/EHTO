@@ -127,7 +127,8 @@ function Resident({ fig, bubbles }: { fig: Fig; bubbles: Bubble[] }) {
           alt=""
           draggable={false}
           className="pixelated h-full w-auto object-contain object-bottom drop-shadow-[0_3px_6px_rgba(0,0,0,0.4)]"
-          style={{ transform: `scaleX(${facing})` }}
+          // sprites face LEFT by default → mirror so they face their heading
+          style={{ transform: `scaleX(${-facing})` }}
         />
         <AnimatePresence>
           {bubbles.map((b) => (
@@ -216,12 +217,12 @@ export function LivingPlaza() {
     const allFigs = FIGURES.map((_, i) => i);
     const spawnText = () =>
       setBubbles((prev) => {
-        if (prev.length >= 3) return prev;
+        if (prev.length >= 2) return prev;
         const free = allFigs.filter((f) => !prev.some((b) => b.fig === f));
         if (free.length === 0) return prev;
         const fig = free[Math.floor(Math.random() * free.length)];
         const id = ++seq;
-        window.setTimeout(() => setBubbles((p) => p.filter((b) => b.id !== id)), 3800);
+        window.setTimeout(() => setBubbles((p) => p.filter((b) => b.id !== id)), 4800);
         return [...prev, { id, fig, kind: "text", text: LINES[Math.floor(Math.random() * LINES.length)] }];
       });
     const spawnVideo = () =>
@@ -235,7 +236,7 @@ export function LivingPlaza() {
           { id, fig, kind: "video", text: v.title, thumb: `https://img.youtube.com/vi/${v.id}/mqdefault.jpg` },
         ];
       });
-    const textIv = setInterval(spawnText, 2600);
+    const textIv = setInterval(spawnText, 4000);
     const vidIv = setInterval(spawnVideo, 14000);
     const firstVid = setTimeout(spawnVideo, 6000);
     return () => {
