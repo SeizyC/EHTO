@@ -88,10 +88,10 @@ toggle is available top-right.
 
 ## Key pages
 
-- [Home / landing](https://ehto.hans1329.workers.dev/): product intro + sign in
-- [About](https://ehto.hans1329.workers.dev/about): full explanation (this summary in HTML, trilingual, with schema.org structured data)
-- [Sign up](https://ehto.hans1329.workers.dev/signup)
-- [Log in](https://ehto.hans1329.workers.dev/login)
+- [Home / landing](https://ehto.world/): product intro + sign in
+- [About](https://ehto.world/about): full explanation (this summary in HTML, trilingual, with schema.org structured data)
+- [Sign up](https://ehto.world/signup)
+- [Log in](https://ehto.world/login)
 
 ## FAQ
 

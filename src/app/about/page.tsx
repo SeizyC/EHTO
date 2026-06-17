@@ -6,7 +6,7 @@ import { countryToLocale } from "@/lib/about-content";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic"; // reads cf-ipcountry per request
 
-const SITE_URL = "https://ehto.hans1329.workers.dev";
+const SITE_URL = "https://ehto.world";
 const ABOUT_URL = `${SITE_URL}/about`;
 
 // Rich, language-tagged metadata. Description is written for machine
