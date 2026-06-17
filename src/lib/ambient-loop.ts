@@ -20,6 +20,8 @@ import {
   type LineShape,
   type SpeechIntent,
 } from "@/lib/member-reply";
+import type { Locale } from "@/lib/language";
+import { peerHintLine } from "@/lib/prompt-i18n";
 import { fetchRecentMemory } from "@/lib/memory-engine";
 import { extractTopic, fetchPeerRelations, recordInteraction } from "@/lib/member-relations";
 import { getNewsHeadlines } from "@/lib/news-fetch";
@@ -153,9 +155,10 @@ export async function tickAmbientConversation(
   // Fetch world+owner info for the check-in path (also used for cooldown).
   const { data: world } = await sb
     .from("worlds")
-    .select("owner_id, last_owner_checkin_at, bias, plan, moments_used, moments_day, interject_used, interject_day")
+    .select("owner_id, last_owner_checkin_at, bias, plan, moments_used, moments_day, interject_used, interject_day, language")
     .eq("id", worldId)
     .maybeSingle();
+  const language = (world?.language ?? "ko") as Locale;
   let ownerHandle: string | null = null;
   if (world?.owner_id) {
     const { data: prof } = await sb
@@ -355,12 +358,7 @@ export async function tickAmbientConversation(
   const peerRelations = await fetchPeerRelations(sb, speaker.id, 3);
   const peerHints = peerRelations
     .filter((r) => r.interactionCount >= 2 || r.sharedTopics.length > 0)
-    .map((r) => {
-      const topics = r.sharedTopics.length > 0
-        ? ` (${r.sharedTopics.slice(-2).join(", ")})`
-        : "";
-      return `- ${r.peerName}: 같이 어울린 적 ${r.interactionCount}회${topics}`;
-    });
+    .map((r) => peerHintLine(language, r.peerName, r.interactionCount, r.sharedTopics));
 
   // Generate + insert.
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -395,14 +393,12 @@ export async function tickAmbientConversation(
   const skipShape = intent.type === "reply-user" || intent.type === "reply-user-mention";
   const shape = skipShape ? undefined : pickShape(intent.type);
   const text = await generateAmbientLine(speaker, transcript, {
-    // TODO(Task 7): thread the plaza language through here instead of the
-    // ko stopgap so non-ko rooms compose their prompt + reply correctly.
-    language: "ko",
+    language,
     intent,
     shape,
     avoid,
     memory,
-    joinedAgo: formatJoinedAgo(speaker.activated_at),
+    joinedAgo: formatJoinedAgo(speaker.activated_at, language),
     newsHeadlines,
     peerHints,
     sceneHint,

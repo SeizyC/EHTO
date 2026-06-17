@@ -269,6 +269,14 @@ export function peerHintLine(language: Locale, name: string, count: number, topi
   return `- ${name}: hung out ${count} time(s)${t}`;
 }
 
+// Localized label for the join-time fact ("- <label>: <joinedAgo>").
+// `ko` is verbatim — it must keep buildSystemPrompt(ko) byte-identical.
+export function joinedAgoLabel(language: Locale): string {
+  if (language === "en") return "Joined this plaza";
+  if (language === "ja") return "この広場に来た時期";
+  return "이 광장에 들어온 시기";
+}
+
 // NOTE: an earlier draft exported PROMPT_LABELS (per-language hint-block
 // headers) for member-reply.ts to assemble each block as `<label>\n<body>`.
 // The final design instead embeds the localized labels directly inside

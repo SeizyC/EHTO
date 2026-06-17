@@ -11,7 +11,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { chatComplete, chatCompleteWithVideo, CHAT_MODEL, FILLER_CHAT_MODEL } from "@/lib/claude";
 import type { Locale } from "@/lib/language";
-import { PROMPT_FRAME, languageDirective } from "@/lib/prompt-i18n";
+import { PROMPT_FRAME, languageDirective, joinedAgoLabel } from "@/lib/prompt-i18n";
 
 type Member = {
   id: string;
@@ -114,7 +114,7 @@ function buildSystemPrompt(
   const backstory = m.backstory ?? "";
 
   const factLines: string[] = [];
-  if (opts?.joinedAgo) factLines.push(`- 이 광장에 들어온 시기: ${opts.joinedAgo}`);
+  if (opts?.joinedAgo) factLines.push(`- ${joinedAgoLabel(opts.language)}: ${opts.joinedAgo}`);
 
   const memoryLines = (opts?.memory ?? []).map((m) => `- ${m}`);
   const newsLines = (opts?.newsHeadlines ?? []).slice(0, 6).map((h) => `- ${h}`);
