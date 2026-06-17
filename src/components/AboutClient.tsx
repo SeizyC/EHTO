@@ -29,8 +29,8 @@ export function AboutClient({ initialLocale }: Props) {
         <img
           src="/logo_ehto_wordmark.png"
           alt="EHTO"
-          width={180}
-          height={70}
+          width={153}
+          height={60}
           className="pixelated mb-6"
           draggable={false}
         />

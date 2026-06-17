@@ -57,8 +57,8 @@ export default function LoginPage() {
         <img
           src="/logo_ehto_wordmark.png"
           alt="EHTO"
-          width={200}
-          height={78}
+          width={170}
+          height={66}
           className="pixelated"
           draggable={false}
         />

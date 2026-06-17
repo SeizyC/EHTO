@@ -12,6 +12,14 @@
 //      again avoiding stacking on neighbours.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { OBJECT_CATALOG, type PlazaObjectType } from "@/lib/plaza-objects";
+import { catalogAll } from "@/lib/object-catalog";
+import {
+  obstacleRadius,
+  isoDist,
+  clearOfObstacles,
+  type Obstacle,
+} from "@/lib/plaza-obstacles";
 
 // Floor band — widened in two passes 2026-05-31:
 //   pass 1: (14–86 / 42–80) → (8–92 / 36–80)   — use whole canvas
@@ -60,43 +68,37 @@ function clamp(n: number, lo: number, hi: number) {
   return Math.min(hi, Math.max(lo, n));
 }
 
-function dist(a: { x: number; y: number }, b: { x: number; y: number }) {
-  const dx = a.x - b.x;
-  const dy = (a.y - b.y) * 1.4;
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
-// Pick a random floor-band point that's clear of every `taken` point.
-// Tries `attempts` candidates and returns the best (most-distant from
-// nearest neighbour) so dense plazas still progress instead of locking
-// up at the default coordinate.
-function pickClearSpot(
+// Pick a random floor-band point clear of every `taken` character AND
+// every object obstacle. Prefers a spot that's both clear of obstacles
+// and ≥ MIN_GAP from neighbours; falls back to the best obstacle-clear
+// spot, then to the best spot overall, so dense plazas still progress.
+export function pickClearSpot(
   taken: Array<{ x: number; y: number }>,
+  obstacles: Obstacle[],
   yBand?: [number, number],
   attempts = 12,
 ): { x: number; y: number } {
   const [yMin, yMax] = yBand
     ?? DEPTH_BUCKETS[Math.floor(Math.random() * DEPTH_BUCKETS.length)];
-  let best = {
+  const sample = () => ({
     x: FLOOR_X_MIN + Math.random() * (FLOOR_X_MAX - FLOOR_X_MIN),
     y: yMin + Math.random() * (yMax - yMin),
-  };
+  });
+  let best = sample();
   let bestMinD = -1;
+  let bestClear: { x: number; y: number } | null = null;
+  let bestClearMinD = -1;
   for (let i = 0; i < attempts; i++) {
-    const cand = {
-      x: FLOOR_X_MIN + Math.random() * (FLOOR_X_MAX - FLOOR_X_MIN),
-      y: yMin + Math.random() * (yMax - yMin),
-    };
+    const cand = sample();
+    const clear = clearOfObstacles(cand, obstacles);
     const minD = taken.length === 0
       ? Infinity
-      : Math.min(...taken.map((t) => dist(cand, t)));
-    if (minD >= MIN_GAP) return cand;
-    if (minD > bestMinD) {
-      bestMinD = minD;
-      best = cand;
-    }
+      : Math.min(...taken.map((t) => isoDist(cand, t)));
+    if (clear && minD >= MIN_GAP) return cand;
+    if (clear && minD > bestClearMinD) { bestClearMinD = minD; bestClear = cand; }
+    if (minD > bestMinD) { bestMinD = minD; best = cand; }
   }
-  return best;
+  return bestClear ?? best;
 }
 
 type Row = {
@@ -115,6 +117,40 @@ function isUninitialized(r: Row): boolean {
   // function so the only way (50, 60, false) lingers is if no scatter
   // has run yet for that row.
   return r.x === 50 && r.y === 60 && r.flip === false;
+}
+
+// Build object keep-out obstacles for a world. Static types resolve
+// their display height from the TS catalog; dynamic types from the DB
+// catalog (by variant id). Short objects (radius 0) are dropped.
+async function buildObstacles(
+  sb: SupabaseClient,
+  worldId: string,
+): Promise<Obstacle[]> {
+  const { data: objRows } = await sb
+    .from("plaza_objects")
+    .select("x, y, scale, type, variant_id")
+    .eq("world_id", worldId);
+  if (!objRows || objRows.length === 0) return [];
+  const cat = await catalogAll(sb);
+  const heightByVariant = new Map<string, number>();
+  const heightByTypeKey = new Map<string, number>();
+  for (const t of cat) {
+    heightByTypeKey.set(t.typeKey, t.nativeHeightPct);
+    for (const v of t.variants) heightByVariant.set(v.id, t.nativeHeightPct);
+  }
+  const obstacles: Obstacle[] = [];
+  for (const r of objRows as Array<{ x: number; y: number; scale: number | null; type: string; variant_id: string | null }>) {
+    // Resolve display height: static TS catalog → DB variant → DB type key
+    // → 0. The type-key fallback mirrors the render enrich path
+    // (api/world/objects) so tall dynamic objects with a null variant_id
+    // still register as obstacles instead of being silently dropped.
+    const staticH = OBJECT_CATALOG[r.type as PlazaObjectType]?.nativeHeightPct;
+    const dynH = r.variant_id ? heightByVariant.get(r.variant_id) : undefined;
+    const h = (staticH ?? dynH ?? heightByTypeKey.get(r.type) ?? 0) * (r.scale ?? 1);
+    const radius = obstacleRadius(h);
+    if (radius > 0) obstacles.push({ x: r.x, y: r.y, radius });
+  }
+  return obstacles;
 }
 
 export async function tickMemberPositions(
@@ -138,6 +174,7 @@ export async function tickMemberPositions(
     .eq("status", "active");
   if (!rows || rows.length === 0) return { scattered: 0, moved: 0 };
   const typed = rows as Row[];
+  const obstacles = await buildObstacles(sb, worldId);
 
   // Snapshot of every CURRENT position so scatter + drift both avoid
   // collisions with everyone (not just the rows they'll touch).
@@ -159,7 +196,7 @@ export async function tickMemberPositions(
     // naturally pushes them off the center because the first scattered
     // member updates the snapshot before the next one runs.
     const others = positions.filter((p) => p.id !== r.id);
-    const spot = pickClearSpot(others);
+    const spot = pickClearSpot(others, obstacles);
     const flip = spot.x > PLAZA_CENTER_X;
     const { error } = await sb
       .from("members")
@@ -210,9 +247,10 @@ export async function tickMemberPositions(
       const nx = clamp(curX + dx, FLOOR_X_MIN, FLOOR_X_MAX);
       const ny = clamp(curY + dy, FLOOR_Y_MIN, FLOOR_Y_MAX);
       const cand = { x: nx, y: ny };
+      if (!clearOfObstacles(cand, obstacles)) continue; // never drift into an object
       const minD = others.length === 0
         ? Infinity
-        : Math.min(...others.map((o) => dist(cand, o)));
+        : Math.min(...others.map((o) => isoDist(cand, o)));
       if (minD >= MIN_GAP) { best = cand; bestMinD = minD; break; }
       if (minD > bestMinD) { bestMinD = minD; best = cand; }
     }
