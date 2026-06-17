@@ -237,15 +237,22 @@ function Dog({ shadow }: { shadow: number }) {
   );
 }
 
-function MusicCard() {
+const MUSIC: Record<Locale, { who: string; track: string }> = {
+  ko: { who: "하루", track: "밤 산책하기 좋은 곡" },
+  en: { who: "Haru", track: "perfect for a night walk" },
+  ja: { who: "ハル", track: "夜の散歩に合う曲" },
+};
+
+function MusicCard({ locale }: { locale: Locale }) {
+  const m = MUSIC[locale];
   return (
     <div className="pointer-events-none absolute bottom-3 right-3 z-20">
       <div className="border-line overflow-hidden rounded-2xl border shadow-md" style={{ background: "#141014", maxWidth: 230 }}>
         <div className="flex items-center gap-2 px-2.5 py-1.5">
           <span aria-hidden style={{ color: "#E8C067" }} className="text-[12px] leading-none">♪</span>
-          <span className="text-ink shrink-0 text-[11px] font-medium leading-none">하루</span>
+          <span className="text-ink shrink-0 text-[11px] font-medium leading-none">{m.who}</span>
           <span className="text-dim text-[10px] leading-none">·</span>
-          <span className="text-sub truncate text-[11px] leading-none">밤 산책하기 좋은 곡</span>
+          <span className="text-sub truncate text-[11px] leading-none">{m.track}</span>
           <span className="ml-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full" style={{ background: "#1DB954" }} aria-hidden>
             <svg viewBox="0 0 12 12" width="9" height="9" fill="#0a0a0a">
               <path d="M2.5 1.5 L2.5 10.5 L10 6 Z" />
@@ -319,7 +326,7 @@ export function LivingPlaza({ locale }: { locale: Locale }) {
 
       {entities.map((e) => e.el)}
 
-      <MusicCard />
+      <MusicCard locale={locale} />
 
       <div className="from-bg pointer-events-none absolute inset-x-0 bottom-0 h-[8%] bg-gradient-to-t to-transparent" />
     </div>
