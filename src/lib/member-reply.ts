@@ -221,8 +221,9 @@ export async function generateGreeting(
 export async function generateMemberReply(
   member: Member,
   userText: string,
+  language: Locale = "ko",
 ): Promise<string | null> {
-  const system = buildSystemPrompt(member, { language: "ko" });
+  const system = buildSystemPrompt(member, { language });
   const text = await callChat(system, userText, MAX_TOKENS);
   return text ? clean(text) : null;
 }
