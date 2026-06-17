@@ -12,3 +12,6 @@ build/
 *.log
 .cache/
 tmp/
+
+# TS incremental build artifact
+tsconfig.tsbuildinfo
