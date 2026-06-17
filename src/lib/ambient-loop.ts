@@ -375,7 +375,7 @@ export async function tickAmbientConversation(
   // once here so news-fetch and the system-prompt nudge share the
   // exact same snapshot.
   const implicit = await aggregateImplicit(sb, worldId);
-  const newsHeadlines = await getNewsHeadlines(worldBias, implicit);
+  const newsHeadlines = await getNewsHeadlines(worldBias, implicit, language);
   const biasHint = biasPromptLine(worldBias, language);
   // implicitHint — top 1-2 keywords, joined. Empty when cold-start or
   // below the panel floor.
