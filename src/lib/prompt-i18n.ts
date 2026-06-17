@@ -269,64 +269,9 @@ export function peerHintLine(language: Locale, name: string, count: number, topi
   return `- ${name}: hung out ${count} time(s)${t}`;
 }
 
-// Localized header labels for the conditional hint blocks. The next task
-// (member-reply.ts) builds each block as `<label>\n<body>` so the prompt
-// can be assembled in any language. The `ko` strings are the verbatim
-// headers used today in buildSystemPrompt.
-//
-// Block bodies that carry a trailing instruction line (bias, implicit,
-// news) keep that line here too so the whole block stays localized.
-export type PromptLabels = {
-  /** factLines block header. */
-  facts: string;
-  /** biasHint block: header + the trailing "weave it in" instruction. */
-  biasHeader: string;
-  biasFooter: string;
-  /** implicitHint block: header + trailing instruction. */
-  implicitHeader: string;
-  implicitFooter: string;
-  /** sceneHint block header. */
-  scene: string;
-  /** memory block header. */
-  memory: string;
-  /** peer block header. */
-  peers: string;
-  /** news block header (the long anti-hallucination instruction line). */
-  news: string;
-};
-
-export const PROMPT_LABELS: Record<Locale, PromptLabels> = {
-  ko: {
-    facts: "사실 (질문 받으면 이대로 답함, 거짓 X):",
-    biasHeader: "[광장 정체성]",
-    biasFooter: "관련 화제를 자연스럽게 섞어내. 단, 모든 라인이 이 주제일 필요는 없음 — 일상도 OK.",
-    implicitHeader: "[최근 자주 떠올랐던 결]",
-    implicitFooter: "매번 강요는 아니지만 결이 그쪽으로 자연스럽게 흐를 때 한 줄 흘려도 좋아.",
-    scene: "지금 광장 vibe (배경일 뿐 — 톤만 살짝 묻어남):",
-    memory: "최근 며칠 기억 (참고만, 매번 인용 X):",
-    peers: "같이 어울려본 사람들 (필요할 때만 자연스럽게):",
-    news: "오늘(KST 9시 이후) 발행된 뉴스 헤드라인. 자기 결에 닿는 게 있을 때만 자연스럽게 한 줄 꺼내. 아래 목록에 없는 사건·아이템·인물을 '오늘 봤다'고 만들어내면 안 됨. 굳이 인용할 거 없으면 안 해도 됨:",
-  },
-  en: {
-    facts: "Facts (answer truthfully like this if asked, no lying):",
-    biasHeader: "[Plaza identity]",
-    biasFooter: "Weave related topics in naturally. But not every line has to be about this — everyday stuff is fine too.",
-    implicitHeader: "[What's been on people's minds lately]",
-    implicitFooter: "No need to force it every time, but when the flow naturally drifts that way, it's fine to drop a line.",
-    scene: "Plaza vibe right now (just backdrop — let it tint the tone only):",
-    memory: "Memories from the last few days (reference only, don't quote every time):",
-    peers: "People you've hung out with (only when it comes up naturally):",
-    news: "Headlines published today. Pull one into a line only when it genuinely touches your interests, and only naturally. Don't invent an event, item, or person as something you \"saw today\" if it's not in the list below. If nothing's worth citing, skip it:",
-  },
-  ja: {
-    facts: "事実（聞かれたらこの通りに答える、嘘はナシ）:",
-    biasHeader: "[広場のアイデンティティ]",
-    biasFooter: "関連する話題を自然に混ぜて。ただし全部の行がこのテーマである必要はない — 日常もOK。",
-    implicitHeader: "[最近よく話に出ていた流れ]",
-    implicitFooter: "毎回強制ではないけど、流れが自然とそっちに向いたとき一言こぼしてもいい。",
-    scene: "今の広場の空気（背景なだけ — トーンに少し滲ませるだけ）:",
-    memory: "ここ数日の記憶（参考だけ、毎回引用しない）:",
-    peers: "一緒に過ごしたことのある人たち（必要なときだけ自然に）:",
-    news: "今日発行されたニュースの見出し。自分の色に触れるものがあるときだけ自然に一言出す。下のリストにない出来事・アイテム・人物を「今日見た」と作り出してはいけない。わざわざ引用するものがなければしなくていい:",
-  },
-};
+// NOTE: an earlier draft exported PROMPT_LABELS (per-language hint-block
+// headers) for member-reply.ts to assemble each block as `<label>\n<body>`.
+// The final design instead embeds the localized labels directly inside
+// PROMPT_FRAME, so member-reply hands the frame raw hint inputs and the
+// frame composes the whole block. PROMPT_LABELS became dead code and was
+// removed.

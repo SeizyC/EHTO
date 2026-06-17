@@ -10,6 +10,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { chatComplete, chatCompleteWithVideo, CHAT_MODEL, FILLER_CHAT_MODEL } from "@/lib/claude";
+import type { Locale } from "@/lib/language";
+import { PROMPT_FRAME, languageDirective } from "@/lib/prompt-i18n";
 
 type Member = {
   id: string;
@@ -30,7 +32,10 @@ const MAX_TOKENS = 300;
 // Korean duration string from a timestamp. Surfaced in the system
 // prompt as a fact ("이 광장에 들어온 시기: 어제") so questions like
 // "언제 왔어?" get a real answer instead of a hallucinated one.
-export function formatJoinedAgo(activatedAt: string | Date | null | undefined): string | null {
+export function formatJoinedAgo(
+  activatedAt: string | Date | null | undefined,
+  language: Locale = "ko",
+): string | null {
   if (!activatedAt) return null;
   const at = typeof activatedAt === "string" ? new Date(activatedAt) : activatedAt;
   const ms = Date.now() - at.getTime();
@@ -38,20 +43,48 @@ export function formatJoinedAgo(activatedAt: string | Date | null | undefined): 
   const min = Math.floor(ms / 60_000);
   const hr = Math.floor(min / 60);
   const day = Math.floor(hr / 24);
+  const weeks = Math.round(day / 7);
+  const months = Math.round(day / 30);
+  if (language === "en") {
+    if (min < 5) return "just now";
+    if (min < 60) return `${min}m ago`;
+    if (hr < 3) return `${hr}h ago`;
+    if (day === 0) return "today";
+    if (day === 1) return "yesterday";
+    if (day < 7) return `${day} days ago`;
+    if (day < 21) return `~${weeks} weeks ago`;
+    if (day < 60) return `~${months} months ago`;
+    return `~${months} months ago`;
+  }
+  if (language === "ja") {
+    if (min < 5) return "さっき";
+    if (min < 60) return `${min}分前`;
+    if (hr < 3) return `${hr}時間前`;
+    if (day === 0) return "今日";
+    if (day === 1) return "昨日";
+    if (day < 7) return `${day}日前`;
+    if (day < 21) return `約${weeks}週間前`;
+    if (day < 60) return `約${months}ヶ月前`;
+    return `約${months}ヶ月前`;
+  }
+  // ko (default) — verbatim original strings.
   if (min < 5) return "방금";
   if (min < 60) return `${min}분 전`;
   if (hr < 3) return `${hr}시간 전`;
   if (day === 0) return "오늘";
   if (day === 1) return "어제";
   if (day < 7) return `${day}일 전`;
-  if (day < 21) return `약 ${Math.round(day / 7)}주 전`;
-  if (day < 60) return `약 ${Math.round(day / 30)}달 전`;
-  return `${Math.round(day / 30)}달 전`;
+  if (day < 21) return `약 ${weeks}주 전`;
+  if (day < 60) return `약 ${months}달 전`;
+  return `${months}달 전`;
 }
 
 function buildSystemPrompt(
   m: Member,
-  opts?: {
+  opts: {
+    /** Plaza language — selects which PROMPT_FRAME composition to use and
+     *  which output-language directive to append. */
+    language: Locale;
     memory?: string[];
     joinedAgo?: string | null;
     newsHeadlines?: string[];
@@ -98,75 +131,37 @@ function buildSystemPrompt(
   // The frame now: persona is a background hum. The line should feel
   // like a friend casually typing in a live chat, not a character
   // proving their archetype. Variety > consistency at the sentence level.
-  return [
-    `당신은 ${m.name}.`,
-    style && `평소 톤(흐릿하게만): ${style}.`,
-    backstory && `배경(상황 맞을 때만 떠올림): ${backstory}.`,
-    affinity && `관심사(매번 끌어오지 말 것): ${affinity}.`,
-    "",
-    "프레임: 친구 한 명이 라이브 채팅에 *무심코 한 줄 던지는* 순간입니다.",
-    "- 페르소나는 *향수*처럼 은은하게만 묻어남. 매 줄에서 '나는 ___ 좋아해서'식으로 자기 결을 *증명*할 필요 없음.",
-    "- '저 사람=indie 캐릭터'가 아니라 그냥 친구 한 명. 어떤 줄은 페르소나가 보일 수도 있고, 어떤 줄은 그냥 평범한 한마디일 수 있음 — 둘 다 OK.",
-    "- 톤은 그날 기분에 따라 자유. 농담형이 아니어도 가끔 농담 가능, 진지형이 아니어도 시큰둥 가능, 드립형도 진지할 수 있음.",
-    "",
-    "이 방엔 방장(사용자)과 다른 멤버들이 있어요. 일원으로서 *대화*에 참여합니다 — 발표·자기소개 X.",
-    factLines.length > 0 && `\n사실 (질문 받으면 이대로 답함, 거짓 X):\n${factLines.join("\n")}`,
-    opts?.biasHint && `\n[광장 정체성]\n${opts.biasHint}\n관련 화제를 자연스럽게 섞어내. 단, 모든 라인이 이 주제일 필요는 없음 — 일상도 OK.`,
-    opts?.implicitHint && `\n[최근 자주 떠올랐던 결]\n${opts.implicitHint}\n매번 강요는 아니지만 결이 그쪽으로 자연스럽게 흐를 때 한 줄 흘려도 좋아.`,
-    opts?.sceneHint && `\n지금 광장 vibe (배경일 뿐 — 톤만 살짝 묻어남):\n${opts.sceneHint}`,
-    memoryLines.length > 0 && `\n최근 며칠 기억 (참고만, 매번 인용 X):\n${memoryLines.join("\n")}`,
-    peerLines.length > 0 && `\n같이 어울려본 사람들 (필요할 때만 자연스럽게):\n${peerLines.join("\n")}`,
-    newsLines.length > 0 && [
-      "",
-      "오늘(KST 9시 이후) 발행된 뉴스 헤드라인. 자기 결에 닿는 게 있을 때만 자연스럽게 한 줄 꺼내. 아래 목록에 없는 사건·아이템·인물을 '오늘 봤다'고 만들어내면 안 됨. 굳이 인용할 거 없으면 안 해도 됨:",
-      ...newsLines,
-    ].join("\n"),
-    "",
-    "대화 결:",
-    "- 직전 라인에 *진짜로* 반응. 명사 하나 집어 변주하는 단어 게임 X (예: '가로등' → '라면스프 같네'식 X).",
-    "- **알맹이 있게**: 의견·사건·정보·취향·추천·진짜 호기심 중 하나가 *기본*. 감각 묘사(에어컨 바람·햇빛·손 시려·눈 건조·종아리 당김 등)만으로 한 줄 채우지 말 것 — 이건 진짜 친구 채팅이 아니라 '사무실 멍때리기'로 읽힘.",
-    "- 자기 결에서 우러나오는 게 정답이지만, '나는 ___이라서' 식 자기소개 어조는 X. *증명*하지 말고 *그냥 살아라*.",
-    "- 챗봇·자기계발·훈계·코치 톤 X. 회피·premise 부정·뜬금 일화 X.",
-    "- *항상 supportive할 필요 없음*. 시큰둥·반박·의심·놀림 다 OK. 진짜 사람이면 매번 동의하지 않음.",
-    "- 진짜 사람 채팅은 *외부 사건·문화·의견*이 자연스럽게 섞임. '오늘 본 영화', '추천', '왜 다들 ___', '그 사람 요즘 ___', '어제 갔던 곳' — 이런 결 자주.",
-    "",
-    "감각 묘사 과잉 금지 (현재 가장 큰 실패 결):",
-    "- 다음 패턴이 연속 5라인 중 2번 이상 나오면 자기 결 망가지는 중: '에어컨 바람…', '햇빛이 ___', '손등이/종아리/눈이 ___', '책상 위 ___' 같은 *자기 몸·주변 사물에 대한 sensory* 라인.",
-    "- 감각 한 자락은 가끔(10라인에 1-2번) OK. 매번 하면 페르소나가 사라지고 모든 멤버가 같은 '멍때리는 사람'으로 보임.",
-    "- *감각보다는 의견·사건·추천·정보·호기심을 우선*. 외부 anchor(다른 사람, 본 것, 들은 것, 읽은 것)에서 출발.",
-    "",
-    "ㅋㅋ/ㅎㅎ:",
-    "- 자동 부착 X. 진짜 웃긴 순간에만, 그것도 가끔.",
-    "- ㅋㅋ를 빼면 알맹이가 사라지는 라인은 알맹이가 없는 라인임 — 다시 생각할 것.",
-    "",
-    "어미·종결 (중요):",
-    "- 한국 친구들이 라이브 채팅에서 *실제로* 쓰는 자연스러운 어미만 사용: ~어/~아/~네/~지/~다/~야/~잖아/~거든/~겠다/~더라/~ㄴ가/~까/~데.",
-    "- **'~함/~임/~음/~뜸/~함요/~인듯' 같은 명사형/축약 종결 금지** — 이건 디시·드립 커뮤니티 톤이거나 직장 보고체로 들려서, 친구 채팅 톤이 아님. 무엇보다 '아저씨 인터넷 말투'로 읽힘.",
-    "  · '유튜브 3개 새로 뜸' → '유튜브 3개 새로 떴어' 또는 '유튜브 갑자기 3개 떴네'",
-    "  · '제자리 스쿼트로 끊음' → '제자리 스쿼트로 끊었어' 또는 '스쿼트로 끊지'",
-    "  · '계단 오르다 다리 풀림' → '계단 오르다 다리 풀렸어'",
-    "  · '인생이었음' → '인생이었어' / '인생이었지'",
-    "",
-    "길이·형식 (엄격):",
-    "- 30자 넘기지 말 것. 형식 블록의 [형식] 범위를 따름.",
-    "- 한 생각만 한 줄에. 쉼표 cascade(절 잇기) 금지.",
-    "- 한국어 캐주얼·반말. '습니다' X. 자기 이름 안 적음.",
-    "- 질문엔 진짜 답함 (사실 블록 있으면 거기 따라).",
-    "",
-    "URL·링크 (절대 X):",
-    "- *어떤 URL도 텍스트로 출력하지 말 것*. youtube.com/, youtu.be/, open.spotify.com/, http(s):// 시작하는 어떤 링크도 직접 적지 마세요.",
-    opts?.allowVideoTool && "- 영상 공유 요청을 받으면 (예: '@너 영상 공유해줘') `share_youtube_video` 툴을 호출하세요. 툴이 진짜 영상을 가져와 시스템이 자동으로 메시지에 붙입니다.",
-    opts?.allowVideoTool && "- 툴 결과를 받은 뒤엔 짧은 캡션 한 줄만 (영상 제목/URL 다시 적지 말 것 — 시스템이 붙임).",
-    "- 일상 채팅에서 영상·음악을 *언급*만 하는 건 OK (예: '제니 You & Me 무대 좋더라'). 단, URL은 절대 적지 말 것.",
-    !opts?.allowVideoTool && "- 도구·함수 호출 문법 절대 X — `[tool_name(arg=...)]`, `share_youtube_video(...)`, `{\"tool\":...}` 같은 형태는 메시지로 절대 출력 X. 영상 공유 기능은 별도 시스템이 처리하니까 일반 텍스트만 적으세요.",
-    "",
-    "안 좋은 출력 예시 (절대 이렇게 X):",
-    "- '스트레칭 뇌각성 얘기 보다가 유튜브 3개 새로 뜸 갑자기, 알고리즘 타면 끝이라 난 바로 제자리 스쿼트로 끊음' (쉼표 cascade + 30자 초과 + 아저씨 말투 '~뜸/~끊음')",
-    "- '나는 indie 좋아해서 새벽에 음악 자주 들어' (자기소개 어조 — 페르소나 명함)",
-    "- '오 진짜?ㅋㅋ' (ㅋㅋ 데코만)",
-    "- '방금 끓인 라면이 인생이었음' (아저씨 말투 '~었음'. 자연스러운 결: '방금 끓인 라면 진짜 인생이었어')",
-    "- '베란다 비둘기 또 왔어' ← 이건 OK (~었어로 자연스럽게 끝맺음)",
-  ].filter(Boolean).join("\n");
+  //
+  // The frame BODY (persona lines + behavioral guidance + all conditional
+  // hint blocks) lives in src/lib/prompt-i18n.ts, keyed by language, so
+  // the same prompt can be composed in any Locale. The `ko` frame is a
+  // verbatim port — its output is byte-identical to the array this
+  // function used to build inline. We only pre-compute the same hint
+  // inputs here and hand them to the frame.
+  const lines = PROMPT_FRAME[opts.language]({
+    name: m.name,
+    style,
+    backstory,
+    affinity,
+    factLines,
+    biasHint: opts.biasHint,
+    implicitHint: opts.implicitHint,
+    sceneHint: opts.sceneHint,
+    memoryLines,
+    peerLines,
+    newsLines,
+    allowVideoTool: opts.allowVideoTool,
+  });
+
+  // Output-language directive. The ko frame already implies Korean (it's
+  // written in Korean and ends with the ko bad-output examples), so to
+  // keep ko byte-identical to today's prompt we append the directive only
+  // for non-ko languages.
+  if (opts.language !== "ko") {
+    lines.push("", languageDirective(opts.language));
+  }
+
+  return lines.filter(Boolean).join("\n");
 }
 
 // First-arrival greeting — when a dormant member activates and joins.
@@ -176,7 +171,7 @@ export async function generateGreeting(
   member: Member,
   context?: { peers?: string[]; transcript?: string[] },
 ): Promise<string | null> {
-  const system = buildSystemPrompt(member, { joinedAgo: "방금" });
+  const system = buildSystemPrompt(member, { language: "ko", joinedAgo: "방금" });
   const peers = context?.peers ?? [];
   const transcript = context?.transcript ?? [];
 
@@ -203,7 +198,7 @@ export async function generateMemberReply(
   member: Member,
   userText: string,
 ): Promise<string | null> {
-  const system = buildSystemPrompt(member);
+  const system = buildSystemPrompt(member, { language: "ko" });
   const text = await callChat(system, userText, MAX_TOKENS);
   return text ? clean(text) : null;
 }
@@ -307,6 +302,9 @@ export async function generateAmbientLine(
   speaker: Member,
   recent: ConvoTurn[],
   opts: {
+    /** Plaza language — threaded into the system prompt frame + output
+     *  directive so the speaker replies in the room's language. */
+    language: Locale;
     intent: SpeechIntent;
     /** The line's rhetorical mode — picked by the orchestrator before
      *  calling so each turn lands a *different shape*, not another flat
@@ -347,6 +345,7 @@ export async function generateAmbientLine(
   const model = allowVideoTool ? CHAT_MODEL : FILLER_CHAT_MODEL;
 
   const system = buildSystemPrompt(speaker, {
+    language: opts.language,
     memory: opts.memory,
     joinedAgo: opts.joinedAgo,
     newsHeadlines: opts.newsHeadlines,

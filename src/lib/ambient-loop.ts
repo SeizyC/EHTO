@@ -395,6 +395,9 @@ export async function tickAmbientConversation(
   const skipShape = intent.type === "reply-user" || intent.type === "reply-user-mention";
   const shape = skipShape ? undefined : pickShape(intent.type);
   const text = await generateAmbientLine(speaker, transcript, {
+    // TODO(Task 7): thread the plaza language through here instead of the
+    // ko stopgap so non-ko rooms compose their prompt + reply correctly.
+    language: "ko",
     intent,
     shape,
     avoid,
