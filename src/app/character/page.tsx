@@ -1,289 +1,711 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { Character, CreatureFace } from "@/components/Character";
-import { Platform } from "@/components/Platform";
-import { useProfile } from "@/lib/profileStore";
-import type {
-  BodyType,
-  CreatureKind,
-  Outfit,
-  OutfitStyle,
-} from "@/types/world";
+import {
+  GENDERS,
+  SKINS,
+  OUTFITS,
+  HAIR_STYLES,
+  HAIR_COLORS,
+  ACCESSORIES,
+  type GenderId,
+  type SkinId,
+  type OutfitId,
+  type HairStyleId,
+  type HairColorId,
+  type AccessoryId,
+} from "@/lib/prompts";
+import { saveCharacter, loadCharacter, saveHandle } from "@/lib/character-store";
+import { browserClient } from "@/lib/supabase";
+import { PixelButton } from "@/components/PixelButton";
+import { MeGlyph } from "@/components/MeGlyph";
+import { MeSheet } from "@/components/MeSheet";
+import { useRequireSession } from "@/lib/use-require-session";
+import { currentBucket } from "@/lib/time-of-day";
 
-const CREATURES: { kind: CreatureKind; label: string }[] = [
-  { kind: "cheerful", label: "cheerful" },
-  { kind: "cool", label: "cool" },
-  { kind: "shy", label: "shy" },
-  { kind: "sleepy", label: "sleepy" },
-  { kind: "geek", label: "geek" },
-  { kind: "playful", label: "playful" },
-  { kind: "soft", label: "soft" },
-  { kind: "mysterious", label: "mystery" },
-];
+const MAX_ROLLS = 3;
 
-const BODY_TYPES: { value: BodyType; label: string }[] = [
-  { value: "masc", label: "masc" },
-  { value: "fem", label: "fem" },
-];
-
-const STYLES: { value: OutfitStyle; label: string; emoji?: string }[] = [
-  { value: "casual", label: "casual" },
-  { value: "suit", label: "suit" },
-  { value: "hiphop", label: "hiphop" },
-  { value: "dress", label: "dress" },
-];
-
-const SHIRTS = ["#2a4ac8", "#c8385a", "#7a4a2a", "#5a7a4a", "#6a3aa8", "#d4a83a", "#3a3a4a", "#1a1a1a"];
-const PANTS = ["#1a1f3a", "#3a1a26", "#3a2418", "#2c3a22", "#2c1858", "#5a3e15", "#1a1a26", "#0a0a0a"];
-const HAIRS = ["#1f1814", "#3a2418", "#6a3a18", "#d4a83a", "#c8385a", "#7af0ff", "#dfe5ff", "#3a3a4a"];
-const ACCENTS = ["#1a1a26", "#c8385a", "#d4a83a", "#7af0ff", "#ff5ec4", "#ffffff"];
-
-const HATS: { hat: Outfit["hat"]; label: string }[] = [
-  { hat: { kind: "none" }, label: "없음" },
-  { hat: { kind: "cap", color: "#d4385a" }, label: "cap" },
-  { hat: { kind: "beanie", color: "#3a3a4a" }, label: "beanie" },
-  { hat: { kind: "hood", color: "#1a1a26" }, label: "hood" },
-  { hat: { kind: "halo" }, label: "halo" },
-];
+type Stage = "select" | "generating" | "result" | "naming" | "room-naming" | "error";
 
 export default function CharacterPage() {
+  useRequireSession();
   const router = useRouter();
-  const profile = useProfile((s) => s.profile);
-  const patch = useProfile((s) => s.patch);
+  const [stage, setStage] = useState<Stage>("select");
+  const [gender, setGender] = useState<GenderId>("m");
+  const [skin, setSkin] = useState<SkinId>("fair");
+  const [outfit, setOutfit] = useState<OutfitId>("casual");
+  const [hairStyle, setHairStyle] = useState<HairStyleId>("short");
+  const [hairColor, setHairColor] = useState<HairColorId>("black");
+  const [accessory, setAccessory] = useState<AccessoryId>("none");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [characterId, setCharacterId] = useState<string | null>(null);
+  const [rolledHair, setRolledHair] = useState<string | undefined>();
+  const [rollsUsed, setRollsUsed] = useState(0);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [meOpen, setMeOpen] = useState(false);
 
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => setHydrated(true), []);
+  const remaining = MAX_ROLLS - rollsUsed;
+  const canRoll = remaining > 0;
 
-  const [kind, setKind] = useState<CreatureKind>(profile?.creature ?? "cheerful");
-  const [bodyType, setBodyType] = useState<BodyType>(profile?.outfit.bodyType ?? "masc");
-  const [style, setStyle] = useState<OutfitStyle>(profile?.outfit.style ?? "casual");
-  const [shirt, setShirt] = useState(profile?.outfit.shirt ?? SHIRTS[0]);
-  const [pants, setPants] = useState(profile?.outfit.pants ?? PANTS[0]);
-  const [hair, setHair] = useState<string | undefined>(profile?.outfit.hair ?? HAIRS[0]);
-  const [accent, setAccent] = useState(profile?.outfit.accent ?? ACCENTS[1]);
-  const [hat, setHat] = useState<Outfit["hat"]>(profile?.outfit.hat ?? { kind: "none" });
-
+  // Entry guard — character identity is locked once created.
+  //   ・ character + handle → /home (returning users land in the plaza
+  //                          directory, NOT their own /world — gives them
+  //                          discovery as the default. Their own plaza is
+  //                          surfaced as the first card by /api/plazas.)
+  //   ・ character only     → jump to naming
+  //   ・ neither in LS      → fetch from server (fresh-browser returning user);
+  //                          if server also has nothing, stay in select flow
   useEffect(() => {
-    if (profile) {
-      setKind(profile.creature);
-      setBodyType(profile.outfit.bodyType ?? "masc");
-      setStyle(profile.outfit.style ?? "casual");
-      setShirt(profile.outfit.shirt);
-      setPants(profile.outfit.pants);
-      setHair(profile.outfit.hair ?? HAIRS[0]);
-      setAccent(profile.outfit.accent ?? ACCENTS[1]);
-      setHat(profile.outfit.hat ?? { kind: "none" });
+    const cached = loadCharacter();
+    if (cached) {
+      if (cached.handle) {
+        router.replace("/home");
+        return;
+      }
+      setImageUrl(cached.imageUrl);
+      setCharacterId(cached.id);
+      setStage("naming");
+      return;
     }
-  }, [profile]);
 
-  // dress is fem-only — clamp
-  useEffect(() => {
-    if (style === "dress" && bodyType !== "fem") setBodyType("fem");
-  }, [style, bodyType]);
+    // No LS — try to recover from server.
+    let cancelled = false;
+    (async () => {
+      const sb = browserClient();
+      const { data: sess } = await sb.auth.getSession();
+      if (!sess.session) return;
+      const r = await fetch("/api/character/me", {
+        headers: { Authorization: `Bearer ${sess.session.access_token}` },
+      });
+      if (cancelled || !r.ok) return;
+      const j = await r.json();
+      const ch = j.character;
+      if (!ch) return; // user really has no character yet → stay on select
+      saveCharacter({
+        id: ch.id,
+        imageUrl: ch.imageUrl,
+        gender: ch.gender,
+        skin: ch.skin,
+        outfit: ch.outfit,
+        rolledHair: ch.rolledHair,
+        handle: ch.handle,
+        createdAt: ch.createdAt,
+      });
+      if (ch.handle) {
+        router.replace("/home");
+      } else {
+        setImageUrl(ch.imageUrl);
+        setCharacterId(ch.id);
+        setStage("naming");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [router]);
 
-  const outfit: Outfit = useMemo(
-    () => ({ bodyType, style, shirt, pants, hair, accent, hat }),
-    [bodyType, style, shirt, pants, hair, accent, hat],
-  );
+  async function generate() {
+    // Hard cap — same counter for first-make, re-roll, and re-select paths.
+    if (rollsUsed >= MAX_ROLLS) {
+      setErrorMsg("이번 라운드 티켓을 다 썼어요. 결과 중에서 골라주세요.");
+      setStage("error");
+      return;
+    }
+    setStage("generating");
+    setErrorMsg("");
+    try {
+      // 1. Session must already exist — useRequireSession guards this page.
+      const sb = browserClient();
+      const { data: sess } = await sb.auth.getSession();
+      if (!sess.session) throw new Error("세션 없음 — 다시 로그인해줘");
 
-  if (hydrated && !profile) {
-    router.replace("/signup");
-    return null;
+      // 2. Call API with token
+      const r = await fetch("/api/generate-character", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sess.session!.access_token}`,
+        },
+        body: JSON.stringify({
+          gender, skin, outfit, hairStyle, hairColor, accessory,
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? "Failed");
+
+      setImageUrl(j.publicUrl);
+      setCharacterId(j.character?.id ?? null);
+      setRolledHair(j.rolled?.hair);
+      setRollsUsed((n) => n + 1);
+      setStage("result");
+    } catch (e: unknown) {
+      setErrorMsg(e instanceof Error ? e.message : "오류");
+      setStage("error");
+    }
+  }
+
+  function confirmEnter() {
+    if (!imageUrl || !characterId) return;
+    saveCharacter({
+      id: characterId,
+      imageUrl,
+      gender,
+      skin,
+      outfit,
+      rolledHair,
+      createdAt: Date.now(),
+    });
+    setStage("naming");
   }
 
   return (
-    <main
-      className="mx-auto flex min-h-dvh max-w-[420px] flex-col text-white"
-      style={{
-        background:
-          "linear-gradient(180deg, #1a3a55 0%, #0e2238 30%, #08111e 60%, #050608 100%)",
-      }}
-    >
-      <header className="px-5 pt-6 pb-3 text-center">
-        <p className="text-[10px] tracking-[0.35em] text-white/65 uppercase">Step 2 / 3</p>
-        <h1 className="mt-2 text-[20px] font-semibold drop-shadow-md">
-          당신의 모습을 선택하세요
-        </h1>
+    <main className="grain mx-auto flex min-h-dvh max-w-[420px] flex-col px-5 pb-8 pt-6">
+      <header className="mb-4 flex items-center justify-between">
+        <BackLink stage={stage} onBack={() => goBack(stage, setStage, router)} />
+        <div className="flex items-center gap-2.5">
+          {(stage === "select" || stage === "result") && (
+            <TicketChip remaining={remaining} max={MAX_ROLLS} />
+          )}
+          <MeGlyph onOpen={() => setMeOpen(true)} />
+        </div>
       </header>
 
-      {/* preview: round platform + character — Platform first so it sits behind */}
-      <div className="relative mx-auto flex h-[290px] w-full items-end justify-center">
-        <div className="absolute left-1/2 z-0 -translate-x-1/2" style={{ bottom: -6 }}>
-          <Platform width={220} />
-        </div>
-        <div className="absolute left-1/2 z-10 -translate-x-1/2" style={{ bottom: 28 }}>
-          <Character kind={kind} presence="active" outfit={outfit} size={5} />
-        </div>
-      </div>
+      {stage === "select" && (
+        <SelectView
+          gender={gender} skin={skin} outfit={outfit}
+          hairStyle={hairStyle} hairColor={hairColor} accessory={accessory}
+          onGender={setGender} onSkin={setSkin} onOutfit={setOutfit}
+          onHairStyle={setHairStyle} onHairColor={setHairColor} onAccessory={setAccessory}
+          onGenerate={generate}
+          canGenerate={canRoll}
+          remaining={remaining}
+        />
+      )}
 
-      {/* control card */}
-      <div className="rounded-t-2xl bg-black/65 px-5 pt-5 pb-7 backdrop-blur-sm">
-        {/* body type segmented control */}
-        <Section label="체형">
-          <div className="grid grid-cols-2 gap-2">
-            {BODY_TYPES.map((b) => {
-              const active = b.value === bodyType;
-              return (
-                <button
-                  key={b.value}
-                  type="button"
-                  onClick={() => setBodyType(b.value)}
-                  className={pill(active)}
-                >
-                  {b.label}
-                </button>
-              );
-            })}
-          </div>
-        </Section>
+      {stage === "generating" && <GeneratingView />}
 
-        <Section label="스타일">
-          <div className="grid grid-cols-4 gap-2">
-            {STYLES.map((s) => {
-              const active = s.value === style;
-              const disabled = s.value === "dress" && bodyType !== "fem";
-              return (
-                <button
-                  key={s.value}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => setStyle(s.value)}
-                  className={
-                    pill(active) +
-                    (disabled ? " opacity-30 cursor-not-allowed" : "")
-                  }
-                >
-                  {s.label}
-                </button>
-              );
-            })}
-          </div>
-        </Section>
+      {stage === "result" && imageUrl && (
+        <ResultView
+          imageUrl={imageUrl}
+          remaining={remaining}
+          canRoll={canRoll}
+          onReroll={generate}
+          onBackToSelect={() => setStage("select")}
+          onConfirm={confirmEnter}
+        />
+      )}
 
-        <Section label="얼굴">
-          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-            {CREATURES.map((c) => {
-              const active = c.kind === kind;
-              return (
-                <button
-                  key={c.kind}
-                  type="button"
-                  onClick={() => setKind(c.kind)}
-                  className={
-                    "flex h-[78px] w-[64px] shrink-0 flex-col items-center justify-between rounded-md border px-1 py-1.5 text-[10px] transition " +
-                    (active
-                      ? "border-sky-300 bg-sky-300/15 text-white"
-                      : "border-white/15 bg-white/5 text-white/65 hover:border-white/35")
-                  }
-                >
-                  <div className="grid h-12 w-12 place-items-center">
-                    <CreatureFace kind={c.kind} size={3} />
-                  </div>
-                  <span className="leading-none">{c.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </Section>
+      {stage === "naming" && imageUrl && (
+        <NamingView
+          imageUrl={imageUrl}
+          onDone={() => setStage("room-naming")}
+        />
+      )}
 
-        <Section label="머리카락">
-          <Swatch values={HAIRS} value={hair ?? "#000"} onChange={setHair} />
-        </Section>
+      {stage === "room-naming" && imageUrl && (
+        <RoomNamingView
+          imageUrl={imageUrl}
+          onDone={() => router.push("/world")}
+        />
+      )}
 
-        <Section label="상의">
-          <Swatch values={SHIRTS} value={shirt} onChange={setShirt} />
-        </Section>
+      {stage === "error" && (
+        <ErrorView
+          message={errorMsg}
+          onRetry={generate}
+          onBack={() => setStage("select")}
+        />
+      )}
 
-        <Section label="하의">
-          <Swatch values={PANTS} value={pants} onChange={setPants} />
-        </Section>
-
-        {(style === "suit" || style === "hiphop") && (
-          <Section label={style === "suit" ? "타이" : "체인"}>
-            <Swatch values={ACCENTS} value={accent} onChange={setAccent} />
-          </Section>
-        )}
-
-        <Section label="머리 위">
-          <div className="grid grid-cols-5 gap-2">
-            {HATS.map((h, i) => {
-              const active = JSON.stringify(h.hat) === JSON.stringify(hat);
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setHat(h.hat)}
-                  className={pill(active) + " text-[10px]"}
-                >
-                  {h.label}
-                </button>
-              );
-            })}
-          </div>
-        </Section>
-
-        <button
-          type="button"
-          onClick={() => {
-            patch({ creature: kind, outfit });
-            router.push("/world");
-          }}
-          className="mt-6 w-full rounded-md bg-emerald-500 py-3 text-[14px] font-medium tracking-wider text-white shadow-lg shadow-emerald-900/40 transition hover:bg-emerald-400"
-        >
-          내 세상으로 →
-        </button>
-      </div>
+      <MeSheet open={meOpen} onClose={() => setMeOpen(false)} />
     </main>
   );
 }
 
-function pill(active: boolean) {
+/* ---------- Stages ---------- */
+
+function SelectView(props: {
+  gender: GenderId; skin: SkinId; outfit: OutfitId;
+  hairStyle: HairStyleId; hairColor: HairColorId; accessory: AccessoryId;
+  onGender: (g: GenderId) => void;
+  onSkin: (s: SkinId) => void;
+  onOutfit: (o: OutfitId) => void;
+  onHairStyle: (h: HairStyleId) => void;
+  onHairColor: (c: HairColorId) => void;
+  onAccessory: (a: AccessoryId) => void;
+  onGenerate: () => void;
+  canGenerate: boolean;
+  remaining: number;
+}) {
   return (
-    "rounded-md border py-2 text-[11px] transition " +
-    (active
-      ? "border-sky-300 bg-sky-300/15 text-white"
-      : "border-white/15 bg-white/5 text-white/65 hover:border-white/35")
+    <div className="animate-fade-in flex flex-1 flex-col">
+      <section className="mb-7">
+        <h2 className="text-[20px] font-medium leading-[1.4]">
+          어떤 모습으로 머무를까요
+        </h2>
+        <p className="text-sub mt-2 text-[13px] leading-[1.7]">
+          여섯 가지 항목으로 결을 잡아요.
+        </p>
+      </section>
+
+      <section className="flex flex-1 flex-col gap-7">
+        <PillRow label="성별"   options={GENDERS}     value={props.gender}    onChange={props.onGender} />
+        <PillRow label="피부톤" options={SKINS}       value={props.skin}      onChange={props.onSkin} />
+        <PillRow label="머리"   options={HAIR_STYLES} value={props.hairStyle} onChange={props.onHairStyle} />
+        <PillRow label="머리색" options={HAIR_COLORS} value={props.hairColor} onChange={props.onHairColor} />
+        <PillRow label="착장"   options={OUTFITS}     value={props.outfit}    onChange={props.onOutfit} />
+        <PillRow label="장신구" options={ACCESSORIES} value={props.accessory} onChange={props.onAccessory} />
+      </section>
+
+      <footer className="mt-7 flex flex-col gap-3">
+        <PixelButton
+          block
+          size="lg"
+          onClick={props.onGenerate}
+          disabled={!props.canGenerate}
+        >
+          {props.canGenerate
+            ? `내 캐릭터 만들기 · 티켓 ${props.remaining}장`
+            : "티켓 소진 (결과 중 하나 선택)"}
+        </PixelButton>
+        <p className="text-sub text-center text-[11px] leading-relaxed">
+          이미지 생성엔 약 30초 · 다시 고르기 포함 총 3번까지 시도
+        </p>
+      </footer>
+    </div>
   );
 }
 
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
+// Header back link — goes back ONE step within the character-creation
+// pipeline instead of bouncing all the way to "/". On the very first
+// stage (select) it does still leave the flow to home; on stages mid-
+// generation it hides itself entirely because canceling an in-flight
+// OpenAI call cleanly isn't worth the complexity right now.
+function BackLink({
+  stage,
+  onBack,
+}: {
+  stage: Stage;
+  onBack: () => void;
+}) {
+  if (stage === "generating") return <span />; // reserve header space, no action
+  const label = stage === "select" ? "← 홈으로" : "← 뒤로";
   return (
-    <section className="mb-4">
-      <h2 className="mb-2 text-[10px] tracking-[0.3em] text-white/55 uppercase">{label}</h2>
-      {children}
+    <button
+      type="button"
+      onClick={onBack}
+      className="text-sub hover:text-ink text-[13px] transition"
+    >
+      {label}
+    </button>
+  );
+}
+
+// Decide where ← takes the user based on the current pipeline stage.
+function goBack(
+  stage: Stage,
+  setStage: (s: Stage) => void,
+  router: ReturnType<typeof useRouter>,
+) {
+  switch (stage) {
+    case "select":      router.push("/"); return;
+    case "result":      setStage("select"); return;
+    case "naming":      setStage("result"); return;
+    case "room-naming": setStage("naming"); return;
+    case "error":       setStage("select"); return;
+    case "generating":  return; // no-op
+  }
+}
+
+// Small ticket counter shown in the page header during select/result stages.
+// Three dots: filled = unused tickets, empty = spent.
+function TicketChip({ remaining, max }: { remaining: number; max: number }) {
+  return (
+    <div
+      aria-label={`남은 티켓 ${remaining}장 / ${max}`}
+      className="border-line bg-surface flex items-center gap-1.5 rounded-full border px-2.5 py-1"
+    >
+      <span className="text-sub text-[10px] tracking-wide">티켓</span>
+      <span className="flex items-center gap-1">
+        {Array.from({ length: max }, (_, i) => (
+          <span
+            key={i}
+            className={
+              "block h-1.5 w-1.5 rounded-full " +
+              (i < remaining ? "bg-accent" : "bg-line")
+            }
+          />
+        ))}
+      </span>
+      <span className="text-ink ml-0.5 text-[10px] tabular-nums">
+        {remaining}/{max}
+      </span>
+    </div>
+  );
+}
+
+// Per-step duration (ms). Tuned so total ≈ 18–20s, matching typical
+// gpt-image-1 high-quality round-trip. Later steps take longer to feel
+// natural ("polish" is slow). If gen finishes early, stage transitions
+// out anyway. If it's still running on the last step, the bar keeps
+// crawling toward 100% instead of standing still.
+const GEN_STEPS: { label: string; ms: number }[] = [
+  { label: "캔버스에 자리를 잡는 중",        ms: 2800 },
+  { label: "전체 골격을 세우는 중",          ms: 3000 },
+  { label: "피부 톤을 입히는 중",            ms: 3200 },
+  { label: "어울리는 옷을 골라 입히는 중",   ms: 3400 },
+  { label: "머리 모양을 정하는 중",          ms: 3600 },
+  { label: "마지막 디테일을 다듬는 중",      ms: 21000 },
+];
+
+function GeneratingView() {
+  const [step, setStep] = useState(0);
+
+  // Advance through steps one-by-one using the per-step duration.
+  useEffect(() => {
+    if (step >= GEN_STEPS.length - 1) return; // stay on last step
+    const t = setTimeout(() => setStep((s) => s + 1), GEN_STEPS[step].ms);
+    return () => clearTimeout(t);
+  }, [step]);
+
+  const { label, ms } = GEN_STEPS[step];
+
+  return (
+    <section className="animate-fade-in spotlight relative flex flex-1 flex-col items-center justify-center gap-10 overflow-hidden px-2">
+      {/* breathing focus orb */}
+      <div className="relative h-[120px] w-[120px]">
+        <div className="border-line absolute inset-0 rounded-full border" />
+        <div className="bg-accent/15 absolute inset-3 animate-breathe-glow rounded-full blur-2xl" />
+        <div className="bg-surface absolute inset-[28%] animate-pulse rounded-full" />
+      </div>
+
+      {/* Single thick bar — one label, advances with the step. */}
+      <div className="w-full max-w-[280px] space-y-3">
+        <div className="flex items-baseline justify-between">
+          <span key={label} className="text-ink animate-fade-up text-[13.5px]">
+            {label}
+          </span>
+          <span className="text-dim text-[10.5px] tracking-wide">
+            {step + 1} / {GEN_STEPS.length}
+          </span>
+        </div>
+        <div className="bg-line h-2 w-full overflow-hidden rounded-full">
+          {/* key on step → animation restarts each step. The bar always
+              fills over the step's ms; on the long last step it crawls
+              steadily and the stage usually transitions before it hits 100. */}
+          <div
+            key={step}
+            className="bg-accent h-full"
+            style={{ animation: `barFill ${ms}ms ease-out forwards` }}
+          />
+        </div>
+      </div>
     </section>
   );
 }
 
-function Swatch({
-  values,
-  value,
-  onChange,
-}: {
-  values: string[];
-  value: string;
-  onChange: (v: string) => void;
+function ResultView(props: {
+  imageUrl: string;
+  remaining: number;
+  canRoll: boolean;
+  onReroll: () => void;
+  onBackToSelect: () => void;
+  onConfirm: () => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-2">
-      {values.map((v) => {
-        const active = v === value;
-        return (
-          <button
-            key={v}
-            type="button"
-            onClick={() => onChange(v)}
-            className={
-              "h-8 w-8 rounded-md border-2 transition " +
-              (active ? "border-white scale-110 shadow-md" : "border-white/15 hover:border-white/50")
-            }
-            style={{ background: v }}
-            aria-label={v}
+    <div className="animate-fade-in flex flex-1 flex-col">
+      {/* Stage with theatrical lighting */}
+      <section className="stage-light relative my-2 flex flex-1 items-center justify-center overflow-hidden rounded-lg">
+        <div className="relative h-[440px] w-[300px]">
+          {/* Warm floor halo where the beam lands */}
+          <div className="floor-glow pointer-events-none absolute bottom-[5%] left-1/2 h-[36px] w-[240px] -translate-x-1/2" />
+          {/* Soft elliptical shadow grounding the figure */}
+          <div className="foot-shadow pointer-events-none absolute bottom-[3%] left-1/2 h-[14px] w-[150px] -translate-x-1/2" />
+          {/* Character with sway */}
+          <div className="relative h-full w-full animate-sway">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              key={props.imageUrl}
+              src={props.imageUrl}
+              alt=""
+              className="pixelated animate-fade-up absolute inset-0 h-full w-full object-contain"
+              draggable={false}
+            />
+          </div>
+        </div>
+      </section>
+
+      <footer className="mt-3 flex flex-col gap-3">
+        <PixelButton block size="lg" onClick={props.onConfirm}>
+          이 모습으로 들어가기
+        </PixelButton>
+
+        {props.canRoll ? (
+          <PixelButton block variant="muted" onClick={props.onReroll}>
+            다시 만들기 · {props.remaining}번 남음
+          </PixelButton>
+        ) : (
+          <PixelButton block variant="muted" disabled>
+            티켓으로 한 번 더 (잠금)
+          </PixelButton>
+        )}
+
+        <button
+          onClick={props.onBackToSelect}
+          className="text-sub hover:text-ink mt-1 text-center text-[11px] underline-offset-4 transition hover:underline"
+        >
+          다시 고르기
+        </button>
+      </footer>
+    </div>
+  );
+}
+
+function NamingView(props: { imageUrl: string; onDone: () => void }) {
+  const [name, setName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const trimmed = name.trim();
+  const valid = trimmed.length >= 1 && trimmed.length <= 12;
+
+  async function submit() {
+    if (!valid || submitting) return;
+    setSubmitting(true);
+    setErr(null);
+    const { error } = await saveHandle(trimmed);
+    setSubmitting(false);
+    if (error) {
+      setErr(
+        error.toLowerCase().includes("duplicate")
+          ? "이미 누군가 쓰고 있어요"
+          : "지금은 저장이 어려워요",
+      );
+      return;
+    }
+    props.onDone();
+  }
+
+  return (
+    <div className="animate-fade-in flex flex-1 flex-col">
+      {/* Character peek — smaller, leaves room for the prompt */}
+      <section className="spotlight relative my-2 flex items-center justify-center overflow-hidden rounded-lg py-4">
+        <div className="relative h-[240px] w-[160px]">
+          <div className="floor-glow pointer-events-none absolute bottom-[4%] left-1/2 h-[22px] w-[140px] -translate-x-1/2" />
+          <div className="foot-shadow pointer-events-none absolute bottom-[2%] left-1/2 h-[10px] w-[90px] -translate-x-1/2" />
+          <div className="animate-sway relative h-full w-full">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={props.imageUrl}
+              alt=""
+              className="pixelated absolute inset-0 h-full w-full object-contain"
+              draggable={false}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Name input */}
+      <section className="mt-3 space-y-4 px-1">
+        <div className="space-y-1.5">
+          <h2 className="text-ink text-[18px] font-medium">
+            어떻게 불릴까요
+          </h2>
+          <p className="text-sub text-[12.5px] leading-relaxed">
+            세계에서 당신을 부르는 이름. 1–12자.
+          </p>
+        </div>
+
+        <div className="border-line bg-surface flex items-center rounded-full border px-4 py-3">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value.slice(0, 12));
+              setErr(null);
+            }}
+            placeholder="이름…"
+            maxLength={12}
+            autoFocus
+            className="text-ink placeholder:text-dim flex-1 bg-transparent text-[14px] outline-none"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && valid) submit();
+            }}
           />
-        );
-      })}
+          <span className="text-dim ml-2 text-[10.5px] tabular-nums">
+            {trimmed.length} / 12
+          </span>
+        </div>
+
+        {err && <p className="text-accent text-[11.5px]">{err}</p>}
+      </section>
+
+      <footer className="mt-auto flex flex-col gap-2.5 pb-2">
+        <PixelButton
+          block
+          size="lg"
+          disabled={!valid || submitting}
+          onClick={submit}
+        >
+          {submitting ? "들어가는 중…" : "이 이름으로 들어가기"}
+        </PixelButton>
+        <p className="text-sub text-center text-[11px]">
+          이름은 나중에 설정에서 바꿀 수 있어요
+        </p>
+      </footer>
+    </div>
+  );
+}
+
+function RoomNamingView(props: { imageUrl: string; onDone: () => void }) {
+  const [name, setName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const bucket = currentBucket().id;
+  const plazaBg = `/sprites/rooms/states/empty_${bucket}.png`;
+
+  const trimmed = name.trim();
+  const valid = trimmed.length >= 1 && trimmed.length <= 16;
+
+  async function submit() {
+    if (!valid || submitting) return;
+    setSubmitting(true);
+    setErr(null);
+    try {
+      const sb = browserClient();
+      const { data: sess } = await sb.auth.getSession();
+      if (!sess.session) throw new Error("세션이 끊겼어요");
+      const r = await fetch("/api/world/name", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sess.session.access_token}`,
+        },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? "이름 설정 실패");
+      props.onDone();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "오류");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="animate-fade-in flex flex-1 flex-col">
+      {/* Plaza preview — the world they're about to name */}
+      <section className="border-line relative my-2 overflow-hidden rounded-xl border" style={{ aspectRatio: "3 / 2" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={plazaBg}
+          alt="광장 미리보기"
+          className="absolute inset-0 h-full w-full object-cover"
+          draggable={false}
+        />
+        {/* Soft vignette so the heading remains legible over bright bgs */}
+        <div className="from-bg/55 pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t to-transparent" />
+      </section>
+
+      <section className="mt-3 space-y-4 px-1">
+        <div className="space-y-1.5">
+          <h2 className="text-ink text-[18px] font-medium">
+            이 세계의 이름을 정해주세요
+          </h2>
+          <p className="text-sub text-[12.5px] leading-relaxed">
+            당신만의 작은 사회. 나중에 바꿀 수 있어요.
+          </p>
+        </div>
+
+        <div className="border-line bg-surface flex items-center rounded-full border px-4 py-3">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value.slice(0, 16));
+              setErr(null);
+            }}
+            placeholder="예) 새벽 광장, 비 오는 카페…"
+            maxLength={16}
+            autoFocus
+            className="text-ink placeholder:text-dim flex-1 bg-transparent text-[14px] outline-none"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && valid) submit();
+            }}
+          />
+          <span className="text-dim ml-2 text-[10.5px] tabular-nums">
+            {trimmed.length} / 16
+          </span>
+        </div>
+
+        {err && <p className="text-accent text-[11.5px]">{err}</p>}
+      </section>
+
+      <footer className="mt-auto flex flex-col gap-2.5 pb-2">
+        <PixelButton
+          block
+          size="lg"
+          disabled={!valid || submitting}
+          onClick={submit}
+        >
+          {submitting ? "들어가는 중…" : "이 세계로 들어가기"}
+        </PixelButton>
+        <p className="text-sub text-center text-[11px] leading-relaxed">
+          처음엔 아무도 없어요 · 잠시 후 한 명씩 들어옵니다
+        </p>
+      </footer>
+    </div>
+  );
+}
+
+function ErrorView(props: { message: string; onRetry: () => void; onBack: () => void }) {
+  return (
+    <section className="animate-fade-in flex flex-1 flex-col items-center justify-center gap-5">
+      <p className="text-sub text-center text-[14px] leading-[1.7]">
+        지금은 잘 안 만들어져요.
+        <br />
+        <span className="text-dim mt-1 inline-block text-[11px]">{props.message}</span>
+      </p>
+      <div className="flex gap-3">
+        <PixelButton onClick={props.onRetry}>다시 시도</PixelButton>
+        <PixelButton variant="muted" onClick={props.onBack}>돌아가기</PixelButton>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- Bits ---------- */
+
+function PillRow<T extends string>(props: {
+  label: string;
+  options: readonly { id: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div>
+      <div className="text-sub mb-2.5 text-[10px] uppercase tracking-[0.22em]">
+        {props.label}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {props.options.map((opt) => {
+          const active = opt.id === props.value;
+          return (
+            <button
+              key={opt.id}
+              onClick={() => props.onChange(opt.id)}
+              className={[
+                "rounded-full border px-4 py-2 text-[13px] transition",
+                active
+                  ? "border-ink bg-ink text-bg"
+                  : "border-line text-sub active:bg-panel hover:border-dim",
+              ].join(" ")}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

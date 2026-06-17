@@ -1,0 +1,20 @@
+{
+  "$schema": "https://unpkg.com/wrangler@latest/config-schema.json",
+  "name": "ehto",
+  "account_id": "REDACTED_CF_ACCOUNT_ID",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-01-15",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  }
+  // Server-side secrets go via `wrangler secret put <KEY>` after deploy:
+  //   OPENAI_API_KEY, SUPABASE_SERVICE_ROLE_KEY, NAVER_CLIENT_ID,
+  //   NAVER_CLIENT_SECRET, CRON_SECRET, ADMIN_EMAILS
+  //
+  // NEXT_PUBLIC_* vars are baked into the client bundle at build time
+  // and must be set in the build environment (.env.local locally, or
+  // in CI):
+  //   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+}

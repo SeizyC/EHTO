@@ -10,6 +10,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { ensureAiPool, pickAvailable } from "@/lib/ai-pool";
 import { memberCap, type Plan } from "@/lib/energy";
 import type { Locale } from "@/lib/language";
+import { sysMemberJoined } from "@/lib/system-messages";
 import { localizeIdentity } from "@/lib/member-identity";
 
 // How many AI characters a brand-new world initially recruits from the pool.
@@ -262,7 +263,7 @@ export async function tickMemberActivations(
     justActivated.map((m) => ({
       world_id: worldId,
       kind: "system",
-      text: `${m.name} 님이 입장하셨어요`,
+      text: sysMemberJoined(language, m.name),
     })),
   );
 

@@ -1,0 +1,132 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { PlazaCanvas, type PlazaCharacter } from "@/components/PlazaCanvas";
+import { PLAZA_PRESETS, type PlazaState } from "@/lib/plaza-objects";
+import { currentBucket } from "@/lib/time-of-day";
+
+const TIME_BUCKETS = [
+  { id: "dawn",      label: "새벽" },
+  { id: "morning",   label: "아침" },
+  { id: "afternoon", label: "오후" },
+  { id: "evening",   label: "저녁" },
+  { id: "night",     label: "밤" },
+] as const;
+
+// 6 demo characters placed across the plaza floor with intentionally
+// small height (CHARACTER_HEIGHT_PCT in PlazaCanvas).
+const DEMO_CHARACTERS: PlazaCharacter[] = [
+  { id: "1", src: "/sprites/hero/test_01.png", x: 40, y: 78,         name: "민" },
+  { id: "2", src: "/sprites/hero/test_02.png", x: 60, y: 80,         name: "소라" },
+  { id: "3", src: "/sprites/hero/test_03.png", x: 30, y: 70, scale: 0.92 },
+  { id: "4", src: "/sprites/hero/test_04.png", x: 70, y: 72, scale: 0.92, bubble: { id: "demo-b1", text: "여기 분위기 좋네" } },
+  { id: "5", src: "/sprites/hero/test_05.png", x: 50, y: 88, scale: 1.06 },
+  { id: "6", src: "/sprites/hero/test_01.png", x: 20, y: 84, scale: 1.0 },
+];
+
+export default function DemoPlaza() {
+  const [presetKey, setPresetKey] = useState<keyof typeof PLAZA_PRESETS>("empty");
+  const [bucket, setBucket] = useState<string>(currentBucket().id);
+  const [showChars, setShowChars] = useState(true);
+
+  const state: PlazaState = PLAZA_PRESETS[presetKey].state;
+  // Empty plaza bgs per time-of-day — objects layer on top cleanly without
+  // duplicating baked-in furniture (unlike the full plaza_*.png variants).
+  const bgPath = `/sprites/rooms/states/empty_${bucket}.png`;
+
+  return (
+    <main className="mx-auto flex min-h-dvh max-w-[920px] flex-col px-5 pb-10 pt-6">
+      <header className="mb-4 flex items-center justify-between">
+        <Link href="/" className="text-sub hover:text-ink text-[13px] transition">
+          ← 돌아가기
+        </Link>
+        <span className="text-sub text-[11px] tracking-[0.22em]">DEMO · PLAZA</span>
+      </header>
+
+      <section className="mb-5">
+        <h1 className="text-[20px] font-medium leading-snug">광장의 진화</h1>
+        <p className="text-sub mt-1 text-[12.5px] leading-relaxed">
+          시간대 (bg) × 누적 오브제 (layer) × 캐릭터 시각화 PoC
+        </p>
+      </section>
+
+      {/* Stage */}
+      <section className="border-line overflow-hidden rounded-lg border">
+        <PlazaCanvas
+          state={state}
+          bgOverride={bgPath}
+          bucket={bucket as "dawn" | "morning" | "afternoon" | "evening" | "night"}
+          characters={showChars ? DEMO_CHARACTERS : []}
+        />
+      </section>
+
+      {/* Controls */}
+      <section className="mt-6 space-y-5">
+        <ControlRow label="누적 상태">
+          {Object.entries(PLAZA_PRESETS).map(([key, preset]) => (
+            <Pill
+              key={key}
+              active={key === presetKey}
+              onClick={() => setPresetKey(key as keyof typeof PLAZA_PRESETS)}
+            >
+              {preset.label}
+            </Pill>
+          ))}
+        </ControlRow>
+
+        <ControlRow label="시간대">
+          {TIME_BUCKETS.map((b) => (
+            <Pill key={b.id} active={b.id === bucket} onClick={() => setBucket(b.id)}>
+              {b.label}
+            </Pill>
+          ))}
+        </ControlRow>
+
+        <ControlRow label="캐릭터">
+          <Pill active={showChars} onClick={() => setShowChars(true)}>표시</Pill>
+          <Pill active={!showChars} onClick={() => setShowChars(false)}>숨기기</Pill>
+        </ControlRow>
+
+        <p className="text-sub text-[11px] leading-relaxed">
+          오브제 수: <span className="text-ink">{state.objects.length}</span> ·
+          현재 KST bucket: <span className="text-ink">{currentBucket().id}</span> ·
+          이 데모는 누적 카운트 트리거 (Tier 0) 까지의 시각화. 채팅 의미 분석 (Tier 1–3) 은 M5 이후.
+        </p>
+      </section>
+    </main>
+  );
+}
+
+function ControlRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-sub mb-2 text-[10px] uppercase tracking-[0.22em]">{label}</div>
+      <div className="flex flex-wrap gap-2">{children}</div>
+    </div>
+  );
+}
+
+function Pill({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={[
+        "rounded-full border px-4 py-2 text-[12.5px] transition",
+        active
+          ? "border-ink bg-ink text-bg"
+          : "border-line text-sub hover:border-dim active:bg-panel",
+      ].join(" ")}
+    >
+      {children}
+    </button>
+  );
+}
