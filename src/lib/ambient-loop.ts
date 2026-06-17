@@ -454,7 +454,7 @@ export async function tickAmbientConversation(
         // Topic extraction is a separate Claude call. Best-effort: null
         // is fine, just means this exchange counts but doesn't carry a
         // semantic anchor.
-        const topic = await extractTopic(text);
+        const topic = await extractTopic(text, language);
         await recordInteraction(sb, speaker.id, last.owner_member_id, topic ?? undefined);
       } catch (e) {
         console.warn("[ambient] recordInteraction failed:", e instanceof Error ? e.message : e);

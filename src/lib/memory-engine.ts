@@ -13,6 +13,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { dayLabel, dayStart, dayEnd, dayStartFromLabel } from "@/lib/day-rollover";
 import { chatComplete } from "@/lib/claude";
+import { type Locale, LANGUAGE_NAMES } from "@/lib/language";
 
 const SUMMARY_MAX_TOKENS = 200;
 
@@ -37,6 +38,7 @@ export async function summarizeMemberDay(
   member: MemberRow,
   worldId: string,
   dayLabelStr: string,
+  language: Locale = "ko",
 ): Promise<string | null> {
   // Skip if trace already exists for this day.
   const { data: existing } = await sb
@@ -83,45 +85,85 @@ export async function summarizeMemberDay(
   }
   const peerList = [...peerNames];
 
+  // ko keeps the original Korean prompt verbatim (byte-identical to the
+  // pre-i18n version). Non-ko plazas get a same-intent English-meta prompt
+  // that pins the *diary output* to the plaza language via LANGUAGE_NAMES,
+  // so a native member's memory trace is written in their own language.
+  const langName = LANGUAGE_NAMES[language];
+  const selfMark = language === "ko" ? "나" : "me";
+  const ownerMark = language === "ko" ? "방장" : "owner";
+  const unknownPeer = language === "ko" ? "다른 멤버" : "another member";
+
   // Build a compact transcript with role markers + peer names so the
   // model can see who said what.
   const transcript = rows
     .map((r) => {
-      if (r.owner_member_id === member.id) return `[나] ${r.text}`;
-      if (r.owner_user_id) return `[방장] ${r.text}`;
+      if (r.owner_member_id === member.id) return `[${selfMark}] ${r.text}`;
+      if (r.owner_user_id) return `[${ownerMark}] ${r.text}`;
       const peerName = Array.isArray(r.members) ? r.members[0]?.name : r.members?.name;
-      return `[${peerName ?? "다른 멤버"}] ${r.text}`;
+      return `[${peerName ?? unknownPeer}] ${r.text}`;
     })
     .join("\n");
 
-  const system = [
-    `당신은 ${member.name}, 가상의 광장 멤버. 페르소나:`,
-    member.persona.affinity ? `- 관심사: ${member.persona.affinity.join(", ")}` : "",
-    member.persona.speech_style ? `- 말투: ${member.persona.speech_style}` : "",
-    member.backstory ? `- 배경: ${member.backstory}` : "",
-  ].filter(Boolean).join("\n");
+  const system = language === "ko"
+    ? [
+        `당신은 ${member.name}, 가상의 광장 멤버. 페르소나:`,
+        member.persona.affinity ? `- 관심사: ${member.persona.affinity.join(", ")}` : "",
+        member.persona.speech_style ? `- 말투: ${member.persona.speech_style}` : "",
+        member.backstory ? `- 배경: ${member.backstory}` : "",
+      ].filter(Boolean).join("\n")
+    : [
+        `You are ${member.name}, a member of a virtual plaza. Persona:`,
+        member.persona.affinity ? `- Interests: ${member.persona.affinity.join(", ")}` : "",
+        member.persona.speech_style ? `- Voice: ${member.persona.speech_style}` : "",
+        member.backstory ? `- Background: ${member.backstory}` : "",
+        "",
+        `Write entirely in ${langName}.`,
+      ].filter(Boolean).join("\n");
 
-  const peerHint = peerList.length > 0
-    ? `오늘 같이 있던 사람들: ${peerList.join(", ")}.`
-    : "오늘 다른 멤버는 거의 없었음.";
+  const peerHint = language === "ko"
+    ? (peerList.length > 0
+        ? `오늘 같이 있던 사람들: ${peerList.join(", ")}.`
+        : "오늘 다른 멤버는 거의 없었음.")
+    : (peerList.length > 0
+        ? `People around today: ${peerList.join(", ")}.`
+        : "Hardly any other members around today.");
 
-  const userPrompt = [
-    `[작업: 아래는 ${dayLabelStr} 하루의 광장 대화. 당신([나]) 입장에서 그 날을 한 줄로 회상해 적습니다.]`,
-    peerHint,
-    "",
-    transcript,
-    "",
-    "회상 한 줄을 1인칭 평어로. 예:",
-    `- "강변 따라 10km 뛰고 막걸리집 들름."`,
-    `- "시연이랑 야근 얘기로 짠해했음."`,
-    `- "야근파, 해리 둘이 막걸리 얘기 길게 했네."`,
-    "",
-    "규칙:",
-    "- 한 줄. 40자 이내.",
-    "- 1인칭 평어. 자기 이름 안 적음.",
-    "- *다른 멤버랑 의미 있게 주고받은 게 있으면* 그 사람 이름 + 무슨 얘기였는지 짧게 포함. (없으면 굳이 X.)",
-    "- 진짜 그 날의 사실만. 메타·안내 톤 X.",
-  ].join("\n");
+  const userPrompt = language === "ko"
+    ? [
+        `[작업: 아래는 ${dayLabelStr} 하루의 광장 대화. 당신([나]) 입장에서 그 날을 한 줄로 회상해 적습니다.]`,
+        peerHint,
+        "",
+        transcript,
+        "",
+        "회상 한 줄을 1인칭 평어로. 예:",
+        `- "강변 따라 10km 뛰고 막걸리집 들름."`,
+        `- "시연이랑 야근 얘기로 짠해했음."`,
+        `- "야근파, 해리 둘이 막걸리 얘기 길게 했네."`,
+        "",
+        "규칙:",
+        "- 한 줄. 40자 이내.",
+        "- 1인칭 평어. 자기 이름 안 적음.",
+        "- *다른 멤버랑 의미 있게 주고받은 게 있으면* 그 사람 이름 + 무슨 얘기였는지 짧게 포함. (없으면 굳이 X.)",
+        "- 진짜 그 날의 사실만. 메타·안내 톤 X.",
+      ].join("\n")
+    : [
+        `[Task: below is the plaza chat from ${dayLabelStr}. From your point of view ([${selfMark}]), recall that day in one line.]`,
+        peerHint,
+        "",
+        transcript,
+        "",
+        `Write the one-line recollection in first person, in ${langName}. Examples (in your language):`,
+        `- "Ran 10k along the river, stopped by the pub after."`,
+        `- "Got into a heart-to-heart with Siyeon about working late."`,
+        `- "The late-shift folks and Harry went on about drinks for ages."`,
+        "",
+        "Rules:",
+        "- One line. Keep it short.",
+        "- First person. Don't write your own name.",
+        "- *If you had a meaningful exchange with another member*, include their name + briefly what it was about. (Skip if there wasn't one.)",
+        `- Only real facts from that day. No meta/instructional tone. Write in ${langName}.`,
+      ].join("\n");
 
   const raw = await chatComplete({
     system,
@@ -162,6 +204,15 @@ export async function tickDailySummaries(
   const yesterdayMs = dayStart().getTime() - 1000; // any moment inside yesterday
   const yesterday = dayLabel(yesterdayMs);
 
+  // Plaza language. ko (default) keeps the diary prompt byte-identical;
+  // non-ko plazas write each member's daily memory trace in-language.
+  const { data: w } = await sb
+    .from("worlds")
+    .select("language")
+    .eq("id", worldId)
+    .maybeSingle();
+  const language = ((w?.language ?? "ko") as Locale);
+
   // Pull every member ever active in this world (we want to summarize
   // even members who have since gone ghost — their memory persists).
   const { data: memberRows } = await sb
@@ -173,7 +224,7 @@ export async function tickDailySummaries(
   const summarized: string[] = [];
   for (const m of members) {
     try {
-      const text = await summarizeMemberDay(sb, m, worldId, yesterday);
+      const text = await summarizeMemberDay(sb, m, worldId, yesterday, language);
       if (text) summarized.push(m.name);
     } catch (e) {
       console.warn(`[memory] ${m.name} summary failed:`, e instanceof Error ? e.message : e);

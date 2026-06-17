@@ -15,6 +15,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { chatComplete } from "@/lib/claude";
 import type { Plan } from "@/lib/energy";
+import { type Locale, LANGUAGE_NAMES } from "@/lib/language";
 
 // 5분 이상 자리비웠으면 recap 대상. ambient-loop의 OWNER_OFFLINE_MUTE_MS
 // 와 동일하게 맞춰 "광장이 조용해진 구간 = recap 구간" 이라는 직관에
@@ -43,6 +44,7 @@ export async function maybeInsertAbsenceRecap(
   sb: SupabaseClient,
   worldId: string,
   prevActiveAtIso: string | null,
+  language: Locale = "ko",
 ): Promise<{ inserted: boolean; reason?: string }> {
   if (!prevActiveAtIso) return { inserted: false, reason: "no-prev-stamp" };
   const prevMs = new Date(prevActiveAtIso).getTime();
@@ -103,7 +105,7 @@ export async function maybeInsertAbsenceRecap(
 
   if (!process.env.ANTHROPIC_API_KEY) return { inserted: false, reason: "no-api-key" };
 
-  const summary = await summarize(transcript, plan);
+  const summary = await summarize(transcript, plan, language);
   if (!summary) return { inserted: false, reason: "summary-empty" };
 
   const { error: insErr } = await sb.from("messages").insert({
@@ -117,41 +119,84 @@ export async function maybeInsertAbsenceRecap(
   return { inserted: true };
 }
 
-async function summarize(transcript: string, plan: Plan): Promise<string | null> {
+async function summarize(
+  transcript: string,
+  plan: Plan,
+  language: Locale = "ko",
+): Promise<string | null> {
   const isPlus = plan === "plus";
-  const system = isPlus
-    ? [
-        "당신은 작은 디지털 광장의 부재 요약을 적는 사람입니다.",
-        "",
-        "역할: 사용자가 자리비운 동안 멤버들끼리 떤 대화 로그를 받아, 그 사이 *무슨 결이 흘렀는지* 한 발 떨어져 들려줍니다.",
-        "",
-        "톤: 친구가 슬쩍 정리해주듯. \"라온이 막걸리 얘기로 분위기 띄웠고, 야근파가 늦게 합류해서 둘이 한참 떠들었어요. 드립.k는 오늘따라 조용.\" 같은 결.",
-        "",
-        "규칙:",
-        "- 2~3문장, 총 60~120자. 줄바꿈 1~2번으로 끊어도 OK.",
-        "- 분위기 + 도드라진 순간 2~3개 + 멤버 사이의 결(누가 누구랑 어울렸는지) 한 자락.",
-        "- 사건을 기계적으로 나열하지 말 것. 누가 한 말 그대로 반복 X.",
-        "- 인용부호·따옴표·머리말('요약:')·자기 호명 X. 관찰자 톤.",
-      ].join("\n")
-    : [
-        "당신은 작은 디지털 광장의 부재 요약을 적는 사람입니다.",
-        "",
-        "역할: 사용자가 자리비운 동안 멤버들끼리 떤 대화 로그를 받아, *한 줄*로 그 분위기를 압축해서 알려줍니다.",
-        "",
-        "톤: 친구가 슬쩍 알려주듯 가볍게. \"라온이 막걸리 얘기 던지고 갔어요. 야근파가 늦게 합류.\" 같은 결.",
-        "",
-        "규칙:",
-        "- 한 줄, 25~50자. 두 토막 정도 가능 (마침표·쉼표로 끊기).",
-        "- 멤버 이름은 자연스럽게 인용 OK. 모두 호명할 필요 X.",
-        "- 사건을 시간 순으로 나열하지 말고, *분위기*를 잡아낼 것.",
-        "- 인용부호, 따옴표, 머리말('요약:'), 자기 호명 X.",
-        "- 누가 한 말을 그대로 반복하지 말 것. 한 발 떨어진 관찰자 톤.",
-      ].join("\n");
+  // ko keeps the original Korean prompts verbatim (byte-identical to the
+  // pre-i18n single-language version). Non-ko plazas get a same-intent
+  // English-meta prompt that pins the *output* to the plaza language via
+  // LANGUAGE_NAMES — a native recap written in-language, not a translation.
+  const langName = LANGUAGE_NAMES[language];
+  const system = language === "ko"
+    ? (isPlus
+        ? [
+            "당신은 작은 디지털 광장의 부재 요약을 적는 사람입니다.",
+            "",
+            "역할: 사용자가 자리비운 동안 멤버들끼리 떤 대화 로그를 받아, 그 사이 *무슨 결이 흘렀는지* 한 발 떨어져 들려줍니다.",
+            "",
+            "톤: 친구가 슬쩍 정리해주듯. \"라온이 막걸리 얘기로 분위기 띄웠고, 야근파가 늦게 합류해서 둘이 한참 떠들었어요. 드립.k는 오늘따라 조용.\" 같은 결.",
+            "",
+            "규칙:",
+            "- 2~3문장, 총 60~120자. 줄바꿈 1~2번으로 끊어도 OK.",
+            "- 분위기 + 도드라진 순간 2~3개 + 멤버 사이의 결(누가 누구랑 어울렸는지) 한 자락.",
+            "- 사건을 기계적으로 나열하지 말 것. 누가 한 말 그대로 반복 X.",
+            "- 인용부호·따옴표·머리말('요약:')·자기 호명 X. 관찰자 톤.",
+          ].join("\n")
+        : [
+            "당신은 작은 디지털 광장의 부재 요약을 적는 사람입니다.",
+            "",
+            "역할: 사용자가 자리비운 동안 멤버들끼리 떤 대화 로그를 받아, *한 줄*로 그 분위기를 압축해서 알려줍니다.",
+            "",
+            "톤: 친구가 슬쩍 알려주듯 가볍게. \"라온이 막걸리 얘기 던지고 갔어요. 야근파가 늦게 합류.\" 같은 결.",
+            "",
+            "규칙:",
+            "- 한 줄, 25~50자. 두 토막 정도 가능 (마침표·쉼표로 끊기).",
+            "- 멤버 이름은 자연스럽게 인용 OK. 모두 호명할 필요 X.",
+            "- 사건을 시간 순으로 나열하지 말고, *분위기*를 잡아낼 것.",
+            "- 인용부호, 따옴표, 머리말('요약:'), 자기 호명 X.",
+            "- 누가 한 말을 그대로 반복하지 말 것. 한 발 떨어진 관찰자 톤.",
+          ].join("\n"))
+    : (isPlus
+        ? [
+            `You write the "while you were away" recap for a small digital plaza. Write entirely in ${langName} (a native summary, NOT a translation).`,
+            "",
+            "Role: you receive a log of what the members said to each other while the owner was away, and tell them — one step removed — *what mood and threads ran through it*.",
+            "",
+            "Tone: like a friend casually catching them up, e.g. \"Raon got everyone going on a drinks tangent, the late-shift crowd joined later and the two of them talked for a while. drip.k was quiet today.\"",
+            "",
+            "Rules:",
+            "- 2-3 sentences, fairly short overall. One or two line breaks are fine.",
+            "- The mood + 2-3 standout moments + a thread of who-clicked-with-whom.",
+            "- Don't list events mechanically. Don't repeat anyone's words verbatim.",
+            "- No quotes, no header ('Summary:'), no self-reference. Observer tone.",
+          ].join("\n")
+        : [
+            `You write the "while you were away" recap for a small digital plaza. Write entirely in ${langName} (a native summary, NOT a translation).`,
+            "",
+            "Role: you receive a log of what the members said to each other while the owner was away, and compress the *mood* of it into a single line.",
+            "",
+            "Tone: light, like a friend casually catching them up, e.g. \"Raon tossed out a drinks tangent and left. The late-shift crowd joined later.\"",
+            "",
+            "Rules:",
+            "- One line, short. Two clauses at most (split with a period or comma).",
+            "- Quoting member names naturally is fine. No need to name everyone.",
+            "- Don't list events in time order — capture the *mood*.",
+            "- No quotes, no header ('Summary:'), no self-reference.",
+            "- Don't repeat anyone's words verbatim. One step removed, observer tone.",
+          ].join("\n"));
+  const userPrompt = language === "ko"
+    ? (isPlus
+        ? `[광장 대화 로그]\n${transcript}\n\n위 대화의 결을 2~3문장으로.`
+        : `[광장 대화 로그]\n${transcript}\n\n위 대화의 분위기를 한 줄로.`)
+    : (isPlus
+        ? `[plaza chat log]\n${transcript}\n\nSummarize the threads above in 2-3 sentences (in ${langName}).`
+        : `[plaza chat log]\n${transcript}\n\nCapture the mood above in one line (in ${langName}).`);
   const raw = await chatComplete({
     system,
-    user: isPlus
-      ? `[광장 대화 로그]\n${transcript}\n\n위 대화의 결을 2~3문장으로.`
-      : `[광장 대화 로그]\n${transcript}\n\n위 대화의 분위기를 한 줄로.`,
+    user: userPrompt,
     maxTokens: isPlus ? 360 : RECAP_MAX_TOKENS,
   });
   if (!raw) return null;

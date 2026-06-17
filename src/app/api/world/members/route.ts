@@ -10,6 +10,7 @@ import { tickPlazaGrowth } from "@/lib/plaza-grow";
 import { tickMemberPositions } from "@/lib/position-drift";
 import { tickPersonaDrift } from "@/lib/persona-drift";
 import { kstDayLabel, energyView, type Plan } from "@/lib/energy";
+import type { Locale } from "@/lib/language";
 
 // GET /api/world/members
 // · Lazy-activates any dormant members whose scheduled offset has elapsed
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
 
   const { data: world, error: worldErr } = await sb
     .from("worlds")
-    .select("id, name, created_at, last_owner_active_at")
+    .select("id, name, created_at, last_owner_active_at, language")
     .eq("owner_id", userData.user.id)
     .maybeSingle();
   if (worldErr) return NextResponse.json({ error: worldErr.message }, { status: 500 });
@@ -51,6 +52,7 @@ export async function GET(req: NextRequest) {
   // we refresh the stamp so the ambient gate stays open while they're
   // on /world.
   const prevActiveAt = world.last_owner_active_at ?? null;
+  const language = ((world.language ?? "ko") as Locale);
   await svc.from("worlds")
     .update({ last_owner_active_at: new Date().toISOString() })
     .eq("id", world.id);
@@ -59,7 +61,7 @@ export async function GET(req: NextRequest) {
   // a one-line summary as a kind="recap" message. Fire-and-forget so
   // it doesn't gate the response.
   void (async () => {
-    try { await maybeInsertAbsenceRecap(svc, world.id, prevActiveAt); }
+    try { await maybeInsertAbsenceRecap(svc, world.id, prevActiveAt, language); }
     catch (e) { console.warn("[recap] failed:", e instanceof Error ? e.message : e); }
   })();
   try {

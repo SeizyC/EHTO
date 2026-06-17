@@ -12,6 +12,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { pickAvailable } from "@/lib/ai-pool";
 import type { Locale } from "@/lib/language";
+import { localizeIdentity } from "@/lib/member-identity";
 import { sysMemberLeft } from "@/lib/system-messages";
 
 const REFILL_MIN_HRS = 12;
@@ -107,7 +108,7 @@ async function refillFromPool(
 
   const { data: world } = await sb
     .from("worlds")
-    .select("created_at")
+    .select("created_at, language")
     .eq("id", worldId)
     .maybeSingle();
   if (!world) return 0;
@@ -115,19 +116,42 @@ async function refillFromPool(
     (Date.now() - new Date(world.created_at).getTime()) / 1000,
   );
 
-  const rows = fresh.map((c) => {
+  // Plaza language. ko (default) → localizeIdentity returns null and every
+  // field falls back to the native Korean pool defaults, so the ko refill is
+  // byte-identical to before. Non-ko plazas render each fresh member's
+  // identity in-language (name/speech_style/backstory); affinity slugs are
+  // neutral and kept as-is. Per-item failure tolerated (.catch → null → ko
+  // pool fallback), so a refill always yields a valid member.
+  const language = ((world.language ?? "ko") as Locale);
+  const localized = language === "ko"
+    ? fresh.map(() => null)
+    : await Promise.all(
+        fresh.map((c) =>
+          localizeIdentity(
+            {
+              affinity: c.base_persona.affinity ?? [],
+              speechSeed: c.base_persona.speech_style ?? "",
+              backstorySeed: c.base_backstory ?? "",
+            },
+            language,
+          ).catch(() => null),
+        ),
+      );
+
+  const rows = fresh.map((c, idx) => {
     const gapHrs = REFILL_MIN_HRS + Math.random() * (REFILL_MAX_HRS - REFILL_MIN_HRS);
+    const id = localized[idx];
     return {
       ai_character_id: c.id,
       origin_world_id: worldId,
       current_location_world_id: worldId,
-      name: c.name,
+      name: id?.name ?? c.name,
       persona: {
         sprite: c.sprite,
         affinity: c.base_persona.affinity,
-        speech_style: c.base_persona.speech_style,
+        speech_style: id?.speech_style ?? c.base_persona.speech_style,
       },
-      backstory: c.base_backstory,
+      backstory: id?.backstory ?? c.base_backstory,
       activity_weight: c.default_activity_weight,
       status: "active",
       activation_priority: 99,        // refills don't compete with seed priority
