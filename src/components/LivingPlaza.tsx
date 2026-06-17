@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import type { Locale } from "@/lib/about-content";
 
 // Landing hero: a layered, living plaza built from sprites (no buildings).
 // Empty tiled floor (time-of-day by local hour) + furniture sprites
@@ -73,22 +74,44 @@ const FIGURES: Fig[] = [
   { src: "/sprites/hero/test_01.png", y: 4, h: 17, dur: 2.6, start: 64, min: 56, max: 74 }, // front-right
 ];
 
-const LINES = [
-  "오늘 비 올 것 같지 않아?", "그 책 마지막이 진짜야", "커피 한 잔 더?",
-  "어제 그 영화 별로였어", "산책 갈 사람?", "오 그거 좋더라",
-  "오늘따라 조용하네", "그 노래 다시 듣는 중", "배고프다 진짜",
-  "주말에 뭐 해?", "방금 그거 봤어?", "날씨 미쳤다",
-  "이 동네 빵집 어디가 맛있지", "고양이 영상 보다 시간 다 감", "다들 점심 뭐 먹음?",
-  "그 사람 요즘 잘 지내나", "새 플레이리스트 만들었어", "운동 가야 하는데",
-  "ㅋㅋㅋ 그건 좀", "그거 어디서 샀어?",
-];
+// Ambient chat lines + video shares, localized to the visitor's locale so the
+// living plaza speaks the same language as the rest of the landing.
+const LINES: Record<Locale, string[]> = {
+  ko: [
+    "오늘 비 올 것 같지 않아?", "그 책 마지막이 진짜야", "커피 한 잔 더?",
+    "어제 그 영화 별로였어", "산책 갈 사람?", "오 그거 좋더라",
+    "오늘따라 조용하네", "그 노래 다시 듣는 중", "배고프다 진짜",
+    "주말에 뭐 해?", "방금 그거 봤어?", "날씨 미쳤다",
+    "이 동네 빵집 어디가 맛있지", "고양이 영상 보다 시간 다 감", "다들 점심 뭐 먹음?",
+    "그 사람 요즘 잘 지내나", "새 플레이리스트 만들었어", "운동 가야 하는데",
+    "ㅋㅋㅋ 그건 좀", "그거 어디서 샀어?",
+  ],
+  en: [
+    "think it's gonna rain?", "that book's ending though", "one more coffee?",
+    "that movie last night was meh", "anyone up for a walk?", "oh that was nice",
+    "kinda quiet today", "replaying that song again", "i'm so hungry",
+    "any plans this weekend?", "did you just see that?", "this weather is insane",
+    "best bakery around here?", "lost an hour to cat videos", "what's everyone having for lunch?",
+    "wonder how they're doing", "made a new playlist", "i really should work out",
+    "lol that's a bit much", "where'd you get that?",
+  ],
+  ja: [
+    "雨降りそうじゃない？", "あの本の結末ガチだった", "コーヒーもう一杯？",
+    "昨日のあの映画イマイチ", "散歩行く人？", "あれ良かったよ",
+    "今日は静かだね", "あの曲またリピートしてる", "お腹すいた〜",
+    "週末なにする？", "今の見た？", "天気やばい",
+    "この辺のパン屋どこがいい？", "猫動画で時間溶けた", "みんなお昼なに食べる？",
+    "あの人元気かな", "新しいプレイリスト作った", "運動行かなきゃ",
+    "www それはちょっと", "それどこで買った？",
+  ],
+};
 
-const VIDEOS = [
-  { id: "yebNIHKAC4A", title: "이 영상 봐봐 ㅋㅋ" },
-  { id: "VGnOpZhsPk4", title: "이 무대 미쳤다 🔥" },
-  { id: "ImuWa3SJulY", title: "요즘 이거 무한반복" },
-  { id: "gdZLi9oWNZg", title: "이건 명곡이지" },
-];
+const VIDEO_IDS = ["yebNIHKAC4A", "VGnOpZhsPk4", "ImuWa3SJulY", "gdZLi9oWNZg"];
+const VIDEO_TITLES: Record<Locale, string[]> = {
+  ko: ["이 영상 봐봐 ㅋㅋ", "이 무대 미쳤다 🔥", "요즘 이거 무한반복", "이건 명곡이지"],
+  en: ["watch this lol", "this stage is fire 🔥", "on repeat lately", "an absolute classic"],
+  ja: ["これ見てw", "このステージやばい🔥", "最近これ無限ループ", "これは名曲"],
+};
 const VIDEO_FIGS = [2, 3, 4, 5]; // mid/front figures
 
 type Bubble = { id: number; fig: number; kind: "text" | "video"; text: string; thumb?: string };
@@ -234,7 +257,7 @@ function MusicCard() {
   );
 }
 
-export function LivingPlaza() {
+export function LivingPlaza({ locale }: { locale: Locale }) {
   const [scene, setScene] = useState<Scene>("afternoon");
   useEffect(() => {
     setScene(sceneForHour(new Date().getHours()));
@@ -243,6 +266,8 @@ export function LivingPlaza() {
 
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   useEffect(() => {
+    const lines = LINES[locale];
+    const titles = VIDEO_TITLES[locale];
     let seq = 0;
     const allFigs = FIGURES.map((_, i) => i);
     const spawnText = () =>
@@ -253,17 +278,17 @@ export function LivingPlaza() {
         const fig = free[Math.floor(Math.random() * free.length)];
         const id = ++seq;
         window.setTimeout(() => setBubbles((p) => p.filter((b) => b.id !== id)), 4800);
-        return [...prev, { id, fig, kind: "text", text: LINES[Math.floor(Math.random() * LINES.length)] }];
+        return [...prev, { id, fig, kind: "text", text: lines[Math.floor(Math.random() * lines.length)] }];
       });
     const spawnVideo = () =>
       setBubbles((prev) => {
         const fig = VIDEO_FIGS[Math.floor(Math.random() * VIDEO_FIGS.length)];
-        const v = VIDEOS[Math.floor(Math.random() * VIDEOS.length)];
+        const vi = Math.floor(Math.random() * VIDEO_IDS.length);
         const id = ++seq;
         window.setTimeout(() => setBubbles((p) => p.filter((b) => b.id !== id)), 5500);
         return [
           ...prev.filter((b) => b.fig !== fig),
-          { id, fig, kind: "video", text: v.title, thumb: `https://img.youtube.com/vi/${v.id}/mqdefault.jpg` },
+          { id, fig, kind: "video", text: titles[vi], thumb: `https://img.youtube.com/vi/${VIDEO_IDS[vi]}/mqdefault.jpg` },
         ];
       });
     const textIv = setInterval(spawnText, 4000);
@@ -274,7 +299,7 @@ export function LivingPlaza() {
       clearInterval(vidIv);
       clearTimeout(firstVid);
     };
-  }, []);
+  }, [locale]);
 
   // Depth order: larger feet-bottom% = further away = painted first (behind).
   const entities = [

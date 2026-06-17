@@ -27,7 +27,7 @@ export function LandingClient({ initialLocale }: { initialLocale: Locale }) {
       </header>
 
       <div className="flex flex-1 flex-col justify-center gap-8 pb-4">
-        <LivingPlaza />
+        <LivingPlaza locale={locale} />
 
         <section className="mx-auto w-full max-w-[680px] space-y-7 px-6">
           <div className="animate-fade-up space-y-4">
