@@ -169,24 +169,48 @@ function buildSystemPrompt(
 // to that ("다들 음악 얘기 중이구나").
 export async function generateGreeting(
   member: Member,
-  context?: { peers?: string[]; transcript?: string[] },
+  context?: { peers?: string[]; transcript?: string[]; language?: Locale },
 ): Promise<string | null> {
-  const system = buildSystemPrompt(member, { language: "ko", joinedAgo: "방금" });
+  const language: Locale = context?.language ?? "ko";
+  // joinedAgo here is "just arrived" — localize the label so the system
+  // prompt fact line reads natively. ko keeps the original "방금".
+  const joinedAgo = formatJoinedAgo(new Date(), language) ?? "방금";
+  const system = buildSystemPrompt(member, { language, joinedAgo });
   const peers = context?.peers ?? [];
   const transcript = context?.transcript ?? [];
 
   const scene: string[] = [];
-  if (peers.length > 0) scene.push(`이미 있는 사람: ${peers.join(", ")}`);
-  else scene.push("방엔 방장만 있음.");
-  if (transcript.length > 0) scene.push(`최근 대화:\n${transcript.map((t) => `  ${t}`).join("\n")}`);
-  else scene.push("최근은 조용함.");
+  if (language === "en") {
+    if (peers.length > 0) scene.push(`Already here: ${peers.join(", ")}`);
+    else scene.push("Only the host is in the room.");
+    if (transcript.length > 0) scene.push(`Recent chat:\n${transcript.map((t) => `  ${t}`).join("\n")}`);
+    else scene.push("It's quiet right now.");
+  } else if (language === "ja") {
+    if (peers.length > 0) scene.push(`すでにいる人: ${peers.join(", ")}`);
+    else scene.push("部屋にはホストだけ。");
+    if (transcript.length > 0) scene.push(`最近の会話:\n${transcript.map((t) => `  ${t}`).join("\n")}`);
+    else scene.push("今は静か。");
+  } else {
+    if (peers.length > 0) scene.push(`이미 있는 사람: ${peers.join(", ")}`);
+    else scene.push("방엔 방장만 있음.");
+    if (transcript.length > 0) scene.push(`최근 대화:\n${transcript.map((t) => `  ${t}`).join("\n")}`);
+    else scene.push("최근은 조용함.");
+  }
 
-  const userPrompt = [
-    "[방금 광장에 들어왔어요. 자연스럽게 한마디.]",
-    ...scene,
-    "",
-    "1문장, 짧게. 인사도 좋고 분위기 보고 한마디도 좋아요.",
-  ].join("\n");
+  const header =
+    language === "en"
+      ? "[You just entered the plaza. Say one natural line.]"
+      : language === "ja"
+        ? "[今プラザに入ったところ。自然にひとこと。]"
+        : "[방금 광장에 들어왔어요. 자연스럽게 한마디.]";
+  const footer =
+    language === "en"
+      ? "One short sentence. A greeting is fine, or a quick read of the room."
+      : language === "ja"
+        ? "1文で短く。挨拶でも、雰囲気を見たひとことでもOK。"
+        : "1문장, 짧게. 인사도 좋고 분위기 보고 한마디도 좋아요.";
+
+  const userPrompt = [header, ...scene, "", footer].join("\n");
 
   const text = await callChat(system, userPrompt, MAX_TOKENS);
   return text ? clean(text) : null;

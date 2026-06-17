@@ -9,6 +9,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ensureAiPool, pickAvailable } from "@/lib/ai-pool";
 import { memberCap, type Plan } from "@/lib/energy";
+import type { Locale } from "@/lib/language";
+import { localizeIdentity } from "@/lib/member-identity";
 
 // How many AI characters a brand-new world initially recruits from the pool.
 // They land as dormant rows; lazy activation reveals them on schedule, capped
@@ -56,6 +58,15 @@ export async function seedMembersIfEmpty(
 
   if ((count ?? 0) > 0) return { inserted: 0, skipped: true };
 
+  // Plaza language. ko (default) keeps the native Korean pool identities
+  // verbatim; non-ko plazas render each member's identity in-language.
+  const { data: w } = await sb
+    .from("worlds")
+    .select("language")
+    .eq("id", worldId)
+    .maybeSingle();
+  const language = ((w?.language ?? "ko") as Locale);
+
   // Make sure the global pool is populated, then draw the least-loaded slice.
   await ensureAiPool(sb);
   const picked = await pickAvailable(sb, SEED_COUNT);
@@ -70,19 +81,73 @@ export async function seedMembersIfEmpty(
   // arrival ramp is well-shaped regardless of randomness.
   const offsets = generateActivationOffsets(ordered.length);
 
+  // For non-ko plazas, generate a native identity per character from its
+  // neutral archetype. ko → all-null (every field below falls back to the
+  // Korean pool defaults, so ko stays byte-identical to before). Per-item
+  // failure tolerated: a null entry just means that member keeps its
+  // Korean pool defaults instead of dropping out of the seed.
+  const localized = language === "ko"
+    ? ordered.map(() => null)
+    : await Promise.all(
+        ordered.map((c) =>
+          localizeIdentity(
+            {
+              affinity: c.base_persona.affinity ?? [],
+              speechSeed: c.base_persona.speech_style ?? "",
+              backstorySeed: c.base_backstory ?? "",
+            },
+            language,
+          ).catch(() => null),
+        ),
+      );
+
+  // members.name is UNIQUE. Localized (en/ja) names may collide with each
+  // other within this batch or with names already present in this world.
+  // De-duplicate only the localized names (ko names are pool-unique and
+  // untouched, preserving the ko path exactly). Existing-name set is fetched
+  // once; a colliding name gets a bounded numeric suffix.
+  const seedNames = new Set<string>();
+  if (language !== "ko") {
+    const { data: existing } = await sb
+      .from("members")
+      .select("name")
+      .eq("current_location_world_id", worldId);
+    for (const r of existing ?? []) if (r.name) seedNames.add(r.name);
+  }
+  const uniqueName = (proposed: string): string => {
+    if (!seedNames.has(proposed)) {
+      seedNames.add(proposed);
+      return proposed;
+    }
+    for (let i = 2; i <= 9; i++) {
+      const candidate = `${proposed} ${i}`;
+      if (!seedNames.has(candidate)) {
+        seedNames.add(candidate);
+        return candidate;
+      }
+    }
+    // Exhausted suffixes — fall back to a guaranteed-unique tail.
+    const candidate = `${proposed} ${Date.now() % 1000}`;
+    seedNames.add(candidate);
+    return candidate;
+  };
+
   const rows = ordered.map((c, idx) => {
     const priority = idx + 1;
+    const id = localized[idx];
+    // ko: id is null → name resolves to c.name and skips suffixing entirely.
+    const name = id?.name ? uniqueName(id.name) : c.name;
     return {
       ai_character_id: c.id,
       origin_world_id: worldId,
       current_location_world_id: worldId,
-      name: c.name,
+      name,
       persona: {
         sprite: c.sprite,
-        affinity: c.base_persona.affinity,
-        speech_style: c.base_persona.speech_style,
+        affinity: c.base_persona.affinity,        // neutral slugs kept as-is
+        speech_style: id?.speech_style ?? c.base_persona.speech_style,
       },
-      backstory: c.base_backstory,
+      backstory: id?.backstory ?? c.base_backstory,
       activity_weight: c.default_activity_weight,
       status: "active",
       activation_priority: priority,
@@ -149,10 +214,11 @@ export async function tickMemberActivations(
   // Surplus eligibles stay dormant and fill in later as members rotate out.
   const { data: w } = await sb
     .from("worlds")
-    .select("plan")
+    .select("plan, language")
     .eq("id", worldId)
     .maybeSingle();
   const cap = memberCap((w?.plan ?? "free") as Plan);
+  const language = ((w?.language ?? "ko") as Locale);
   const { count: activeCount } = await sb
     .from("members")
     .select("id", { count: "exact", head: true })
@@ -240,7 +306,7 @@ export async function tickMemberActivations(
       for (const m of justActivated) {
         const greeting = await generateGreeting(
           m as Parameters<typeof generateGreeting>[0],
-          { peers: peers.filter((p) => p !== m.name), transcript },
+          { peers: peers.filter((p) => p !== m.name), transcript, language },
         );
         if (!greeting) continue;
         await sb.from("messages").insert({
