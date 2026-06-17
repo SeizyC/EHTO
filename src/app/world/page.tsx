@@ -251,14 +251,15 @@ export default function WorldPage() {
     return () => cancelAnimationFrame(id);
   }, [me?.id]);
 
-  // Mobile-only: when a new speaker bubble appears, smooth-scroll the plaza
-  // viewport so the speaker sits horizontally centered. Y stays put because
-  // floor band is already in view on mobile. On lg+ the scroller element is
-  // present but `display: none` (lg:hidden), so scrollTo is a visual no-op.
+  // When a new speaker bubble appears, smooth-scroll the visible plaza
+  // viewport so the speaker sits horizontally centered. Y stays put — the
+  // floor band is already in view. Drives BOTH scrollers: the mobile one
+  // (scrollerRef) and the PC one (pcScrollerRef). Whichever is hidden at
+  // the current breakpoint reports clientWidth 0 and is skipped, so this
+  // works on desktop (lg+) as well as mobile. Coordinates use the zoomed
+  // canvas size (PLAZA_W * zoom) to match the scroll content's real width.
   const lastCenteredBubbleRef = useRef<string | null>(null);
   useEffect(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
     // Find the newest active bubble in chat.
     let newest: { id: string; fromCharId: string } | null = null;
     for (let i = chat.length - 1; i >= 0; i--) {
@@ -273,10 +274,16 @@ export default function WorldPage() {
     const speaker = characters.find((c) => c.id === newest!.fromCharId);
     if (!speaker) return;
 
-    const targetX = PLAZA_W * (speaker.x / 100) - el.clientWidth / 2;
-    el.scrollTo({ left: Math.max(0, targetX), behavior: "smooth" });
-    lastCenteredBubbleRef.current = newest.id;
-  }, [chat, characters]);
+    const targetX = PLAZA_W * zoom * (speaker.x / 100);
+    let scrolled = false;
+    for (const ref of [scrollerRef, pcScrollerRef]) {
+      const el = ref.current;
+      if (!el || el.clientWidth === 0) continue; // hidden viewport at this breakpoint
+      el.scrollTo({ left: Math.max(0, targetX - el.clientWidth / 2), behavior: "smooth" });
+      scrolled = true;
+    }
+    if (scrolled) lastCenteredBubbleRef.current = newest.id;
+  }, [chat, characters, zoom]);
 
   // Header — same content on every breakpoint, factored once.
   const headerNode = (
