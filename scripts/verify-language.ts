@@ -1,5 +1,6 @@
 import { resolveUserLanguage, LANGUAGE_NAMES } from "../src/lib/language";
 import { localizeIdentity } from "../src/lib/member-identity";
+import { parseGoogleNewsRss } from "../src/lib/news-google";
 
 function assert(cond: boolean, msg: string) {
   if (!cond) { console.error("FAIL:", msg); process.exit(1); }
@@ -14,6 +15,12 @@ assert(resolveUserLanguage({}) === "ko", "default ko");
 // US -> en
 assert(resolveUserLanguage({ country: "US" }) === "en", "US -> en");
 assert(LANGUAGE_NAMES.en === "English", "language names");
+
+// Parser fixture tests
+const xml = `<rss><channel><item><title>Big thing happens - BBC</title></item><item><title><![CDATA[Another & story - CNN]]></title></item></channel></rss>`;
+const got = parseGoogleNewsRss(xml);
+assert(got[0] === "Big thing happens", "rss strips source");
+assert(got[1] === "Another & story", "rss decodes entities + cdata");
 
 // Gated live check: only run if ANTHROPIC_API_KEY is set
 async function runGatedChecks() {
