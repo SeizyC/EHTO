@@ -376,7 +376,7 @@ export async function tickAmbientConversation(
   // exact same snapshot.
   const implicit = await aggregateImplicit(sb, worldId);
   const newsHeadlines = await getNewsHeadlines(worldBias, implicit);
-  const biasHint = biasPromptLine(worldBias);
+  const biasHint = biasPromptLine(worldBias, language);
   // implicitHint — top 1-2 keywords, joined. Empty when cold-start or
   // below the panel floor.
   const implicitHint = implicit.topics.length > 0
