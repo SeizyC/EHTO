@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { userClient, serviceClient } from "@/lib/supabase";
 import { dayStart, dayEnd, dayStartFromLabel } from "@/lib/day-rollover";
 import { tickAmbientConversation } from "@/lib/ambient-loop";
-import { extractTopic } from "@/lib/member-relations";
+import { classifySteer, stripAffinityTopic } from "@/lib/topic-steer";
 import { invalidateImplicit } from "@/lib/implicit-pref";
 import type { Locale } from "@/lib/language";
+
+// Weight for an explicit "let's talk about Y" focus signal — large enough
+// to climb above an accumulated topic fast (vs the +1.0 of a normal line).
+const FOCUS_WEIGHT = 8.0;
 
 // GET  /api/messages?limit=50  — latest N messages in authed user's world
 // POST /api/messages { text }  — append user message (returns inserted row).
@@ -146,17 +150,49 @@ export async function POST(req: NextRequest) {
     try {
       const svc2 = serviceClient();
       const rows: Array<Record<string, unknown>> = [];
+      let steered = false;
 
-      // (1) chat signal — topic extraction. extractTopic returns null
-      //     for short reactions ("ㅋㅋ", "응") which we want to skip
-      //     anyway so they don't drown out real topics.
-      const topic = await extractTopic(text, language).catch(() => null);
-      if (topic) {
+      // (1) topic + steering. classifySteer separates a plain topic from
+      //     an explicit "stop X / let's talk Y", so a steering line never
+      //     ironically reinforces the very topic the user is dropping.
+      const steer = await classifySteer(text, language).catch(() => null);
+
+      // drop → hard-mute + strip from member affinity; never reinforce it.
+      if (steer?.drop) {
+        await svc2.from("user_topic_mutes").upsert(
+          { user_id: userId, world_id: worldId, topic_keyword: steer.drop },
+          { onConflict: "user_id,world_id,topic_keyword" },
+        );
+        await stripAffinityTopic(svc2, worldId, steer.drop);
+        steered = true;
+      }
+
+      // focus → strong positive signal so it climbs to the top fast, and
+      //         unmute it if it had been muted before.
+      if (steer?.focus) {
+        await svc2
+          .from("user_topic_mutes")
+          .delete()
+          .eq("user_id", userId)
+          .eq("world_id", worldId)
+          .eq("topic_keyword", steer.focus);
         rows.push({
           user_id: userId,
           world_id: worldId,
           kind: "chat",
-          topic_keyword: topic,
+          topic_keyword: steer.focus,
+          weight: FOCUS_WEIGHT,
+        });
+        steered = true;
+      }
+
+      // plain topic → normal +1.0, but never reinforce a just-dropped one.
+      if (steer?.topic && steer.topic !== steer.drop) {
+        rows.push({
+          user_id: userId,
+          world_id: worldId,
+          kind: "chat",
+          topic_keyword: steer.topic,
           weight: 1.0,
         });
       }
@@ -186,6 +222,10 @@ export async function POST(req: NextRequest) {
 
       if (rows.length > 0) {
         await svc2.from("user_signals").insert(rows);
+      }
+      // Invalidate the aggregate cache if anything changed — including a
+      // pure drop (mute + affinity strip) that inserts no signal rows.
+      if (rows.length > 0 || steered) {
         invalidateImplicit(worldId);
       }
     } catch (e) {
