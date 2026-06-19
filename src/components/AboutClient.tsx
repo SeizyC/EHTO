@@ -99,7 +99,7 @@ export function AboutClient({ initialLocale }: Props) {
       </section>
 
       <footer className="mt-14 flex justify-center">
-        <PixelLink href="/signup" size="lg">
+        <PixelLink href="/start" size="lg">
           {c.ui.enter}
         </PixelLink>
       </footer>

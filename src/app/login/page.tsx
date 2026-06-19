@@ -99,7 +99,7 @@ export default function LoginPage() {
 
         <p className="text-sub mt-6 text-center text-[12.5px]">
           아직 계정이 없어?{" "}
-          <Link href="/signup" className="text-ink underline-offset-2 hover:underline">
+          <Link href="/start" className="text-ink underline-offset-2 hover:underline">
             가입하기
           </Link>
         </p>

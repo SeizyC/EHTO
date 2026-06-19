@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { userClient, serviceClient } from "@/lib/supabase";
 import { ensureWorld, seedMembersIfEmpty } from "@/lib/world-seed";
 import { consumeCodeAndReward, issueCodesForUser } from "@/lib/beta-codes";
-import type { Locale } from "@/lib/language";
+import { countryToLocale } from "@/lib/language";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,9 +42,17 @@ export async function POST(req: NextRequest) {
   }
 
   // 2. Create the world with the chosen name (+ seed members). Idempotent.
-  const language = ((req.headers.get("x-locale") ?? "ko") as Locale);
+  //    Language follows the request's IP→locale, same as the landing page
+  //    (cf-ipcountry). The world is created HERE (before /character), so this
+  //    is the one place the plaza language is set — a never-set x-locale
+  //    header would have forced every non-KO beta plaza to Korean.
+  const language = countryToLocale(req.headers.get("cf-ipcountry"));
   const worldId = await ensureWorld(svc, uid, roomName, language);
-  await seedMembersIfEmpty(svc, worldId);
+  // Member seeding is best-effort: a seed hiccup must not 500 finalize after
+  // the code is already consumed. The world exists; the next /world poll's
+  // seedMembersIfEmpty backfills. Mirrors generate-character's guarded seed.
+  try { await seedMembersIfEmpty(svc, worldId); }
+  catch (e) { console.warn("[finalize] seed failed:", e instanceof Error ? e.message : e); }
 
   // 3. Issue this user's own 3 invite codes (idempotent).
   await issueCodesForUser(svc, uid);
