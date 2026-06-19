@@ -289,6 +289,11 @@ async function _hydrate(): Promise<void> {
         msgs[i] = { ...m, state: "bubble", silentPromote: true, landedAt: undefined };
       }
       _setMsgs(msgs);
+    } catch (e) {
+      // Transient network failure during initial hydrate — mark hydrated
+      // anyway so the realtime/poll path takes over; don't throw an
+      // unhandled rejection that becomes a runtime-error overlay.
+      console.warn("[chat] hydrate failed", e instanceof Error ? e.message : e);
     } finally {
       _hydrated = true;
       _hydrating = null;
@@ -378,6 +383,9 @@ export async function refreshChat(): Promise<void> {
       if (known.has(row.id)) continue;
       _appendFreshMessage(row);
     }
+  } catch (e) {
+    // Transient network failure — keep current feed, retry next poll.
+    console.warn("[chat] refresh failed", e instanceof Error ? e.message : e);
   } finally {
     _refreshing = false;
   }
