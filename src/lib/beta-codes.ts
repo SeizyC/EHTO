@@ -92,19 +92,21 @@ async function maybeGrantInviteReward(svc: SupabaseClient, ownerId: string): Pro
   const allUsed = codes.every((c) => (c as { used_by: string | null }).used_by !== null);
   if (!allUsed) return;
 
-  // Idempotent: only grant if the marker is still null.
-  const { data: prof } = await svc
-    .from("profiles")
-    .select("invite_reward_granted_at")
-    .eq("id", ownerId)
-    .maybeSingle();
-  if (prof && (prof as { invite_reward_granted_at: string | null }).invite_reward_granted_at) return;
-
-  await grant(svc, ownerId, "invite", 1);
-  await svc
+  // Atomically claim the one-time reward: stamp the marker only while it is
+  // still null. `update ... where invite_reward_granted_at is null` is a
+  // single statement, so exactly one concurrent caller wins the row — this
+  // prevents a double-grant when the owner's last two codes are consumed at
+  // nearly the same moment (the prior read-then-write had a race window).
+  const { data: claimed } = await svc
     .from("profiles")
     .update({ invite_reward_granted_at: new Date().toISOString() })
-    .eq("id", ownerId);
+    .eq("id", ownerId)
+    .is("invite_reward_granted_at", null)
+    .select("id")
+    .maybeSingle();
+  if (!claimed) return; // already claimed/granted by another path
+
+  await grant(svc, ownerId, "invite", 1);
 }
 
 /** Ensure `uid` owns PER_USER codes — issue the difference. Idempotent. */
