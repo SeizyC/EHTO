@@ -46,19 +46,23 @@
 - 스텝마다 갱신. **OAuth 리다이렉트에도 생존**(localStorage라 도메인 내 유지).
 - 인증 성공 후 콜백/모달 핸들러가 드래프트를 읽어 finalize(E) 호출. 성공 시 드래프트 삭제.
 
-### C. 초대코드 시스템
+### C. 초대코드 시스템 (관리자 부트스트랩 + 유저당 3개 바이럴)
 
 신규 테이블:
 ```sql
 create table public.beta_codes (
-  code       text primary key,
-  used_by    uuid references auth.users(id),  -- null = 미사용
-  used_at    timestamptz,
-  created_at timestamptz default now()
+  code          text primary key,
+  owner_user_id uuid references auth.users(id),  -- null = 관리자 시드(부트스트랩)
+  used_by       uuid references auth.users(id),  -- null = 미사용
+  used_at       timestamptz,
+  created_at    timestamptz default now()
 );
 ```
-- 일회용: `used_by`가 null이면 미사용. 발급은 관리자가 시드(수동 insert / 운영 스크립트).
-- **검증 엔드포인트** `POST /api/beta/validate { code }` (공개, 소진 안 함): `code`가 존재하고 `used_by is null`이면 `{ ok: true }`. 코드 스텝에서 즉시 피드백용. 레이트리밋(간단 IP/세션 기준) 적용.
+- **일회용**: `used_by`가 null이면 미사용. 한 번 쓰면 소진.
+- **부트스트랩**: 최초 사용자들은 관리자가 시드한 코드(`owner_user_id` null)로 가입(수동 insert / 운영 스크립트).
+- **유저당 3개**: 가입 확정(E) 시 그 사용자 앞으로 무작위 유니크 코드 **3개 자동 생성**(`owner_user_id = 본인`). 이후 바이럴 성장.
+- **검증 엔드포인트** `POST /api/beta/validate { code }` (공개, 소진 X): `code`가 존재하고 `used_by is null`이면 `{ ok: true }`. 코드 스텝 즉시 피드백용. 레이트리밋(간단 IP/세션 기준).
+- **내 코드 조회** `GET /api/beta/my-codes` (인증): 본인 소유 코드 + 사용/미사용 상태. 설정 화면 "초대" 영역에서 복사·공유.
 - **소진은 E(finalize)에서만** 원자적으로.
 
 ### D. 인증 모달 (구글 OAuth + 이메일/비번)
@@ -72,9 +76,11 @@ create table public.beta_codes (
 ### E. 확정 엔드포인트 (인증 후, 원자적 1회)
 
 `POST /api/onboarding/finalize { code, roomName }` (인증 필요):
-1. **코드 소진 (원자적)**: `update beta_codes set used_by = :uid, used_at = now() where code = :code and used_by is null` → 영향 행 0이면 이미 사용/무효 → `409`, 클라이언트는 코드 스텝으로 복귀. 단, **이 유저가 이미 그 코드를 썼다면**(used_by = uid) 통과로 간주(재시도 idempotent).
-2. **월드 생성**: `ensureWorld(uid, roomName, language)` + `seedMembersIfEmpty`. `ensureWorld`는 idempotent(이미 있으면 이름만 보정).
-3. 응답 `{ ok: true }` → 클라이언트가 `/character`로(캐릭터 스텝).
+1. **코드 소진 (원자적)**: `update beta_codes set used_by=:uid, used_at=now() where code=:code and used_by is null returning owner_user_id` → 영향 행 0이면 이미 사용/무효 → `409`(코드 스텝 복귀). 단, **이 유저가 이미 그 코드를 썼다면**(used_by=uid) 통과로 간주(재시도 idempotent).
+2. **초대 보상 체크**: 소진된 코드에 `owner_user_id`(초대자)가 있으면, 그 초대자 소유 코드 3개가 **모두 소진됐는지** 확인 → 모두면 초대자에게 보상 지급(§H). 멱등(이미 지급 표시된 경우 스킵).
+3. **월드 생성**: `ensureWorld(uid, roomName, language)` + `seedMembersIfEmpty`. idempotent(이미 있으면 이름만 보정).
+4. **본인 코드 3개 발급**: 이 유저 앞으로 유니크 코드 3개 생성(`owner_user_id=uid`). 재진입 시 본인 소유 코드가 3개 미만일 때만 보충(idempotent).
+5. 응답 `{ ok: true }` → 클라이언트가 `/character`로(캐릭터 스텝).
 
 언어(`language`)는 finalize 요청 시점에 IP→로케일 감지(기존 랜딩과 동일 방식)로 결정해 `ensureWorld(uid, roomName, language)`에 넘긴다. 드래프트에는 싣지 않는다(인증 전 사용자 입력 대상이 아님).
 
@@ -91,15 +97,25 @@ create table public.beta_codes (
 - **이메일 확인 대기**: 확인 전엔 세션 없음 → 드래프트 유지, 확인 후 첫 로그인에서 finalize.
 - **미인증 `/world` 접근**: 기존 `useRequireSession` 가드 유지.
 
+### H. 초대 UI 위치 + 완료 보상
+
+- **위치**: 메인/광장이 아니라 **프로필 메뉴의 "초대" 영역**(Sora식으로 눈에 띄게, 단 메인 화면은 깔끔하게 유지).
+- **사용현황 (아주 간단)**: "초대 2/3 사용됨" 한 줄 + 코드 3개(복사 버튼). 미사용 코드만 강조, 사용된 건 흐리게. 데이터는 `GET /api/beta/my-codes`(§C).
+- **완료 보상**: 본인 코드 3개가 **모두 소진**되면(초대 친구 3명 가입 완료) **1회성 보상** 지급. finalize의 소진 체크(§E-2)가 트리거. 멱등 위해 지급 기록(`profiles.invite_reward_granted_at` 또는 별도 테이블).
+- **보상 내용**: **보너스 'invite' 티켓 1장** — 대기 중인 멤버 1명이 광장에 합류(기존 티켓 경제 [tickets.ts](src/lib/tickets.ts) 재사용). "친구를 데려왔더니 내 광장이 더 북적인다"는 테마 보상. 지급 = 해당 유저 invite 티켓 잔량 +1.
+
 ---
 
 ## 3. 데이터·라우트 변경 요약
 
 | 대상 | 변경 |
 |------|------|
-| `beta_codes` | 신규 테이블(code PK, used_by, used_at) |
+| `beta_codes` | 신규 테이블(code PK, **owner_user_id**, used_by, used_at) |
 | `POST /api/beta/validate` | 신규(공개, 소진 X) |
-| `POST /api/onboarding/finalize` | 신규(인증, 원자적 코드 소진 + ensureWorld + seed) |
+| `GET /api/beta/my-codes` | 신규(인증, 본인 코드+사용현황) |
+| 초대 보상 기록 | `profiles.invite_reward_granted_at`(또는 별도 테이블) |
+| 프로필 "초대" UI | 신규(코드 3개·복사·2/3 현황) |
+| `POST /api/onboarding/finalize` | 신규(인증; 원자적 소진 + 보상체크 + ensureWorld+seed + 본인 코드 3개 발급) |
 | `/auth/callback` | 신규(OAuth 리다이렉트 수신 → 드래프트 → finalize) |
 | `/start` | 신규 위저드(코드 → 방이름 → 인증 모달) |
 | 인증 모달 컴포넌트 | 신규(구글 OAuth + 이메일/비번; 기존 auth 헬퍼 공유) |
@@ -113,9 +129,9 @@ create table public.beta_codes (
 
 ## 4. 미포함 / 후속
 
-- **추천인/리퍼럴, 공용 코드, 코드 만료** — 일회용 풀만. 향후 확장.
+- **공용 코드·코드 만료·다단계 추천 보상** — 유저당 3개 일회용 코드 + 1회 완료 보상까지만. 그 외 확장은 후속.
 - **남의 광장 방문/멀티플레이어** — 본 초대코드는 베타 게이트일 뿐, 방문 기능 아님.
-- **코드 발급 관리자 UI** — 일단 수동 insert/스크립트. 필요 시 후속.
+- **코드 발급 관리자 UI** — 부트스트랩 코드는 수동 insert/스크립트. 필요 시 후속.
 - **이메일 확인 비활성화 여부** — Supabase 설정 정책은 별도 결정(본 설계는 두 경우 모두 동작).
 
 ---
@@ -128,3 +144,5 @@ create table public.beta_codes (
 | validate 레이트리밋 | 세션/IP당 분당 N회(구현 시 결정, 예: 20) |
 | 드래프트 키 | `ehto:onboarding:v1` |
 | OAuth 콜백 경로 | `/auth/callback` |
+| 유저당 발급 코드 수 | 3 |
+| 완료 보상 내용 | 보너스 'invite' 티켓 1장 |
