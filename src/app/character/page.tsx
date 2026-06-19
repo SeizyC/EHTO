@@ -22,12 +22,11 @@ import { PixelButton } from "@/components/PixelButton";
 import { MeGlyph } from "@/components/MeGlyph";
 import { MeSheet } from "@/components/MeSheet";
 import { useRequireSession } from "@/lib/use-require-session";
-import { currentBucket } from "@/lib/time-of-day";
 import { LOCALES, LOCALE_LABEL, DEFAULT_LOCALE, isLocale, type Locale } from "@/lib/about-content";
 
 const MAX_ROLLS = 3;
 
-type Stage = "select" | "generating" | "result" | "naming" | "room-naming" | "error";
+type Stage = "select" | "generating" | "result" | "naming" | "error";
 
 export default function CharacterPage() {
   useRequireSession();
@@ -217,13 +216,6 @@ export default function CharacterPage() {
       {stage === "naming" && imageUrl && (
         <NamingView
           imageUrl={imageUrl}
-          onDone={() => setStage("room-naming")}
-        />
-      )}
-
-      {stage === "room-naming" && imageUrl && (
-        <RoomNamingView
-          imageUrl={imageUrl}
           onDone={() => router.push("/world")}
         />
       )}
@@ -365,7 +357,6 @@ function goBack(
     case "select":      router.push("/"); return;
     case "result":      setStage("select"); return;
     case "naming":      setStage("result"); return;
-    case "room-naming": setStage("naming"); return;
     case "error":       setStage("select"); return;
     case "generating":  return; // no-op
   }
@@ -605,108 +596,6 @@ function NamingView(props: { imageUrl: string; onDone: () => void }) {
         </PixelButton>
         <p className="text-sub text-center text-[11px]">
           이름은 나중에 설정에서 바꿀 수 있어요
-        </p>
-      </footer>
-    </div>
-  );
-}
-
-function RoomNamingView(props: { imageUrl: string; onDone: () => void }) {
-  const [name, setName] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const bucket = currentBucket().id;
-  const plazaBg = `/sprites/rooms/states/empty_${bucket}.png`;
-
-  const trimmed = name.trim();
-  const valid = trimmed.length >= 1 && trimmed.length <= 16;
-
-  async function submit() {
-    if (!valid || submitting) return;
-    setSubmitting(true);
-    setErr(null);
-    try {
-      const sb = browserClient();
-      const { data: sess } = await sb.auth.getSession();
-      if (!sess.session) throw new Error("세션이 끊겼어요");
-      const r = await fetch("/api/world/name", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${sess.session.access_token}`,
-        },
-        body: JSON.stringify({ name: trimmed }),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error ?? "이름 설정 실패");
-      props.onDone();
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "오류");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <div className="animate-fade-in flex flex-1 flex-col">
-      {/* Plaza preview — the world they're about to name */}
-      <section className="border-line relative my-2 overflow-hidden rounded-xl border" style={{ aspectRatio: "3 / 2" }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={plazaBg}
-          alt="광장 미리보기"
-          className="absolute inset-0 h-full w-full object-cover"
-          draggable={false}
-        />
-        {/* Soft vignette so the heading remains legible over bright bgs */}
-        <div className="from-bg/55 pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t to-transparent" />
-      </section>
-
-      <section className="mt-3 space-y-4 px-1">
-        <div className="space-y-1.5">
-          <h2 className="text-ink text-[18px] font-medium">
-            이 세계의 이름을 정해주세요
-          </h2>
-          <p className="text-sub text-[12.5px] leading-relaxed">
-            당신만의 작은 사회. 나중에 바꿀 수 있어요.
-          </p>
-        </div>
-
-        <div className="border-line bg-surface flex items-center rounded-full border px-4 py-3">
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value.slice(0, 16));
-              setErr(null);
-            }}
-            placeholder="예) 새벽 광장, 비 오는 카페…"
-            maxLength={16}
-            autoFocus
-            className="text-ink placeholder:text-dim flex-1 bg-transparent text-[14px] outline-none"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && valid) submit();
-            }}
-          />
-          <span className="text-dim ml-2 text-[10.5px] tabular-nums">
-            {trimmed.length} / 16
-          </span>
-        </div>
-
-        {err && <p className="text-accent text-[11.5px]">{err}</p>}
-      </section>
-
-      <footer className="mt-auto flex flex-col gap-2.5 pb-2">
-        <PixelButton
-          block
-          size="lg"
-          disabled={!valid || submitting}
-          onClick={submit}
-        >
-          {submitting ? "들어가는 중…" : "이 세계로 들어가기"}
-        </PixelButton>
-        <p className="text-sub text-center text-[11px] leading-relaxed">
-          처음엔 아무도 없어요 · 잠시 후 한 명씩 들어옵니다
         </p>
       </footer>
     </div>
