@@ -106,6 +106,9 @@ export async function refreshPlazaObjects(): Promise<void> {
       );
     }
     _notify();
+  } catch (e) {
+    // Transient network failure — keep cached objects, retry next poll.
+    console.warn("[objects] refresh failed", e instanceof Error ? e.message : e);
   } finally {
     _loading = false;
   }

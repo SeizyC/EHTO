@@ -168,6 +168,12 @@ export async function refreshMembers(): Promise<void> {
       });
     }
     _notify();
+  } catch (e) {
+    // Transient network failure (dev recompile, offline blip, navigation
+    // mid-flight). Keep the existing roster and let the next poll retry —
+    // without this catch a rejected fetch surfaces as an unhandled
+    // runtime-error overlay.
+    console.warn("[members] refresh failed", e instanceof Error ? e.message : e);
   } finally {
     _loading = false;
   }

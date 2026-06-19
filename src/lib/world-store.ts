@@ -85,6 +85,9 @@ async function fetchWorld(): Promise<void> {
     _cached = next;
     _saveToLs(next);
     _notify();
+  } catch (e) {
+    // Transient network failure — keep cached world info, retry next poll.
+    console.warn("[world] refresh failed", e instanceof Error ? e.message : e);
   } finally {
     _loading = false;
   }

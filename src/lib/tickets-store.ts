@@ -33,6 +33,9 @@ async function fetchTickets(): Promise<void> {
     const j = await r.json();
     _balances = (j.balances ?? null) as Balances | null;
     _notify();
+  } catch (e) {
+    // Transient network failure — keep cached balances, retry next poll.
+    console.warn("[tickets] refresh failed", e instanceof Error ? e.message : e);
   } finally {
     _loading = false;
   }
