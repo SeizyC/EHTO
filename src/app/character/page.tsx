@@ -300,34 +300,27 @@ function SelectView(props: {
       </section>
 
       <footer className="mt-7 flex flex-col gap-3">
-        <div className="flex gap-2">
-          {step > 0 && (
-            <div className="flex-1">
-              <PixelButton variant="muted" size="lg" block onClick={() => setStep(step - 1)}>
-                {nav.back}
-              </PixelButton>
-            </div>
-          )}
-          <div className="flex-1">
-            {isLast ? (
-              <PixelButton
-                variant="primary"
-                size="lg"
-                block
-                onClick={props.onGenerate}
-                disabled={!props.canGenerate}
-              >
-                {props.canGenerate
-                  ? t.createBtn.replace("{n}", String(props.remaining))
-                  : t.createBtnExhausted}
-              </PixelButton>
-            ) : (
-              <PixelButton variant="primary" size="lg" block onClick={() => setStep(step + 1)}>
-                {nav.next}
-              </PixelButton>
-            )}
-          </div>
-        </div>
+        <PixelButton
+          variant="primary"
+          size="lg"
+          block
+          onClick={isLast ? props.onGenerate : () => setStep(step + 1)}
+          disabled={isLast && !props.canGenerate}
+        >
+          {isLast
+            ? (props.canGenerate
+                ? t.createBtn.replace("{n}", String(props.remaining))
+                : t.createBtnExhausted)
+            : nav.next}
+        </PixelButton>
+        {step > 0 && (
+          <button
+            onClick={() => setStep(step - 1)}
+            className="text-sub text-center text-[13px] active:opacity-70"
+          >
+            {nav.back}
+          </button>
+        )}
         <p className="text-sub text-center text-[11px] leading-relaxed">{t.selHint}</p>
       </footer>
     </div>
