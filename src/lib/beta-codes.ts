@@ -5,7 +5,7 @@
 // (validate / consume+reward / issue / list) run with the service role.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { grant } from "@/lib/ticket-balance";
+import { grantEhto } from "@/lib/ehto";
 
 const ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"; // no 0 O 1 I L
 export const CODE_RE = /^[2-9A-HJ-NP-Z]{8}$/;
@@ -106,7 +106,7 @@ async function maybeGrantInviteReward(svc: SupabaseClient, ownerId: string): Pro
     .maybeSingle();
   if (!claimed) return; // already claimed/granted by another path
 
-  await grant(svc, ownerId, "invite", 1);
+  await grantEhto(svc, ownerId, 3); // invite-completion reward, in EHTO
 }
 
 /** Ensure `uid` owns PER_USER codes — issue the difference. Idempotent. */
