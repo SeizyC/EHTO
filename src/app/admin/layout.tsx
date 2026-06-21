@@ -69,6 +69,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin/stats", label: "통계" },
     { href: "/admin/objects", label: "오브제 카탈로그" },
     { href: "/admin/character-status", label: "캐릭터 현황" },
+    { href: "/admin/codes", label: "초대코드" },
   ];
 
   return (
