@@ -75,6 +75,8 @@ export type OnboardingCopy = {
     loginBtn: string;
     toLogin: string;
     toSignup: string;
+    working: string;
+    googleGoing: string;
   };
   callback: {
     entering: string;
@@ -191,6 +193,8 @@ const ko: OnboardingCopy = {
     loginBtn: "로그인",
     toLogin: "이미 계정이 있어요",
     toSignup: "처음이에요 — 가입",
+    working: "광장을 준비하는 중…",
+    googleGoing: "Google로 이동 중…",
   },
   callback: {
     entering: "들어가는 중…",
@@ -314,6 +318,8 @@ const en: OnboardingCopy = {
     loginBtn: "Log in",
     toLogin: "I already have an account",
     toSignup: "First time — sign up",
+    working: "Preparing your plaza…",
+    googleGoing: "Going to Google…",
   },
   callback: {
     entering: "Entering…",
@@ -437,6 +443,8 @@ const ja: OnboardingCopy = {
     loginBtn: "ログイン",
     toLogin: "すでにアカウントがあります",
     toSignup: "はじめて — 登録",
+    working: "広場を準備しています…",
+    googleGoing: "Googleへ移動中…",
   },
   callback: {
     entering: "入っています…",
