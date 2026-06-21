@@ -66,6 +66,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const navItems = [
     { href: "/admin/characters", label: "AI 캐릭터" },
+    { href: "/admin/stats", label: "통계" },
   ];
 
   return (
