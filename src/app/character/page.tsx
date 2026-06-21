@@ -23,6 +23,8 @@ import { MeGlyph } from "@/components/MeGlyph";
 import { MeSheet } from "@/components/MeSheet";
 import { useRequireSession } from "@/lib/use-require-session";
 import { LOCALES, LOCALE_LABEL, DEFAULT_LOCALE, isLocale, type Locale } from "@/lib/about-content";
+import { useLocale } from "@/lib/use-locale";
+import { ONBOARDING, OPTION_LABELS } from "@/lib/onboarding-content";
 
 const MAX_ROLLS = 3;
 
@@ -31,6 +33,8 @@ type Stage = "select" | "generating" | "result" | "naming" | "error";
 export default function CharacterPage() {
   useRequireSession();
   const router = useRouter();
+  const { locale } = useLocale(DEFAULT_LOCALE);
+  const t = ONBOARDING[locale].character;
   const [stage, setStage] = useState<Stage>("select");
   const [gender, setGender] = useState<GenderId>("m");
   const [skin, setSkin] = useState<SkinId>("fair");
@@ -123,7 +127,7 @@ export default function CharacterPage() {
   async function generate() {
     // Hard cap — same counter for first-make, re-roll, and re-select paths.
     if (rollsUsed >= MAX_ROLLS) {
-      setErrorMsg("이번 라운드 티켓을 다 썼어요. 결과 중에서 골라주세요.");
+      setErrorMsg(t.genTicketExhausted);
       setStage("error");
       return;
     }
@@ -133,7 +137,7 @@ export default function CharacterPage() {
       // 1. Session must already exist — useRequireSession guards this page.
       const sb = browserClient();
       const { data: sess } = await sb.auth.getSession();
-      if (!sess.session) throw new Error("세션 없음 — 다시 로그인해줘");
+      if (!sess.session) throw new Error(t.genNoSession);
 
       // 2. Call API with token
       const r = await fetch("/api/generate-character", {
@@ -155,7 +159,7 @@ export default function CharacterPage() {
       setRollsUsed((n) => n + 1);
       setStage("result");
     } catch (e: unknown) {
-      setErrorMsg(e instanceof Error ? e.message : "오류");
+      setErrorMsg(e instanceof Error ? e.message : t.genGeneric);
       setStage("error");
     }
   }
@@ -250,31 +254,34 @@ function SelectView(props: {
   canGenerate: boolean;
   remaining: number;
 }) {
+  const { locale } = useLocale(DEFAULT_LOCALE);
+  const t = ONBOARDING[locale].character;
+
   return (
     <div className="animate-fade-in flex flex-1 flex-col">
       <section className="mb-7">
         <h2 className="text-[20px] font-medium leading-[1.4]">
-          어떤 모습으로 머무를까요
+          {t.selTitle}
         </h2>
         <p className="text-sub mt-2 text-[13px] leading-[1.7]">
-          여섯 가지 항목으로 결을 잡아요.
+          {t.selSub}
         </p>
       </section>
 
       <section className="flex flex-1 flex-col gap-7">
-        <PillRow label="성별"   options={GENDERS}     value={props.gender}    onChange={props.onGender} />
-        <PillRow label="피부톤" options={SKINS}       value={props.skin}      onChange={props.onSkin} />
-        <PillRow label="머리"   options={HAIR_STYLES} value={props.hairStyle} onChange={props.onHairStyle} />
-        <PillRow label="머리색" options={HAIR_COLORS} value={props.hairColor} onChange={props.onHairColor} />
-        <PillRow label="착장"   options={OUTFITS}     value={props.outfit}    onChange={props.onOutfit} />
-        <PillRow label="장신구" options={ACCESSORIES} value={props.accessory} onChange={props.onAccessory} />
+        <PillRow label={t.secGender}    options={GENDERS}     value={props.gender}    onChange={props.onGender} />
+        <PillRow label={t.secSkin}      options={SKINS}       value={props.skin}      onChange={props.onSkin} />
+        <PillRow label={t.secHair}      options={HAIR_STYLES} value={props.hairStyle} onChange={props.onHairStyle} />
+        <PillRow label={t.secHairColor} options={HAIR_COLORS} value={props.hairColor} onChange={props.onHairColor} />
+        <PillRow label={t.secOutfit}    options={OUTFITS}     value={props.outfit}    onChange={props.onOutfit} />
+        <PillRow label={t.secAccessory} options={ACCESSORIES} value={props.accessory} onChange={props.onAccessory} />
 
         {/* Plaza language — sets worlds.language for the world this character
             founds. Defaults to the user's UI locale; drives native member
             generation + ambient language. Same pill style as the rows above. */}
         <div>
           <div className="text-sub mb-2.5 text-[10px] uppercase tracking-[0.22em]">
-            광장 언어
+            {t.plazaLang}
           </div>
           <div className="flex flex-wrap gap-2">
             {LOCALES.map((l) => {
@@ -298,7 +305,7 @@ function SelectView(props: {
             })}
           </div>
           <p className="text-sub mt-2 text-[11px] leading-relaxed">
-            머무는 사람들의 언어 · 나중에 광장 설정에서 바꿀 수 있어요
+            {t.plazaLangDesc}
           </p>
         </div>
       </section>
@@ -311,11 +318,11 @@ function SelectView(props: {
           disabled={!props.canGenerate}
         >
           {props.canGenerate
-            ? `내 캐릭터 만들기 · 티켓 ${props.remaining}장`
-            : "티켓 소진 (결과 중 하나 선택)"}
+            ? t.createBtn.replace("{n}", String(props.remaining))
+            : t.createBtnExhausted}
         </PixelButton>
         <p className="text-sub text-center text-[11px] leading-relaxed">
-          이미지 생성엔 약 30초 · 다시 고르기 포함 총 3번까지 시도
+          {t.selHint}
         </p>
       </footer>
     </div>
@@ -334,8 +341,11 @@ function BackLink({
   stage: Stage;
   onBack: () => void;
 }) {
+  const { locale } = useLocale(DEFAULT_LOCALE);
+  const t = ONBOARDING[locale].character;
+
   if (stage === "generating") return <span />; // reserve header space, no action
-  const label = stage === "select" ? "← 홈으로" : "← 뒤로";
+  const label = stage === "select" ? t.backHome : t.backStep;
   return (
     <button
       type="button"
@@ -365,12 +375,15 @@ function goBack(
 // Small ticket counter shown in the page header during select/result stages.
 // Three dots: filled = unused tickets, empty = spent.
 function TicketChip({ remaining, max }: { remaining: number; max: number }) {
+  const { locale } = useLocale(DEFAULT_LOCALE);
+  const t = ONBOARDING[locale].character;
+
   return (
     <div
-      aria-label={`남은 티켓 ${remaining}장 / ${max}`}
+      aria-label={t.ticketAria.replace("{n}", String(remaining)).replace("{max}", String(max))}
       className="border-line bg-surface flex items-center gap-1.5 rounded-full border px-2.5 py-1"
     >
-      <span className="text-sub text-[10px] tracking-wide">티켓</span>
+      <span className="text-sub text-[10px] tracking-wide">{t.ticketLabel}</span>
       <span className="flex items-center gap-1">
         {Array.from({ length: max }, (_, i) => (
           <span
@@ -394,26 +407,22 @@ function TicketChip({ remaining, max }: { remaining: number; max: number }) {
 // natural ("polish" is slow). If gen finishes early, stage transitions
 // out anyway. If it's still running on the last step, the bar keeps
 // crawling toward 100% instead of standing still.
-const GEN_STEPS: { label: string; ms: number }[] = [
-  { label: "캔버스에 자리를 잡는 중",        ms: 2800 },
-  { label: "전체 골격을 세우는 중",          ms: 3000 },
-  { label: "피부 톤을 입히는 중",            ms: 3200 },
-  { label: "어울리는 옷을 골라 입히는 중",   ms: 3400 },
-  { label: "머리 모양을 정하는 중",          ms: 3600 },
-  { label: "마지막 디테일을 다듬는 중",      ms: 21000 },
-];
+const GEN_STEP_DURATIONS: number[] = [2800, 3000, 3200, 3400, 3600, 21000];
 
 function GeneratingView() {
   const [step, setStep] = useState(0);
+  const { locale } = useLocale(DEFAULT_LOCALE);
+  const t = ONBOARDING[locale].character;
 
   // Advance through steps one-by-one using the per-step duration.
   useEffect(() => {
-    if (step >= GEN_STEPS.length - 1) return; // stay on last step
-    const t = setTimeout(() => setStep((s) => s + 1), GEN_STEPS[step].ms);
-    return () => clearTimeout(t);
+    if (step >= GEN_STEP_DURATIONS.length - 1) return; // stay on last step
+    const timer = setTimeout(() => setStep((s) => s + 1), GEN_STEP_DURATIONS[step]);
+    return () => clearTimeout(timer);
   }, [step]);
 
-  const { label, ms } = GEN_STEPS[step];
+  const ms = GEN_STEP_DURATIONS[step];
+  const label = t.genSteps[step];
 
   return (
     <section className="animate-fade-in spotlight relative flex flex-1 flex-col items-center justify-center gap-10 overflow-hidden px-2">
@@ -431,7 +440,7 @@ function GeneratingView() {
             {label}
           </span>
           <span className="text-dim text-[10.5px] tracking-wide">
-            {step + 1} / {GEN_STEPS.length}
+            {step + 1} / {t.genSteps.length}
           </span>
         </div>
         <div className="bg-line h-2 w-full overflow-hidden rounded-full">
@@ -457,6 +466,9 @@ function ResultView(props: {
   onBackToSelect: () => void;
   onConfirm: () => void;
 }) {
+  const { locale } = useLocale(DEFAULT_LOCALE);
+  const t = ONBOARDING[locale].character;
+
   return (
     <div className="animate-fade-in flex flex-1 flex-col">
       {/* Stage with theatrical lighting */}
@@ -482,16 +494,16 @@ function ResultView(props: {
 
       <footer className="mt-3 flex flex-col gap-3">
         <PixelButton block size="lg" onClick={props.onConfirm}>
-          이 모습으로 들어가기
+          {t.resEnter}
         </PixelButton>
 
         {props.canRoll ? (
           <PixelButton block variant="muted" onClick={props.onReroll}>
-            다시 만들기 · {props.remaining}번 남음
+            {t.resRegen.replace("{n}", String(props.remaining))}
           </PixelButton>
         ) : (
           <PixelButton block variant="muted" disabled>
-            티켓으로 한 번 더 (잠금)
+            {t.resRegenLocked}
           </PixelButton>
         )}
 
@@ -499,7 +511,7 @@ function ResultView(props: {
           onClick={props.onBackToSelect}
           className="text-sub hover:text-ink mt-1 text-center text-[11px] underline-offset-4 transition hover:underline"
         >
-          다시 고르기
+          {t.resReselect}
         </button>
       </footer>
     </div>
@@ -510,6 +522,8 @@ function NamingView(props: { imageUrl: string; onDone: () => void }) {
   const [name, setName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const { locale } = useLocale(DEFAULT_LOCALE);
+  const t = ONBOARDING[locale].character;
 
   const trimmed = name.trim();
   const valid = trimmed.length >= 1 && trimmed.length <= 12;
@@ -523,8 +537,8 @@ function NamingView(props: { imageUrl: string; onDone: () => void }) {
     if (error) {
       setErr(
         error.toLowerCase().includes("duplicate")
-          ? "이미 누군가 쓰고 있어요"
-          : "지금은 저장이 어려워요",
+          ? t.nameErrDup
+          : t.nameErrSave,
       );
       return;
     }
@@ -554,10 +568,10 @@ function NamingView(props: { imageUrl: string; onDone: () => void }) {
       <section className="mt-3 space-y-4 px-1">
         <div className="space-y-1.5">
           <h2 className="text-ink text-[18px] font-medium">
-            어떻게 불릴까요
+            {t.nameTitle}
           </h2>
           <p className="text-sub text-[12.5px] leading-relaxed">
-            세계에서 당신을 부르는 이름. 1–12자.
+            {t.nameSub}
           </p>
         </div>
 
@@ -569,7 +583,7 @@ function NamingView(props: { imageUrl: string; onDone: () => void }) {
               setName(e.target.value.slice(0, 12));
               setErr(null);
             }}
-            placeholder="이름…"
+            placeholder={t.namePlaceholder}
             maxLength={12}
             autoFocus
             className="text-ink placeholder:text-dim flex-1 bg-transparent text-[14px] outline-none"
@@ -592,10 +606,10 @@ function NamingView(props: { imageUrl: string; onDone: () => void }) {
           disabled={!valid || submitting}
           onClick={submit}
         >
-          {submitting ? "들어가는 중…" : "이 이름으로 들어가기"}
+          {submitting ? t.nameSubmitting : t.nameSubmit}
         </PixelButton>
         <p className="text-sub text-center text-[11px]">
-          이름은 나중에 설정에서 바꿀 수 있어요
+          {t.nameHint}
         </p>
       </footer>
     </div>
@@ -603,16 +617,19 @@ function NamingView(props: { imageUrl: string; onDone: () => void }) {
 }
 
 function ErrorView(props: { message: string; onRetry: () => void; onBack: () => void }) {
+  const { locale } = useLocale(DEFAULT_LOCALE);
+  const t = ONBOARDING[locale].character;
+
   return (
     <section className="animate-fade-in flex flex-1 flex-col items-center justify-center gap-5">
       <p className="text-sub text-center text-[14px] leading-[1.7]">
-        지금은 잘 안 만들어져요.
+        {t.errMsg}
         <br />
         <span className="text-dim mt-1 inline-block text-[11px]">{props.message}</span>
       </p>
       <div className="flex gap-3">
-        <PixelButton onClick={props.onRetry}>다시 시도</PixelButton>
-        <PixelButton variant="muted" onClick={props.onBack}>돌아가기</PixelButton>
+        <PixelButton onClick={props.onRetry}>{t.errRetry}</PixelButton>
+        <PixelButton variant="muted" onClick={props.onBack}>{t.errBack}</PixelButton>
       </div>
     </section>
   );
@@ -626,6 +643,8 @@ function PillRow<T extends string>(props: {
   value: T;
   onChange: (v: T) => void;
 }) {
+  const { locale } = useLocale(DEFAULT_LOCALE);
+
   return (
     <div>
       <div className="text-sub mb-2.5 text-[10px] uppercase tracking-[0.22em]">
@@ -645,7 +664,7 @@ function PillRow<T extends string>(props: {
                   : "border-line text-sub active:bg-panel hover:border-dim",
               ].join(" ")}
             >
-              {opt.label}
+              {OPTION_LABELS[locale][opt.id] ?? opt.label}
             </button>
           );
         })}
