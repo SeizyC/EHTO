@@ -7,6 +7,10 @@ import { browserClient } from "@/lib/supabase";
 import { useSession } from "@/components/AuthProvider";
 import { clearCharacter, landingPathForSession } from "@/lib/character-store";
 import { PixelButton } from "@/components/PixelButton";
+import { useLocale } from "@/lib/use-locale";
+import { DEFAULT_LOCALE } from "@/lib/about-content";
+import { LangToggle } from "@/components/LangToggle";
+import { ONBOARDING } from "@/lib/onboarding-content";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -19,6 +23,9 @@ export default function SignupPage() {
   // Track that this mount initiated a signup so the session effect below
   // doesn't race the manual router.replace to /character.
   const justSignedUp = useRef(false);
+
+  const { locale, pick } = useLocale(DEFAULT_LOCALE);
+  const t = ONBOARDING[locale].signup;
 
   useEffect(() => {
     if (sessLoading || !session) return;
@@ -39,11 +46,11 @@ export default function SignupPage() {
     if (submitting) return;
     setErr(null);
     if (password.length < 6) {
-      setErr("비밀번호는 6자 이상이어야 해.");
+      setErr(t.errShortPw);
       return;
     }
     if (password !== passwordConfirm) {
-      setErr("비밀번호가 일치하지 않아.");
+      setErr(t.errMismatch);
       return;
     }
     setSubmitting(true);
@@ -54,7 +61,7 @@ export default function SignupPage() {
     });
     setSubmitting(false);
     if (error) {
-      setErr(messageForError(error.message));
+      setErr(messageForError(error.message, t));
       return;
     }
     if (data.session) {
@@ -64,13 +71,13 @@ export default function SignupPage() {
       clearCharacter();
       router.replace("/character");
     } else {
-      setErr("이메일 확인 메일을 보냈어. 링크 클릭 후 로그인해줘.");
+      setErr(t.confirmSent);
     }
   }
 
   return (
     <main className="grain mx-auto flex min-h-dvh max-w-[420px] flex-col px-6 pb-10 pt-10">
-      <header>
+      <header className="flex items-start justify-between">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/logo_ehto_wordmark.png"
@@ -80,19 +87,20 @@ export default function SignupPage() {
           className="pixelated"
           draggable={false}
         />
+        <LangToggle locale={locale} onPick={pick} />
       </header>
 
       <section className="flex flex-1 flex-col justify-center">
         <h1 className="text-ink text-[22px] font-medium leading-tight tracking-[-0.01em]">
-          작은 세계를 만들자
+          {t.title}
         </h1>
         <p className="text-sub mt-2 text-[13px] leading-relaxed">
-          이메일로 가입해 내 광장을 가져.
+          {t.sub}
         </p>
 
         <form onSubmit={onSubmit} className="mt-7 flex flex-col gap-3">
           <Field
-            label="이메일"
+            label={t.email}
             type="email"
             value={email}
             onChange={setEmail}
@@ -100,7 +108,7 @@ export default function SignupPage() {
             required
           />
           <Field
-            label="비밀번호 (6자 이상)"
+            label={t.password}
             type="password"
             value={password}
             onChange={setPassword}
@@ -108,7 +116,7 @@ export default function SignupPage() {
             required
           />
           <Field
-            label="비밀번호 확인"
+            label={t.passwordConfirm}
             type="password"
             value={passwordConfirm}
             onChange={setPasswordConfirm}
@@ -118,15 +126,15 @@ export default function SignupPage() {
           {err && <p className="text-[12px] text-red-400">{err}</p>}
           <div className="mt-2">
             <PixelButton type="submit" disabled={submitting} block>
-              {submitting ? "만드는 중…" : "가입하기"}
+              {submitting ? t.submitting : t.submit}
             </PixelButton>
           </div>
         </form>
 
         <p className="text-sub mt-6 text-center text-[12.5px]">
-          이미 계정이 있어?{" "}
+          {t.haveAccount}{" "}
           <Link href="/login" className="text-ink underline-offset-2 hover:underline">
-            로그인
+            {t.loginLink}
           </Link>
         </p>
       </section>
@@ -157,9 +165,9 @@ function Field(props: {
   );
 }
 
-function messageForError(raw: string): string {
-  if (/already registered|user.*exists/i.test(raw)) return "이미 가입된 이메일이야. 로그인해줘.";
-  if (/password should be/i.test(raw)) return "비밀번호가 너무 짧아 (6자 이상).";
-  if (/invalid email/i.test(raw)) return "이메일 형식이 이상해.";
+function messageForError(raw: string, t: typeof ONBOARDING["ko"]["signup"]): string {
+  if (/already registered|user.*exists/i.test(raw)) return t.errEmailTaken;
+  if (/password should be/i.test(raw)) return t.errPwShort;
+  if (/invalid email/i.test(raw)) return t.errBadEmail;
   return raw;
 }

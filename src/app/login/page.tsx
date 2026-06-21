@@ -7,6 +7,10 @@ import { browserClient } from "@/lib/supabase";
 import { useSession } from "@/components/AuthProvider";
 import { PixelButton } from "@/components/PixelButton";
 import { landingPathForSession } from "@/lib/character-store";
+import { useLocale } from "@/lib/use-locale";
+import { DEFAULT_LOCALE } from "@/lib/about-content";
+import { LangToggle } from "@/components/LangToggle";
+import { ONBOARDING } from "@/lib/onboarding-content";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,6 +19,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  const { locale, pick } = useLocale(DEFAULT_LOCALE);
+  const t = ONBOARDING[locale].login;
 
   useEffect(() => {
     // Already-signed-in visit: resolve destination here (LS first, then
@@ -42,7 +49,7 @@ export default function LoginPage() {
     });
     setSubmitting(false);
     if (error) {
-      setErr(messageForError(error.message));
+      setErr(messageForError(error.message, t));
       return;
     }
     const token = data.session?.access_token;
@@ -52,7 +59,7 @@ export default function LoginPage() {
 
   return (
     <main className="grain mx-auto flex min-h-dvh max-w-[420px] flex-col px-6 pb-10 pt-10">
-      <header>
+      <header className="flex items-start justify-between">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/logo_ehto_wordmark.png"
@@ -62,19 +69,20 @@ export default function LoginPage() {
           className="pixelated"
           draggable={false}
         />
+        <LangToggle locale={locale} onPick={pick} />
       </header>
 
       <section className="flex flex-1 flex-col justify-center">
         <h1 className="text-ink text-[22px] font-medium leading-tight tracking-[-0.01em]">
-          돌아왔어
+          {t.title}
         </h1>
         <p className="text-sub mt-2 text-[13px] leading-relaxed">
-          내 작은 세계로 들어가기.
+          {t.sub}
         </p>
 
         <form onSubmit={onSubmit} className="mt-7 flex flex-col gap-3">
           <Field
-            label="이메일"
+            label={t.email}
             type="email"
             value={email}
             onChange={setEmail}
@@ -82,7 +90,7 @@ export default function LoginPage() {
             required
           />
           <Field
-            label="비밀번호"
+            label={t.password}
             type="password"
             value={password}
             onChange={setPassword}
@@ -92,15 +100,15 @@ export default function LoginPage() {
           {err && <p className="text-[12px] text-red-400">{err}</p>}
           <div className="mt-2">
             <PixelButton type="submit" disabled={submitting} block>
-              {submitting ? "들어가는 중…" : "로그인"}
+              {submitting ? t.submitting : t.submit}
             </PixelButton>
           </div>
         </form>
 
         <p className="text-sub mt-6 text-center text-[12.5px]">
-          아직 계정이 없어?{" "}
+          {t.noAccount}{" "}
           <Link href="/start" className="text-ink underline-offset-2 hover:underline">
-            가입하기
+            {t.signupLink}
           </Link>
         </p>
       </section>
@@ -131,8 +139,8 @@ function Field(props: {
   );
 }
 
-function messageForError(raw: string): string {
-  if (/invalid login credentials/i.test(raw)) return "이메일이나 비밀번호가 안 맞아.";
-  if (/email not confirmed/i.test(raw)) return "이메일 확인이 필요해.";
+function messageForError(raw: string, t: typeof ONBOARDING["ko"]["login"]): string {
+  if (/invalid login credentials/i.test(raw)) return t.errBadCreds;
+  if (/email not confirmed/i.test(raw)) return t.errUnconfirmed;
   return raw;
 }
