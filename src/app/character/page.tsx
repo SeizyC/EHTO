@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CharacterCommitDialog } from "@/components/CharacterCommitDialog";
 import {
   GENDERS,
@@ -33,6 +33,8 @@ type Stage = "select" | "generating" | "result" | "naming" | "error";
 export default function CharacterPage() {
   useRequireSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const change = searchParams.get("change") === "1";
   const { locale } = useLocale(DEFAULT_LOCALE);
   const t = ONBOARDING[locale].character;
   const [stage, setStage] = useState<Stage>("select");
@@ -64,6 +66,10 @@ export default function CharacterPage() {
   //   ・ neither in LS      → fetch from server (fresh-browser returning user);
   //                          if server also has nothing, stay in select flow
   useEffect(() => {
+    // change=1 mode: user is re-creating their character (costs 5 EHTO).
+    // Skip all redirects that would send them away from the select stage.
+    if (change) return;
+
     const cached = loadCharacter();
     if (cached) {
       if (cached.handle) {
@@ -108,7 +114,7 @@ export default function CharacterPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [router]);
+  }, [router, change]);
 
   // Default the plaza language to the user's current UI locale. useLocale
   // persists the picked locale to this same localStorage key on the public

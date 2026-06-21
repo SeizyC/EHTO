@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { browserClient } from "@/lib/supabase";
 import { EHTO_ACTIONS } from "@/lib/ehto";
 import type { EhtoAction } from "@/lib/ehto";
@@ -9,6 +10,7 @@ import type { EhtoAction } from "@/lib/ehto";
 // the user's current balance. Tappable rows spend EHTO via the spend API.
 // Mirrors TicketWallet's row idiom: label + desc on left, price + chevron on right.
 export function EhtoWallet() {
+  const router = useRouter();
   const [balance, setBalance] = useState<number | null>(null);
   const [busy, setBusy] = useState<EhtoAction | null>(null);
 
@@ -71,6 +73,13 @@ export function EhtoWallet() {
   // Actions that the spend API currently handles server-side
   const TAPPABLE: Set<EhtoAction> = new Set(["member_invite", "energy_refill"]);
 
+  // Actions that navigate to a page (charge happens server-side there)
+  function handleCharacterChange(label: string, price: number) {
+    if (busy) return;
+    if (!window.confirm(`'${label}' · EHTO ${price} 쓸까요?`)) return;
+    router.push("/character?change=1");
+  }
+
   return (
     <div className="mt-6 px-6">
       {/* Header: label + balance */}
@@ -102,15 +111,24 @@ export function EhtoWallet() {
             balance !== null &&
             balance >= a.price;
 
-          // character_change: actionable in catalog but not yet wired in spend API
-          // → show "곧" state (non-tappable)
-          const isSoon = a.actionable && !TAPPABLE.has(a.action);
+          // character_change navigates to /character?change=1 (charge is server-side)
+          const isNavAction = a.action === "character_change";
+          const isNavTappable =
+            isNavAction &&
+            a.actionable &&
+            balance !== null &&
+            balance >= a.price;
+
+          // Non-spend, non-nav actionable rows show "곧"
+          const isSoon = a.actionable && !TAPPABLE.has(a.action) && !isNavAction;
 
           const subtext = !a.actionable
             ? "준비 중"
             : isSoon
             ? "곧"
             : a.desc;
+
+          const isAnyTappable = isTappable || isNavTappable;
 
           const priceEl = (
             <span className="flex items-center gap-3">
@@ -122,13 +140,13 @@ export function EhtoWallet() {
                     : undefined
                 }
               >
-                {isTappable ? (
+                {isAnyTappable ? (
                   <span style={{ color: "#E89B6C" }}>◆ {a.price}</span>
                 ) : (
                   <span className="text-dim">◆ {a.price}</span>
                 )}
               </span>
-              {isTappable && (
+              {isAnyTappable && (
                 <span className="text-sub group-active:text-ink text-[14px]">
                   {busy === a.action ? "…" : "›"}
                 </span>
@@ -154,6 +172,14 @@ export function EhtoWallet() {
               {isTappable ? (
                 <button
                   onClick={() => spend(a.action, a.label, a.price)}
+                  disabled={busy === a.action}
+                  className={`group ${cls} active:bg-panel w-full text-left transition disabled:opacity-60`}
+                >
+                  {body}
+                </button>
+              ) : isNavTappable ? (
+                <button
+                  onClick={() => handleCharacterChange(a.label, a.price)}
                   disabled={busy === a.action}
                   className={`group ${cls} active:bg-panel w-full text-left transition disabled:opacity-60`}
                 >
