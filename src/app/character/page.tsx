@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CharacterCommitDialog } from "@/components/CharacterCommitDialog";
 import {
   GENDERS,
   SKINS,
@@ -27,8 +28,6 @@ import { useLocale } from "@/lib/use-locale";
 import { ONBOARDING, OPTION_LABELS } from "@/lib/onboarding-content";
 import { AnimatePresence, motion } from "framer-motion";
 
-const MAX_ROLLS = 3;
-
 type Stage = "select" | "generating" | "result" | "naming" | "error";
 
 export default function CharacterPage() {
@@ -51,12 +50,10 @@ export default function CharacterPage() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [characterId, setCharacterId] = useState<string | null>(null);
   const [rolledHair, setRolledHair] = useState<string | undefined>();
-  const [rollsUsed, setRollsUsed] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
   const [meOpen, setMeOpen] = useState(false);
 
-  const remaining = MAX_ROLLS - rollsUsed;
-  const canRoll = remaining > 0;
+  const [confirming, setConfirming] = useState(false);
 
   // Entry guard — character identity is locked once created.
   //   ・ character + handle → /home (returning users land in the plaza
@@ -126,12 +123,6 @@ export default function CharacterPage() {
   }, []);
 
   async function generate() {
-    // Hard cap — same counter for first-make, re-roll, and re-select paths.
-    if (rollsUsed >= MAX_ROLLS) {
-      setErrorMsg(t.genTicketExhausted);
-      setStage("error");
-      return;
-    }
     setStage("generating");
     setErrorMsg("");
     try {
@@ -157,7 +148,6 @@ export default function CharacterPage() {
       setImageUrl(j.publicUrl);
       setCharacterId(j.character?.id ?? null);
       setRolledHair(j.rolled?.hair);
-      setRollsUsed((n) => n + 1);
       setStage("result");
     } catch (e: unknown) {
       setErrorMsg(e instanceof Error ? e.message : t.genGeneric);
@@ -184,9 +174,6 @@ export default function CharacterPage() {
       <header className="mb-4 flex items-center justify-between">
         <BackLink stage={stage} onBack={() => goBack(stage, setStage, router)} />
         <div className="flex items-center gap-2.5">
-          {(stage === "select" || stage === "result") && (
-            <TicketChip remaining={remaining} max={MAX_ROLLS} />
-          )}
           <MeGlyph onOpen={() => setMeOpen(true)} />
         </div>
       </header>
@@ -197,9 +184,7 @@ export default function CharacterPage() {
           hairStyle={hairStyle} hairColor={hairColor} accessory={accessory}
           onGender={setGender} onSkin={setSkin} onOutfit={setOutfit}
           onHairStyle={setHairStyle} onHairColor={setHairColor} onAccessory={setAccessory}
-          onGenerate={generate}
-          canGenerate={canRoll}
-          remaining={remaining}
+          onRequestCreate={() => setConfirming(true)}
         />
       )}
 
@@ -208,9 +193,6 @@ export default function CharacterPage() {
       {stage === "result" && imageUrl && (
         <ResultView
           imageUrl={imageUrl}
-          remaining={remaining}
-          canRoll={canRoll}
-          onReroll={generate}
           onBackToSelect={() => setStage("select")}
           onConfirm={confirmEnter}
         />
@@ -231,6 +213,13 @@ export default function CharacterPage() {
         />
       )}
 
+      <CharacterCommitDialog
+        open={confirming}
+        copy={ONBOARDING[locale].character}
+        onConfirm={() => { setConfirming(false); generate(); }}
+        onCancel={() => setConfirming(false)}
+      />
+
       <MeSheet open={meOpen} onClose={() => setMeOpen(false)} />
     </main>
   );
@@ -247,9 +236,7 @@ function SelectView(props: {
   onHairStyle: (h: HairStyleId) => void;
   onHairColor: (c: HairColorId) => void;
   onAccessory: (a: AccessoryId) => void;
-  onGenerate: () => void;
-  canGenerate: boolean;
-  remaining: number;
+  onRequestCreate: () => void;
 }) {
   const { locale } = useLocale(DEFAULT_LOCALE);
   const t = ONBOARDING[locale].character;
@@ -304,14 +291,9 @@ function SelectView(props: {
           variant="primary"
           size="lg"
           block
-          onClick={isLast ? props.onGenerate : () => setStep(step + 1)}
-          disabled={isLast && !props.canGenerate}
+          onClick={isLast ? props.onRequestCreate : () => setStep(step + 1)}
         >
-          {isLast
-            ? (props.canGenerate
-                ? t.createBtn.replace("{n}", String(props.remaining))
-                : t.createBtnExhausted)
-            : nav.next}
+          {isLast ? t.selCreate : nav.next}
         </PixelButton>
         {step > 0 && (
           <button
@@ -368,36 +350,6 @@ function goBack(
     case "error":       setStage("select"); return;
     case "generating":  return; // no-op
   }
-}
-
-// Small ticket counter shown in the page header during select/result stages.
-// Three dots: filled = unused tickets, empty = spent.
-function TicketChip({ remaining, max }: { remaining: number; max: number }) {
-  const { locale } = useLocale(DEFAULT_LOCALE);
-  const t = ONBOARDING[locale].character;
-
-  return (
-    <div
-      aria-label={t.ticketAria.replace("{n}", String(remaining)).replace("{max}", String(max))}
-      className="border-line bg-surface flex items-center gap-1.5 rounded-full border px-2.5 py-1"
-    >
-      <span className="text-sub text-[10px] tracking-wide">{t.ticketLabel}</span>
-      <span className="flex items-center gap-1">
-        {Array.from({ length: max }, (_, i) => (
-          <span
-            key={i}
-            className={
-              "block h-1.5 w-1.5 rounded-full " +
-              (i < remaining ? "bg-accent" : "bg-line")
-            }
-          />
-        ))}
-      </span>
-      <span className="text-ink ml-0.5 text-[10px] tabular-nums">
-        {remaining}/{max}
-      </span>
-    </div>
-  );
 }
 
 // Per-step duration (ms). Tuned so total ≈ 18–20s, matching typical
@@ -458,9 +410,6 @@ function GeneratingView() {
 
 function ResultView(props: {
   imageUrl: string;
-  remaining: number;
-  canRoll: boolean;
-  onReroll: () => void;
   onBackToSelect: () => void;
   onConfirm: () => void;
 }) {
@@ -494,16 +443,6 @@ function ResultView(props: {
         <PixelButton block size="lg" onClick={props.onConfirm}>
           {t.resEnter}
         </PixelButton>
-
-        {props.canRoll ? (
-          <PixelButton block variant="muted" onClick={props.onReroll}>
-            {t.resRegen.replace("{n}", String(props.remaining))}
-          </PixelButton>
-        ) : (
-          <PixelButton block variant="muted" disabled>
-            {t.resRegenLocked}
-          </PixelButton>
-        )}
 
         <button
           onClick={props.onBackToSelect}
