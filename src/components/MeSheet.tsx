@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCharacter, saveHandle, clearCharacter } from "@/lib/character-store";
-import { TicketWallet } from "@/components/TicketWallet";
+import { EhtoWallet } from "@/components/EhtoWallet";
 import { worldAge } from "@/lib/age";
 import { useSession } from "@/components/AuthProvider";
 import { browserClient } from "@/lib/supabase";
@@ -20,7 +20,6 @@ export function MeSheet({ open, onClose }: Props) {
   const { signOut, user } = useSession();
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [ehto, setEhto] = useState<number | null>(null);
 
   // Probe admin status once on open. Server-side ADMIN_EMAILS env is the
   // source of truth; we just ask /api/admin/me and show the entry point
@@ -37,26 +36,6 @@ export function MeSheet({ open, onClose }: Props) {
       });
       if (cancelled) return;
       setIsAdmin(r.ok);
-    })();
-    return () => { cancelled = true; };
-  }, [open, user]);
-
-  // Fetch EHTO balance on open (best-effort; leaves null on failure).
-  useEffect(() => {
-    if (!open || !user) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const sb = browserClient();
-        const { data: sess } = await sb.auth.getSession();
-        if (!sess.session) return;
-        const r = await fetch("/api/ehto/balance", {
-          headers: { Authorization: `Bearer ${sess.session.access_token}` },
-        });
-        if (cancelled || !r.ok) return;
-        const j = await r.json();
-        if (!cancelled) setEhto(j.balance);
-      } catch { /* best-effort */ }
     })();
     return () => { cancelled = true; };
   }, [open, user]);
@@ -119,33 +98,10 @@ export function MeSheet({ open, onClose }: Props) {
               )}
               {/* Handle (editable) */}
               <HandleEditor initial={character?.handle ?? null} />
-              {/* Tickets — gold ticket icon + count. Gold reads as the
-                  "earned currency" accent, distinct from the warm orange
-                  used for primary actions. */}
-              {(character?.tickets ?? 0) > 0 && (
-                <span
-                  className="mt-3 inline-flex items-center gap-1.5 text-[13px] tracking-wide"
-                  style={{ color: "#E8C067" }}
-                  aria-label={`티켓 ${character?.tickets}장`}
-                >
-                  <TicketIcon className="h-4 w-4" />
-                  <span className="tabular-nums font-medium">
-                    {character?.tickets}
-                  </span>
-                </span>
-              )}
             </section>
 
-            {/* Ticket wallet — owned tickets + spend (초대 / 이어서 보기) */}
-            <TicketWallet />
-
-            {/* EHTO balance */}
-            {ehto !== null && (
-              <div className="border-line flex items-center justify-between rounded-xl border px-4 py-3">
-                <span className="text-sub text-[13px]">EHTO</span>
-                <span className="text-ink text-[15px] font-semibold tabular-nums">◆ {ehto}</span>
-              </div>
-            )}
+            {/* EHTO wallet — balance + spend (초대 / 이어서 보기) */}
+            <EhtoWallet />
 
             {/* Menu — PRD §5.4 aligned */}
             <nav className="mt-6 flex flex-col px-6">
@@ -199,25 +155,6 @@ export function MeSheet({ open, onClose }: Props) {
 }
 
 // 세계 나이 + 머무름 결 strip — 비교/경쟁 없는 시간 표현
-// Tiny perforated ticket glyph — matches the cozy/retro vibe of the rest
-// of the UI without pulling in an icon library.
-function TicketIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      className={className}
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinejoin="round"
-    >
-      <path d="M2 5.5a1.5 1.5 0 0 1 1.5-1.5h9A1.5 1.5 0 0 1 14 5.5v.5a1.5 1.5 0 0 0 0 3v1A1.5 1.5 0 0 1 12.5 12h-9A1.5 1.5 0 0 1 2 10.5v-1a1.5 1.5 0 0 0 0-3v-1Z" />
-      <path d="M6.2 5v6" strokeDasharray="1 1.4" />
-    </svg>
-  );
-}
-
 function AgeStrip({ createdAt }: { createdAt: number }) {
   const { days, texture } = worldAge(createdAt);
   return (
