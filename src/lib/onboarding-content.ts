@@ -126,6 +126,18 @@ export type OnboardingCopy = {
     genTicketExhausted: string;
     genNoSession: string;
     genGeneric: string;
+    selCreate: string;
+    commitTitle: string;
+    commitBody: string;
+    commitNote: string;
+    commitConfirm: string;
+    commitCancel: string;
+  };
+  welcome: {
+    title: string;
+    body: string;
+    spendIntro: string;
+    cta: string;
   };
 };
 
@@ -251,6 +263,18 @@ const ko: OnboardingCopy = {
     genTicketExhausted: "이번 라운드 티켓을 다 썼어요. 결과 중에서 골라주세요.",
     genNoSession: "세션 없음 — 다시 로그인해줘",
     genGeneric: "오류",
+    selCreate: "캐릭터 생성",
+    commitTitle: "신중하게 골라주세요",
+    commitBody: "이 모습이 당신의 캐릭터가 됩니다. 지금은 한 번만 생성되고 다시 만들 수 없어요.",
+    commitNote: "나중에 변경할 수 있지만, EHTO가 들어요.",
+    commitConfirm: "이대로 생성",
+    commitCancel: "다시 고르기",
+  },
+  welcome: {
+    title: "환영합니다",
+    body: "시작 선물로 EHTO {n}개를 드렸어요.",
+    spendIntro: "EHTO로 친구를 초대하고, 광장을 이어보고, 나중에 캐릭터도 바꿀 수 있어요.",
+    cta: "광장으로",
   },
 };
 
@@ -376,6 +400,18 @@ const en: OnboardingCopy = {
     genTicketExhausted: "You've used this round's tickets. Please pick from the results.",
     genNoSession: "No session — please log in again",
     genGeneric: "Error",
+    selCreate: "Create character",
+    commitTitle: "Choose carefully",
+    commitBody: "This becomes your character. It's generated once and can't be remade right now.",
+    commitNote: "You can change it later — but it costs EHTO.",
+    commitConfirm: "Create as is",
+    commitCancel: "Go back",
+  },
+  welcome: {
+    title: "Welcome",
+    body: "We've given you {n} EHTO to start.",
+    spendIntro: "Spend EHTO to invite friends, keep your plaza awake, and change your character later.",
+    cta: "Enter the plaza",
   },
 };
 
@@ -501,6 +537,18 @@ const ja: OnboardingCopy = {
     genTicketExhausted: "今回のチケットを使い切りました。結果から選んでください。",
     genNoSession: "セッションなし — もう一度ログインしてください",
     genGeneric: "エラー",
+    selCreate: "キャラクターを作る",
+    commitTitle: "慎重に選んでください",
+    commitBody: "この姿があなたのキャラクターになります。生成は一度きりで、今は作り直せません。",
+    commitNote: "あとで変更できますが、EHTOがかかります。",
+    commitConfirm: "この姿で生成",
+    commitCancel: "選び直す",
+  },
+  welcome: {
+    title: "ようこそ",
+    body: "はじめの贈り物として EHTO を {n} 個お渡ししました。",
+    spendIntro: "EHTOで友だちを招いたり、広場を起こしたり、あとでキャラクターを変えられます。",
+    cta: "広場へ",
   },
 };
 
