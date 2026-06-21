@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
+import PageViewBeacon from "@/components/PageViewBeacon";
 
 const SITE_URL = "https://ehto.world";
 const OG_IMAGE = { url: `${SITE_URL}/og_ehto.png`, width: 1340, height: 813, alt: "EHTO — Everyone Has Their Own World" };
@@ -85,7 +86,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Script id="stale-asset-reload" strategy="beforeInteractive">
           {RELOAD_GUARD}
         </Script>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <PageViewBeacon />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );
