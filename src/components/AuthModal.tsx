@@ -93,7 +93,7 @@ export function AuthModal(props: {
           />
         </div>
 
-        {msg && <p className="text-muted mb-2 text-sm">{msg}</p>}
+        {msg && <p className="text-sub mb-2 text-sm">{msg}</p>}
 
         <button
           disabled={!canSubmit}
@@ -105,7 +105,7 @@ export function AuthModal(props: {
 
         <button
           onClick={() => setMode(mode === "signup" ? "login" : "signup")}
-          className="text-muted mt-3 w-full text-center text-sm"
+          className="text-sub mt-3 w-full text-center text-sm"
         >
           {mode === "signup" ? t.toLogin : t.toSignup}
         </button>

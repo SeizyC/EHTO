@@ -56,7 +56,7 @@ export default function AuthCallbackPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center p-6">
-      <p className="text-muted text-sm">{err ?? t.entering}</p>
+      <p className="text-sub text-sm">{err ?? t.entering}</p>
     </main>
   );
 }

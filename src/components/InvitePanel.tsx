@@ -45,19 +45,19 @@ export function InvitePanel(props: { open: boolean }) {
     <section className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <h3 className="text-ink text-sm font-medium">{t.title}</h3>
-        <span className="text-muted text-xs">{t.status.replace("{used}", String(usedCount)).replace("{total}", String(codes.length))}</span>
+        <span className="text-sub text-xs">{t.status.replace("{used}", String(usedCount)).replace("{total}", String(codes.length))}</span>
       </div>
       <ul className="flex flex-col gap-1.5">
         {codes.map((c) => (
           <li key={c.code}
             className={`flex items-center justify-between rounded-lg border px-3 py-2 ${
-              c.used ? "border-line text-muted opacity-50" : "border-line text-ink"
+              c.used ? "border-line text-sub opacity-50" : "border-line text-ink"
             }`}>
             <span className="font-mono tracking-widest">{c.code}</span>
             {c.used ? (
               <span className="text-xs">{t.used}</span>
             ) : (
-              <button onClick={() => copy(c.code)} className="text-muted text-xs">
+              <button onClick={() => copy(c.code)} className="text-sub text-xs">
                 {copied === c.code ? t.copied : t.copy}
               </button>
             )}

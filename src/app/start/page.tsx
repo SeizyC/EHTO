@@ -91,19 +91,19 @@ export default function StartPage() {
       {step === "code" && (
         <>
           <h1 className="text-ink text-xl font-medium">{t.codeTitle}</h1>
-          <p className="text-muted text-sm">{t.codeSub}</p>
+          <p className="text-sub text-sm">{t.codeSub}</p>
           <input
             value={code}
             onChange={(e) => setCode(e.target.value)}
             placeholder={t.codePlaceholder}
             className="border-line bg-bg text-ink rounded-xl border px-3 py-2 tracking-widest"
           />
-          {err && <p className="text-muted text-sm">{err}</p>}
+          {err && <p className="text-sub text-sm">{err}</p>}
           <button onClick={submitCode} disabled={busy || !code.trim()}
             className="bg-ink text-bg rounded-xl py-2.5 font-medium disabled:opacity-40">
             {t.next}
           </button>
-          <button onClick={() => router.push("/login")} className="text-muted text-center text-sm">
+          <button onClick={() => router.push("/login")} className="text-sub text-center text-sm">
             {t.haveAccount}
           </button>
         </>
@@ -112,7 +112,7 @@ export default function StartPage() {
       {step === "name" && (
         <>
           <h1 className="text-ink text-xl font-medium">{t.nameTitle}</h1>
-          <p className="text-muted text-sm">{t.nameSub}</p>
+          <p className="text-sub text-sm">{t.nameSub}</p>
           <input
             value={roomName}
             onChange={(e) => setRoomName(e.target.value)}
@@ -120,7 +120,7 @@ export default function StartPage() {
             placeholder={t.namePlaceholder}
             className="border-line bg-bg text-ink rounded-xl border px-3 py-2"
           />
-          {err && <p className="text-muted text-sm">{err}</p>}
+          {err && <p className="text-sub text-sm">{err}</p>}
           <div className="flex gap-2">
             <button onClick={() => { setErr(null); setStep("code"); }}
               className="border-line text-ink flex-1 rounded-xl border py-2.5">{t.back}</button>
@@ -131,7 +131,7 @@ export default function StartPage() {
       )}
 
       <AuthModal open={step === "auth"} onClose={() => setStep("name")} onAuthed={onAuthed} locale={locale} />
-      {step === "auth" && err && <p className="text-muted text-center text-sm">{err}</p>}
+      {step === "auth" && err && <p className="text-sub text-center text-sm">{err}</p>}
     </main>
   );
 }
