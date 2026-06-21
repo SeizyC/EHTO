@@ -3,7 +3,7 @@ import { userClient, serviceClient } from "@/lib/supabase";
 import { ensureWorld, seedMembersIfEmpty } from "@/lib/world-seed";
 import { consumeCodeAndReward, issueCodesForUser } from "@/lib/beta-codes";
 import { countryToLocale } from "@/lib/language";
-import { getEhtoBalance, grantEhto, START_GRANT } from "@/lib/ehto";
+import { grantEhto, START_GRANT, EHTO_KIND } from "@/lib/ehto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,11 +58,17 @@ export async function POST(req: NextRequest) {
   // 3. Issue this user's own 3 invite codes (idempotent).
   await issueCodesForUser(svc, uid);
 
-  // Starting EHTO — granted once. New users have a 0 balance here (the backfill
-  // only touched pre-existing profiles), so this is effectively idempotent.
-  if ((await getEhtoBalance(svc, uid)) === 0) {
-    await grantEhto(svc, uid, START_GRANT);
-  }
+  // Starting EHTO — granted once, gated on whether the user's EHTO row exists
+  // (NOT its balance): a user who legitimately spent down to 0 must not be
+  // re-granted on a finalize re-run. New users have no row yet (grantEhto
+  // creates it); existing users were row-seeded by the backfill migration.
+  const { data: ehtoRow } = await svc
+    .from("ticket_balances")
+    .select("user_id")
+    .eq("user_id", uid)
+    .eq("kind", EHTO_KIND)
+    .maybeSingle();
+  if (!ehtoRow) await grantEhto(svc, uid, START_GRANT);
 
   return NextResponse.json({ ok: true, worldId });
 }

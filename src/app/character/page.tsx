@@ -193,7 +193,6 @@ export default function CharacterPage() {
       {stage === "result" && imageUrl && (
         <ResultView
           imageUrl={imageUrl}
-          onBackToSelect={() => setStage("select")}
           onConfirm={confirmEnter}
         />
       )}
@@ -410,7 +409,6 @@ function GeneratingView() {
 
 function ResultView(props: {
   imageUrl: string;
-  onBackToSelect: () => void;
   onConfirm: () => void;
 }) {
   const { locale } = useLocale(DEFAULT_LOCALE);
@@ -440,16 +438,11 @@ function ResultView(props: {
       </section>
 
       <footer className="mt-3 flex flex-col gap-3">
+        {/* One-shot: the result is final — only proceed to naming. The
+            commit dialog already gave the "go back" option before generation. */}
         <PixelButton block size="lg" onClick={props.onConfirm}>
           {t.resEnter}
         </PixelButton>
-
-        <button
-          onClick={props.onBackToSelect}
-          className="text-sub hover:text-ink mt-1 text-center text-[11px] underline-offset-4 transition hover:underline"
-        >
-          {t.resReselect}
-        </button>
       </footer>
     </div>
   );

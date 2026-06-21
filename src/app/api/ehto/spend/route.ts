@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { userClient, serviceClient } from "@/lib/supabase";
 import { isEhtoAction, priceOf, spendEhto, grantEhto, type EhtoAction } from "@/lib/ehto";
-import { memberCap, type Plan } from "@/lib/energy";
+import { memberCap, kstDayLabel, type Plan } from "@/lib/energy";
 import { sysMemberJoined } from "@/lib/system-messages";
 import type { Locale } from "@/lib/language";
 
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   const svc = serviceClient();
   const { data: world } = await svc
     .from("worlds")
-    .select("id, plan, language, moments_used")
+    .select("id, plan, language, moments_used, moments_day")
     .eq("owner_id", userId)
     .maybeSingle();
   if (!world) return NextResponse.json({ error: "광장이 아직 없어요" }, { status: 400 });
@@ -82,8 +82,17 @@ export async function POST(req: NextRequest) {
       await svc.from("members").update({ activated_at: now, last_seen_at: now }).eq("id", benchId).is("activated_at", null);
       await svc.from("messages").insert({ world_id: world.id, kind: "system", text: sysMemberJoined(language, benchName) });
     } else if (action === "energy_refill") {
-      const cur = (world.moments_used as number | null) ?? 0;
-      await svc.from("worlds").update({ moments_used: Math.max(0, cur - 30) }).eq("id", world.id);
+      // Anchor to today's KST budget: if moments_day is stale, effective usage
+      // is already 0 (the meter/ambient gate treat a stale day as fresh), so
+      // refilling the stale moments_used would waste the EHTO. Reset the day
+      // and subtract from today's usage.
+      const today = kstDayLabel(Date.now());
+      const usedToday = (world.moments_day as string | null) === today
+        ? ((world.moments_used as number | null) ?? 0)
+        : 0;
+      await svc.from("worlds")
+        .update({ moments_used: Math.max(0, usedToday - 30), moments_day: today })
+        .eq("id", world.id);
     }
   } catch (e) {
     await grantEhto(svc, userId, price).catch(() => {});
