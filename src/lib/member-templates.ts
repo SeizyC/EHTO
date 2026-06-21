@@ -111,3 +111,33 @@ if (process.env.NODE_ENV !== "production") {
     seen.add(t.name);
   }
 }
+
+// Canonical per-locale display names, keyed by the template's (ko) name. A
+// character keeps the SAME name within a language across every plaza instead
+// of inventing one per instance, so the same sprite reads as the same person
+// when seen across public plazas. ko = the template name itself; en/ja are
+// locale-native equivalents (not transliterations) matching the vibe.
+export const NAME_I18N: Record<string, { en: string; ja: string }> = {
+  "민아": { en: "Maya", ja: "あおい" },
+  "지호": { en: "Theo", ja: "はると" },
+  "채아": { en: "Chloe", ja: "ゆい" },
+  "drip.k": { en: "drip.k", ja: "ドリップ" },
+  "졸린눈": { en: "sleepyeyes", ja: "ねむ" },
+  "weekendrun": { en: "weekendrun", ja: "週末ラン" },
+  "옆자리": { en: "nextseat", ja: "となり" },
+  "_chaos_": { en: "_chaos_", ja: "カオス" },
+  "심야서가": { en: "midnight.shelf", ja: "深夜書架" },
+  "야근파": { en: "overtime", ja: "残業組" },
+  "lofi.library": { en: "lofi.library", ja: "ローファイ書庫" },
+  "kidmood": { en: "kidmood", ja: "きっずむーど" },
+  "framing.k": { en: "framing.k", ja: "フレーミング" },
+  "minim:": { en: "minim:", ja: "ミニマ" },
+  "tab.open": { en: "tab.open", ja: "タブ開きっぱ" },
+};
+
+/** Full {ko,en,ja} name set for a template name. ko = the name itself;
+ *  missing en/ja fall back to the ko name. */
+export function nameI18nFor(koName: string): { ko: string; en: string; ja: string } {
+  const m = NAME_I18N[koName];
+  return { ko: koName, en: m?.en ?? koName, ja: m?.ja ?? koName };
+}

@@ -141,8 +141,16 @@ export async function seedMembersIfEmpty(
   const rows = ordered.map((c, idx) => {
     const priority = idx + 1;
     const id = localized[idx];
-    // ko: id is null → name resolves to c.name and skips suffixing entirely.
-    const name = id?.name ? uniqueName(id.name) : c.name;
+    // Name: non-ko plazas use the character's canonical per-locale name
+    // (name_i18n — fixed across plazas, so the same sprite reads as the same
+    // person), falling back to the invented localized name, then the ko pool
+    // name. ko always uses c.name. speech_style/backstory stay localized.
+    const canonical = language !== "ko" ? c.name_i18n?.[language] : undefined;
+    const name = canonical
+      ? uniqueName(canonical)
+      : id?.name
+        ? uniqueName(id.name)
+        : c.name;
     return {
       ai_character_id: c.id,
       origin_world_id: worldId,

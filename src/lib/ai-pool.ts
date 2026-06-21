@@ -10,7 +10,9 @@
 // drift across world deletes, status flips, and concurrent seeds.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { MEMBER_TEMPLATES } from "@/lib/member-templates";
+import { MEMBER_TEMPLATES, nameI18nFor } from "@/lib/member-templates";
+
+export type NameI18n = { ko: string; en: string; ja: string };
 
 export type AiCharacter = {
   id: string;
@@ -20,6 +22,7 @@ export type AiCharacter = {
   base_backstory: string | null;
   default_activity_weight: number;
   max_concurrent_rooms: number;
+  name_i18n: NameI18n | null;
 };
 
 let _poolEnsuredAt: number | null = null;
@@ -35,6 +38,7 @@ export async function ensureAiPool(sb: SupabaseClient): Promise<void> {
     base_persona: { affinity: t.affinity, speech_style: t.speech_style },
     base_backstory: t.backstory_seed,
     default_activity_weight: t.initial_weight,
+    name_i18n: nameI18nFor(t.name),
   }));
 
   const { error } = await sb
@@ -55,7 +59,7 @@ export async function pickAvailable(
 ): Promise<AiCharacter[]> {
   const { data: pool, error: pErr } = await sb
     .from("ai_characters")
-    .select("id, name, sprite, base_persona, base_backstory, default_activity_weight, max_concurrent_rooms");
+    .select("id, name, sprite, base_persona, base_backstory, default_activity_weight, max_concurrent_rooms, name_i18n");
   if (pErr) throw new Error(`ai_characters read: ${pErr.message}`);
   if (!pool || pool.length === 0) return [];
 
