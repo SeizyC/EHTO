@@ -2,12 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { browserClient } from "@/lib/supabase";
+import { useLocale } from "@/lib/use-locale";
+import { DEFAULT_LOCALE } from "@/lib/about-content";
+import { ONBOARDING } from "@/lib/onboarding-content";
 
 type MyCode = { code: string; used: boolean };
 
 export function InvitePanel(props: { open: boolean }) {
   const [codes, setCodes] = useState<MyCode[] | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const { locale } = useLocale(DEFAULT_LOCALE);
+  const t = ONBOARDING[locale].invite;
 
   useEffect(() => {
     if (!props.open) return;
@@ -39,8 +44,8 @@ export function InvitePanel(props: { open: boolean }) {
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <h3 className="text-ink text-sm font-medium">초대</h3>
-        <span className="text-muted text-xs">{usedCount}/{codes.length} 사용됨</span>
+        <h3 className="text-ink text-sm font-medium">{t.title}</h3>
+        <span className="text-muted text-xs">{t.status.replace("{used}", String(usedCount)).replace("{total}", String(codes.length))}</span>
       </div>
       <ul className="flex flex-col gap-1.5">
         {codes.map((c) => (
@@ -50,10 +55,10 @@ export function InvitePanel(props: { open: boolean }) {
             }`}>
             <span className="font-mono tracking-widest">{c.code}</span>
             {c.used ? (
-              <span className="text-xs">사용됨</span>
+              <span className="text-xs">{t.used}</span>
             ) : (
               <button onClick={() => copy(c.code)} className="text-muted text-xs">
-                {copied === c.code ? "복사됨" : "복사"}
+                {copied === c.code ? t.copied : t.copy}
               </button>
             )}
           </li>

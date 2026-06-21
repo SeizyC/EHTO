@@ -5,10 +5,15 @@ import { useRouter } from "next/navigation";
 import { browserClient } from "@/lib/supabase";
 import { loadDraft, clearDraft } from "@/lib/onboarding-draft";
 import { landingPathForSession } from "@/lib/character-store";
+import { useLocale } from "@/lib/use-locale";
+import { DEFAULT_LOCALE } from "@/lib/about-content";
+import { ONBOARDING } from "@/lib/onboarding-content";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
   const [err, setErr] = useState<string | null>(null);
+  const { locale } = useLocale(DEFAULT_LOCALE);
+  const t = ONBOARDING[locale].callback;
 
   useEffect(() => {
     let cancelled = false;
@@ -24,7 +29,7 @@ export default function AuthCallbackPage() {
 
       const { data: sess } = await sb.auth.getSession();
       if (cancelled) return;
-      if (!sess.session) { setErr("로그인을 완료하지 못했어요."); return; }
+      if (!sess.session) { setErr(t.failed); return; }
       const token = sess.session.access_token;
 
       const draft = loadDraft();
@@ -51,7 +56,7 @@ export default function AuthCallbackPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center p-6">
-      <p className="text-muted text-sm">{err ?? "들어가는 중…"}</p>
+      <p className="text-muted text-sm">{err ?? t.entering}</p>
     </main>
   );
 }
