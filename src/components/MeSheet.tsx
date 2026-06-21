@@ -20,6 +20,7 @@ export function MeSheet({ open, onClose }: Props) {
   const { signOut, user } = useSession();
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [ehto, setEhto] = useState<number | null>(null);
 
   // Probe admin status once on open. Server-side ADMIN_EMAILS env is the
   // source of truth; we just ask /api/admin/me and show the entry point
@@ -36,6 +37,26 @@ export function MeSheet({ open, onClose }: Props) {
       });
       if (cancelled) return;
       setIsAdmin(r.ok);
+    })();
+    return () => { cancelled = true; };
+  }, [open, user]);
+
+  // Fetch EHTO balance on open (best-effort; leaves null on failure).
+  useEffect(() => {
+    if (!open || !user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const sb = browserClient();
+        const { data: sess } = await sb.auth.getSession();
+        if (!sess.session) return;
+        const r = await fetch("/api/ehto/balance", {
+          headers: { Authorization: `Bearer ${sess.session.access_token}` },
+        });
+        if (cancelled || !r.ok) return;
+        const j = await r.json();
+        if (!cancelled) setEhto(j.balance);
+      } catch { /* best-effort */ }
     })();
     return () => { cancelled = true; };
   }, [open, user]);
@@ -117,6 +138,14 @@ export function MeSheet({ open, onClose }: Props) {
 
             {/* Ticket wallet — owned tickets + spend (초대 / 이어서 보기) */}
             <TicketWallet />
+
+            {/* EHTO balance */}
+            {ehto !== null && (
+              <div className="border-line flex items-center justify-between rounded-xl border px-4 py-3">
+                <span className="text-sub text-[13px]">EHTO</span>
+                <span className="text-ink text-[15px] font-semibold tabular-nums">◆ {ehto}</span>
+              </div>
+            )}
 
             {/* Menu — PRD §5.4 aligned */}
             <nav className="mt-6 flex flex-col px-6">
