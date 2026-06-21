@@ -57,6 +57,12 @@ export type OnboardingCopy = {
     finalizeFail: string;
     codeConsumed: string;
     noSession: string;
+    okTitle: string;
+    okBody: string;
+    okCta: string;
+    failTitle: string;
+    failBody: string;
+    failCta: string;
   };
   auth: {
     signupTitle: string;
@@ -167,6 +173,12 @@ const ko: OnboardingCopy = {
     finalizeFail: "확정 실패",
     codeConsumed: "초대코드가 방금 소진됐어요. 다른 코드로 다시 시도해주세요.",
     noSession: "세션이 없습니다.",
+    okTitle: "환영합니다",
+    okBody: "이제 당신만의 광장을 만들어 봅시다.",
+    okCta: "시작하기",
+    failTitle: "초대코드를 확인해주세요",
+    failBody: "코드가 올바르지 않거나 이미 사용됐어요.",
+    failCta: "다시 입력",
   },
   auth: {
     signupTitle: "가입하고 시작하기",
@@ -284,6 +296,12 @@ const en: OnboardingCopy = {
     finalizeFail: "Couldn't finish setup",
     codeConsumed: "That invite code was just used up. Try another code.",
     noSession: "No session.",
+    okTitle: "Welcome",
+    okBody: "Now let's build a plaza that's all your own.",
+    okCta: "Let's begin",
+    failTitle: "Check your invite code",
+    failBody: "That code is invalid or already used.",
+    failCta: "Try again",
   },
   auth: {
     signupTitle: "Sign up to start",
@@ -401,6 +419,12 @@ const ja: OnboardingCopy = {
     finalizeFail: "セットアップを完了できませんでした",
     codeConsumed: "招待コードが今しがた使い切られました。別のコードでお試しください。",
     noSession: "セッションがありません。",
+    okTitle: "ようこそ",
+    okBody: "さあ、あなただけの広場をつくりましょう。",
+    okCta: "はじめる",
+    failTitle: "招待コードをご確認ください",
+    failBody: "コードが正しくないか、すでに使われています。",
+    failCta: "もう一度",
   },
   auth: {
     signupTitle: "登録して始める",

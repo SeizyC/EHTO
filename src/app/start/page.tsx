@@ -9,6 +9,8 @@ import { useLocale } from "@/lib/use-locale";
 import { DEFAULT_LOCALE } from "@/lib/about-content";
 import { LangToggle } from "@/components/LangToggle";
 import { ONBOARDING } from "@/lib/onboarding-content";
+import { StartResultDialog } from "@/components/StartResultDialog";
+import { PixelButton } from "@/components/PixelButton";
 
 type Step = "code" | "name" | "auth";
 
@@ -22,6 +24,9 @@ export default function StartPage() {
   const [roomName, setRoomName] = useState(initial.roomName);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Invite-code result surfaces as a modal: success welcomes the user into
+  // building their plaza; fail asks them to re-check the code.
+  const [result, setResult] = useState<"success" | "fail" | null>(null);
 
   async function submitCode() {
     if (busy) return;
@@ -35,10 +40,10 @@ export default function StartPage() {
         body: JSON.stringify({ code: c }),
       });
       const j = await r.json();
-      if (!j.ok) { setErr(t.codeInvalid); return; }
+      if (!j.ok) { setResult("fail"); return; }
       setCode(c);
       saveDraft({ code: c, roomName });
-      setStep("name");
+      setResult("success");
     } catch {
       setErr(t.netErr);
     } finally {
@@ -99,10 +104,9 @@ export default function StartPage() {
             className="border-line bg-bg text-ink rounded-xl border px-3 py-2 tracking-widest"
           />
           {err && <p className="text-sub text-sm">{err}</p>}
-          <button onClick={submitCode} disabled={busy || !code.trim()}
-            className="bg-ink text-bg rounded-xl py-2.5 font-medium disabled:opacity-40">
+          <PixelButton variant="primary" size="lg" block onClick={submitCode} disabled={busy || !code.trim()}>
             {t.next}
-          </button>
+          </PixelButton>
           <button onClick={() => router.push("/login")} className="text-sub text-center text-sm">
             {t.haveAccount}
           </button>
@@ -132,6 +136,13 @@ export default function StartPage() {
 
       <AuthModal open={step === "auth"} onClose={() => setStep("name")} onAuthed={onAuthed} locale={locale} />
       {step === "auth" && err && <p className="text-sub text-center text-sm">{err}</p>}
+
+      <StartResultDialog
+        kind={result}
+        copy={t}
+        onConfirm={() => { setResult(null); setStep("name"); }}
+        onClose={() => setResult(null)}
+      />
     </main>
   );
 }
