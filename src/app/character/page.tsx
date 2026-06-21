@@ -22,9 +22,10 @@ import { PixelButton } from "@/components/PixelButton";
 import { MeGlyph } from "@/components/MeGlyph";
 import { MeSheet } from "@/components/MeSheet";
 import { useRequireSession } from "@/lib/use-require-session";
-import { LOCALES, LOCALE_LABEL, DEFAULT_LOCALE, isLocale, type Locale } from "@/lib/about-content";
+import { DEFAULT_LOCALE, isLocale, type Locale } from "@/lib/about-content";
 import { useLocale } from "@/lib/use-locale";
 import { ONBOARDING, OPTION_LABELS } from "@/lib/onboarding-content";
+import { AnimatePresence, motion } from "framer-motion";
 
 const MAX_ROLLS = 3;
 
@@ -194,10 +195,8 @@ export default function CharacterPage() {
         <SelectView
           gender={gender} skin={skin} outfit={outfit}
           hairStyle={hairStyle} hairColor={hairColor} accessory={accessory}
-          language={language}
           onGender={setGender} onSkin={setSkin} onOutfit={setOutfit}
           onHairStyle={setHairStyle} onHairColor={setHairColor} onAccessory={setAccessory}
-          onLanguage={setLanguage}
           onGenerate={generate}
           canGenerate={canRoll}
           remaining={remaining}
@@ -242,88 +241,94 @@ export default function CharacterPage() {
 function SelectView(props: {
   gender: GenderId; skin: SkinId; outfit: OutfitId;
   hairStyle: HairStyleId; hairColor: HairColorId; accessory: AccessoryId;
-  language: Locale;
   onGender: (g: GenderId) => void;
   onSkin: (s: SkinId) => void;
   onOutfit: (o: OutfitId) => void;
   onHairStyle: (h: HairStyleId) => void;
   onHairColor: (c: HairColorId) => void;
   onAccessory: (a: AccessoryId) => void;
-  onLanguage: (l: Locale) => void;
   onGenerate: () => void;
   canGenerate: boolean;
   remaining: number;
 }) {
   const { locale } = useLocale(DEFAULT_LOCALE);
   const t = ONBOARDING[locale].character;
+  const nav = ONBOARDING[locale].start; // 다음 / 뒤로 labels (shared funnel copy)
+  const [step, setStep] = useState(0);
+  const TOTAL = 6;
+  const isLast = step === TOTAL - 1;
 
   return (
     <div className="animate-fade-in flex flex-1 flex-col">
-      <section className="mb-7">
-        <h2 className="text-[20px] font-medium leading-[1.4]">
-          {t.selTitle}
-        </h2>
-        <p className="text-sub mt-2 text-[13px] leading-[1.7]">
-          {t.selSub}
-        </p>
+      <section className="mb-5">
+        <h2 className="text-[20px] font-medium leading-[1.4]">{t.selTitle}</h2>
+        <p className="text-sub mt-2 text-[13px] leading-[1.7]">{t.selSub}</p>
       </section>
 
-      <section className="flex flex-1 flex-col gap-7">
-        <PillRow label={t.secGender}    options={GENDERS}     value={props.gender}    onChange={props.onGender} />
-        <PillRow label={t.secSkin}      options={SKINS}       value={props.skin}      onChange={props.onSkin} />
-        <PillRow label={t.secHair}      options={HAIR_STYLES} value={props.hairStyle} onChange={props.onHairStyle} />
-        <PillRow label={t.secHairColor} options={HAIR_COLORS} value={props.hairColor} onChange={props.onHairColor} />
-        <PillRow label={t.secOutfit}    options={OUTFITS}     value={props.outfit}    onChange={props.onOutfit} />
-        <PillRow label={t.secAccessory} options={ACCESSORIES} value={props.accessory} onChange={props.onAccessory} />
+      {/* Step progress */}
+      <div className="mb-6 flex items-center gap-1.5">
+        {Array.from({ length: TOTAL }).map((_, i) => (
+          <span
+            key={i}
+            className={[
+              "h-1.5 rounded-full transition-all duration-300",
+              i === step ? "bg-ink w-6" : i < step ? "bg-ink/40 w-3" : "bg-line w-3",
+            ].join(" ")}
+          />
+        ))}
+        <span className="text-sub ml-auto text-[12px] tabular-nums">{step + 1} / {TOTAL}</span>
+      </div>
 
-        {/* Plaza language — sets worlds.language for the world this character
-            founds. Defaults to the user's UI locale; drives native member
-            generation + ambient language. Same pill style as the rows above. */}
-        <div>
-          <div className="text-sub mb-2.5 text-[10px] uppercase tracking-[0.22em]">
-            {t.plazaLang}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {LOCALES.map((l) => {
-              const active = l === props.language;
-              return (
-                <button
-                  key={l}
-                  type="button"
-                  onClick={() => props.onLanguage(l)}
-                  aria-pressed={active}
-                  className={[
-                    "rounded-full border px-4 py-2 text-[13px] font-semibold transition",
-                    active
-                      ? "border-ink bg-ink text-bg"
-                      : "border-line text-sub active:bg-panel hover:border-dim",
-                  ].join(" ")}
-                >
-                  {LOCALE_LABEL[l]}
-                </button>
-              );
-            })}
-          </div>
-          <p className="text-sub mt-2 text-[11px] leading-relaxed">
-            {t.plazaLangDesc}
-          </p>
-        </div>
+      {/* One attribute per step */}
+      <section className="flex flex-1 flex-col">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={step}
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -16 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {step === 0 && <PillRow label={t.secGender}    options={GENDERS}     value={props.gender}    onChange={props.onGender} />}
+            {step === 1 && <PillRow label={t.secSkin}      options={SKINS}       value={props.skin}      onChange={props.onSkin} />}
+            {step === 2 && <PillRow label={t.secHair}      options={HAIR_STYLES} value={props.hairStyle} onChange={props.onHairStyle} />}
+            {step === 3 && <PillRow label={t.secHairColor} options={HAIR_COLORS} value={props.hairColor} onChange={props.onHairColor} />}
+            {step === 4 && <PillRow label={t.secOutfit}    options={OUTFITS}     value={props.outfit}    onChange={props.onOutfit} />}
+            {step === 5 && <PillRow label={t.secAccessory} options={ACCESSORIES} value={props.accessory} onChange={props.onAccessory} />}
+          </motion.div>
+        </AnimatePresence>
       </section>
 
       <footer className="mt-7 flex flex-col gap-3">
-        <PixelButton
-          block
-          size="lg"
-          onClick={props.onGenerate}
-          disabled={!props.canGenerate}
-        >
-          {props.canGenerate
-            ? t.createBtn.replace("{n}", String(props.remaining))
-            : t.createBtnExhausted}
-        </PixelButton>
-        <p className="text-sub text-center text-[11px] leading-relaxed">
-          {t.selHint}
-        </p>
+        <div className="flex gap-2">
+          {step > 0 && (
+            <div className="flex-1">
+              <PixelButton variant="muted" size="lg" block onClick={() => setStep(step - 1)}>
+                {nav.back}
+              </PixelButton>
+            </div>
+          )}
+          <div className="flex-1">
+            {isLast ? (
+              <PixelButton
+                variant="primary"
+                size="lg"
+                block
+                onClick={props.onGenerate}
+                disabled={!props.canGenerate}
+              >
+                {props.canGenerate
+                  ? t.createBtn.replace("{n}", String(props.remaining))
+                  : t.createBtnExhausted}
+              </PixelButton>
+            ) : (
+              <PixelButton variant="primary" size="lg" block onClick={() => setStep(step + 1)}>
+                {nav.next}
+              </PixelButton>
+            )}
+          </div>
+        </div>
+        <p className="text-sub text-center text-[11px] leading-relaxed">{t.selHint}</p>
       </footer>
     </div>
   );
