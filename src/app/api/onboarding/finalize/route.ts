@@ -3,6 +3,7 @@ import { userClient, serviceClient } from "@/lib/supabase";
 import { ensureWorld, seedMembersIfEmpty } from "@/lib/world-seed";
 import { consumeCodeAndReward, issueCodesForUser } from "@/lib/beta-codes";
 import { countryToLocale } from "@/lib/language";
+import { getEhtoBalance, grantEhto, START_GRANT } from "@/lib/ehto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,6 +57,12 @@ export async function POST(req: NextRequest) {
 
   // 3. Issue this user's own 3 invite codes (idempotent).
   await issueCodesForUser(svc, uid);
+
+  // Starting EHTO — granted once. New users have a 0 balance here (the backfill
+  // only touched pre-existing profiles), so this is effectively idempotent.
+  if ((await getEhtoBalance(svc, uid)) === 0) {
+    await grantEhto(svc, uid, START_GRANT);
+  }
 
   return NextResponse.json({ ok: true, worldId });
 }
