@@ -322,7 +322,14 @@ export function LivingPlaza({ locale }: { locale: Locale }) {
   return (
     <div className="relative mx-auto w-full max-w-[680px]">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={SCENES[scene]} alt="" className="pixelated block h-auto w-full" draggable={false} />
+      <img
+        src={SCENES[scene]}
+        alt=""
+        className="pixelated block h-auto w-full"
+        draggable={false}
+        // LCP element — prioritize so it isn't queued behind sprites/JS.
+        fetchPriority="high"
+      />
 
       {entities.map((e) => e.el)}
 
