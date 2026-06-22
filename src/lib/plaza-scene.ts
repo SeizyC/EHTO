@@ -6,6 +6,12 @@
 
 export type Scene = "morning" | "afternoon" | "evening" | "night";
 
+// Public path of a scene's background webp. Shared by LivingPlaza (the <img>)
+// and the root page (an <link rel=preload> for the LCP image).
+export function sceneSrc(scene: Scene): string {
+  return `/sprites/rooms/states/empty_${scene}.land.webp`;
+}
+
 export function sceneForHour(h: number): Scene {
   if (h >= 5 && h < 10) return "morning";
   if (h >= 10 && h < 17) return "afternoon";

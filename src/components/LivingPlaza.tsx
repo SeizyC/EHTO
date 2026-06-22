@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { Locale } from "@/lib/about-content";
-import { type Scene, sceneForHour } from "@/lib/plaza-scene";
+import { type Scene, sceneForHour, sceneSrc } from "@/lib/plaza-scene";
 
 // Landing hero: a layered, living plaza built from sprites (no buildings).
 // Empty tiled floor (time-of-day by local hour) + furniture sprites
@@ -13,12 +13,6 @@ import { type Scene, sceneForHour } from "@/lib/plaza-scene";
 // rear walkway behind the fountain. Daytime scenes get soft ground shadows.
 
 const ROOM = "/sprites/rooms";
-const SCENES = {
-  morning: `${ROOM}/states/empty_morning.land.webp`,
-  afternoon: `${ROOM}/states/empty_afternoon.land.webp`,
-  evening: `${ROOM}/states/empty_evening.land.webp`,
-  night: `${ROOM}/states/empty_night.land.webp`,
-} as const;
 function shadowFor(scene: Scene): number {
   if (scene === "night") return 0;
   if (scene === "evening") return 0.13;
@@ -318,7 +312,7 @@ export function LivingPlaza({ locale, initialScene = "afternoon" }: { locale: Lo
     <div className="relative mx-auto w-full max-w-[680px]">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={SCENES[scene]}
+        src={sceneSrc(scene)}
         alt=""
         className="pixelated block h-auto w-full"
         draggable={false}
