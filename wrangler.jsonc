@@ -2,7 +2,7 @@
   "$schema": "https://unpkg.com/wrangler@latest/config-schema.json",
   "name": "ehto",
   "account_id": "REDACTED_CF_ACCOUNT_ID",
-  "main": ".open-next/worker.js",
+  "main": "worker-entry.js",
   "compatibility_date": "2025-01-15",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {

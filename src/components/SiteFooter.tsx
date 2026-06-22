@@ -6,10 +6,10 @@ export function SiteFooter() {
   return (
     <footer className="text-dim mx-auto w-full max-w-[680px] px-6 pb-8 pt-4">
       <div className="border-line flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-4 text-[12px]">
-        <Link href="/about" className="hover:text-sub transition">소개</Link>
-        <Link href="/terms" className="hover:text-sub transition">이용약관</Link>
-        <Link href="/privacy" className="hover:text-sub transition">개인정보처리방침</Link>
-        <Link href="/contact" className="hover:text-sub transition">문의</Link>
+        <Link href="/about" className="hover:text-sub transition">About</Link>
+        <Link href="/terms" className="hover:text-sub transition">Terms</Link>
+        <Link href="/privacy" className="hover:text-sub transition">Privacy</Link>
+        <Link href="/contact" className="hover:text-sub transition">Contact</Link>
         <span className="text-dim/80 ml-auto text-[11px]">© Fantagram Inc.</span>
       </div>
     </footer>

@@ -1,23 +1,26 @@
 "use client";
 
 import { LOCALES, LOCALE_LABEL, type Locale } from "@/lib/about-content";
-import { browserClient } from "@/lib/supabase";
+import { readAccessToken } from "@/lib/auth-token";
 
 // Fire-and-forget: persist a logged-in user's language to profiles.language
 // so a saved choice beats IP detection on the next visit. Anonymous users
-// (no session) are skipped — their choice lives in localStorage via pick().
-// Mirrors the bearer-token fetch pattern in updateWorldSettings (world-store).
+// (no token) are skipped — their choice lives in localStorage via pick().
+//
+// The token is read straight from localStorage (no Supabase SDK) so this
+// component — shared by the marketing landing — never pulls ~230KB of
+// @supabase/supabase-js into the landing bundle. The server re-validates the
+// token, so a stale value just no-ops (localStorage still holds the choice).
 function persistLanguage(next: Locale) {
+  const token = readAccessToken();
+  if (!token) return;
   void (async () => {
     try {
-      const sb = browserClient();
-      const { data: sess } = await sb.auth.getSession();
-      if (!sess.session) return;
       await fetch("/api/me/language", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${sess.session.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ language: next }),
       });

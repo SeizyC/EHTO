@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { browserClient } from "@/lib/supabase";
+import { readAccessToken } from "@/lib/auth-token";
 
 export default function PageViewBeacon() {
   const pathname = usePathname();
@@ -11,32 +11,19 @@ export default function PageViewBeacon() {
     // Skip admin and API paths — don't count internal traffic
     if (pathname.startsWith("/admin") || pathname.startsWith("/api")) return;
 
-    let cancelled = false;
+    // Read the bearer token straight from localStorage instead of via the
+    // Supabase SDK — this beacon runs on every page (incl. the marketing
+    // landing) and must not pull @supabase/supabase-js into the bundle.
+    const token = readAccessToken();
 
-    (async () => {
-      let token: string | null = null;
-      try {
-        const { data } = await browserClient().auth.getSession();
-        token = data.session?.access_token ?? null;
-      } catch {
-        // best-effort
-      }
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      if (cancelled) return;
-
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      fetch("/api/track", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ path: pathname }),
-      }).catch(() => {});
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    fetch("/api/track", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ path: pathname }),
+    }).catch(() => {});
   }, [pathname]);
 
   return null;

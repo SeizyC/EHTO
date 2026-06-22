@@ -74,7 +74,7 @@ export const PixelButton = forwardRef<HTMLButtonElement, ButtonProps>(
 );
 
 type LinkProps = AnchorHTMLAttributes<HTMLAnchorElement> &
-  CommonProps & { href: string };
+  CommonProps & { href: string; prefetch?: boolean };
 
 export function PixelLink({
   variant = "primary",
@@ -83,12 +83,13 @@ export function PixelLink({
   className = "",
   children,
   href,
+  prefetch,
   ...rest
 }: LinkProps) {
   const { inner, outer } = classes(variant, size, block);
   return (
     <span className={outer}>
-      <Link href={href} className={[inner, className].join(" ")} {...rest}>
+      <Link href={href} prefetch={prefetch} className={[inner, className].join(" ")} {...rest}>
         {children}
       </Link>
     </span>

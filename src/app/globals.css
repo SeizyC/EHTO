@@ -6,16 +6,19 @@
    on demand, so a page only pulls the glyph ranges it actually shows
    (the landing loads ~1–3 chunks instead of the whole font). */
 /* Galmuri — Korean+Latin pixel font (OFL), self-hosted. Used for display
-   text (hero headline / CTA) to match the isometric pixel identity. */
+   text (landing hero headline / sub / CTA) to match the isometric pixel
+   identity. The full font is 505KB+167KB and sat on the LCP critical chain
+   (HTML → CSS → font), so we ship a SUBSET (~7KB) of just the glyphs the
+   landing renders. Regenerate after copy changes: node scripts/subset-galmuri.mjs */
 @font-face {
   font-family: "Galmuri11";
-  src: url("/fonts/Galmuri11.woff2") format("woff2");
+  src: url("/fonts/Galmuri11.subset.woff2") format("woff2");
   font-weight: 400;
   font-display: swap;
 }
 @font-face {
   font-family: "Galmuri11";
-  src: url("/fonts/Galmuri11-Bold.woff2") format("woff2");
+  src: url("/fonts/Galmuri11-Bold.subset.woff2") format("woff2");
   font-weight: 700;
   font-display: swap;
 }

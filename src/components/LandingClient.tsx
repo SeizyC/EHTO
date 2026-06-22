@@ -41,7 +41,10 @@ export function LandingClient({ initialLocale, initialScene }: { initialLocale: 
           </div>
 
           <div>
-            <PixelLink href="/start" size="lg" block className="font-pixel">
+            {/* prefetch off: /start pulls the Supabase SDK chunk, which we
+                deliberately keep off the marketing landing — fetch it on click,
+                not on idle prefetch. */}
+            <PixelLink href="/start" size="lg" block className="font-pixel" prefetch={false}>
               {t.cta}
             </PixelLink>
           </div>

@@ -17,6 +17,11 @@ export default function Home() {
       {/* Preload the LCP scene image so it fetches at navigation start
           instead of after the CSS — kills the LCP "load delay". */}
       <link rel="preload" as="image" href={sceneSrc(initialScene)} fetchPriority="high" />
+      {/* Preload the (tiny, subset) pixel font so the hero headline — the LCP
+          text — paints in Galmuri11 immediately instead of waiting for the CSS
+          to discover it. crossorigin is required even same-origin for fonts. */}
+      <link rel="preload" as="font" type="font/woff2" href="/fonts/Galmuri11-Bold.subset.woff2" crossOrigin="anonymous" />
+      <link rel="preload" as="font" type="font/woff2" href="/fonts/Galmuri11.subset.woff2" crossOrigin="anonymous" />
       <LandingClient initialLocale={initialLocale} initialScene={initialScene} />
     </>
   );

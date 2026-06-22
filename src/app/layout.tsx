@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import "./globals.css";
-import { AuthProvider } from "@/components/AuthProvider";
 import PageViewBeacon from "@/components/PageViewBeacon";
 import { FontLoader } from "@/components/FontLoader";
 
@@ -88,10 +87,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {RELOAD_GUARD}
         </Script>
         <FontLoader />
-        <AuthProvider>
-          <PageViewBeacon />
-          {children}
-        </AuthProvider>
+        {/* PageViewBeacon reads the auth token from localStorage (no SDK), so
+            it stays out of the marketing bundle. AuthProvider now lives in the
+            (app) route group — see src/app/(app)/layout.tsx. */}
+        <PageViewBeacon />
+        {children}
       </body>
     </html>
   );

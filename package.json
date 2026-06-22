@@ -40,5 +40,14 @@
     "tailwindcss": "^3.4.15",
     "tsx": "^4.22.4",
     "typescript": "^5.9.3"
-  }
+  },
+  "//browserslist": "Modern targets so Next doesn't ship legacy polyfills (Array.at/flat/flatMap, Object.fromEntries/hasOwn, String.trimStart/End). All listed browsers support these natively.",
+  "browserslist": [
+    "chrome >= 100",
+    "edge >= 100",
+    "firefox >= 100",
+    "safari >= 15.4",
+    "ios_saf >= 15.4",
+    "not dead"
+  ]
 }
