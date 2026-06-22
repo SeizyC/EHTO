@@ -262,7 +262,7 @@ function SelectView(props: {
 
   return (
     <div className="animate-fade-in flex flex-1 flex-col">
-      <section className="mb-5">
+      <section className="mb-5 mt-8">
         <h2 className="text-[20px] font-medium leading-[1.4]">{t.selTitle}</h2>
         <p className="text-sub mt-2 text-[13px] leading-[1.7]">{t.selSub}</p>
       </section>
