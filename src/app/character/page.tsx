@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CharacterCommitDialog } from "@/components/CharacterCommitDialog";
 import {
@@ -30,7 +30,17 @@ import { AnimatePresence, motion } from "framer-motion";
 
 type Stage = "select" | "generating" | "result" | "naming" | "error";
 
+// Wrap in Suspense: useSearchParams() requires a Suspense boundary or the
+// page must be dynamically rendered (Next 14 App Router build requirement).
 export default function CharacterPage() {
+  return (
+    <Suspense fallback={null}>
+      <CharacterPageInner />
+    </Suspense>
+  );
+}
+
+function CharacterPageInner() {
   useRequireSession();
   const router = useRouter();
   const searchParams = useSearchParams();
