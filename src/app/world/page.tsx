@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AmbientHeader } from "@/components/AmbientHeader";
 import { EnergyMeter } from "@/components/EnergyMeter";
 import { MeGlyph } from "@/components/MeGlyph";
+import { EhtoBadge } from "@/components/EhtoBadge";
 import { PlazaCanvas, type PlazaCharacter } from "@/components/PlazaCanvas";
 import { AmbientFeed } from "@/components/AmbientFeed";
 import { Composer } from "@/components/Composer";
@@ -332,6 +333,7 @@ export default function WorldPage() {
         >
           🌐
         </a>
+        <EhtoBadge />
         <MeGlyph onOpen={() => setMeOpen(true)} />
       </div>
     </header>

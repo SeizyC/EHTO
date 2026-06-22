@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { browserClient } from "@/lib/supabase";
 import { MeGlyph } from "@/components/MeGlyph";
+import { EhtoBadge } from "@/components/EhtoBadge";
 import { MeSheet } from "@/components/MeSheet";
 
 type Plaza = {
@@ -106,6 +107,7 @@ export default function HomePage() {
             >
               🌐
             </Link>
+            <EhtoBadge />
             <MeGlyph onOpen={() => setMeOpen(true)} />
           </div>
         </header>

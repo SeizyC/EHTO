@@ -21,6 +21,7 @@ import { saveCharacter, loadCharacter, saveHandle } from "@/lib/character-store"
 import { browserClient } from "@/lib/supabase";
 import { PixelButton } from "@/components/PixelButton";
 import { MeGlyph } from "@/components/MeGlyph";
+import { EhtoBadge } from "@/components/EhtoBadge";
 import { MeSheet } from "@/components/MeSheet";
 import { useRequireSession } from "@/lib/use-require-session";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "@/lib/about-content";
@@ -190,6 +191,7 @@ function CharacterPageInner() {
       <header className="mb-4 flex items-center justify-between">
         <BackLink stage={stage} onBack={() => goBack(stage, setStage, router)} />
         <div className="flex items-center gap-2.5">
+          <EhtoBadge />
           <MeGlyph onOpen={() => setMeOpen(true)} />
         </div>
       </header>
