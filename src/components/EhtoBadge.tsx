@@ -31,7 +31,7 @@ export function EhtoBadge() {
   if (balance === null) return null;
 
   return (
-    <span className="border-line bg-surface inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12px] font-semibold tabular-nums">
+    <span className="border-line bg-surface mr-1.5 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12px] font-semibold tabular-nums">
       <span className="text-accent">◆</span>
       <span className="text-ink">{balance} ET</span>
     </span>
