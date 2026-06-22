@@ -22,6 +22,10 @@ import { currentBucket } from "@/lib/time-of-day";
 import { activeBubbleOf, dismissBubble, refreshChat, useChatMessages, useTyping } from "@/lib/chat-store";
 import { useRequireSession } from "@/lib/use-require-session";
 import { summonInComposer } from "@/lib/composer-store";
+import { WelcomeDialog } from "@/components/WelcomeDialog";
+import { ONBOARDING } from "@/lib/onboarding-content";
+import { useLocale } from "@/lib/use-locale";
+import { DEFAULT_LOCALE } from "@/lib/about-content";
 
 // Plaza geometry — bg image floor band ≈ y 50 (back) to y 78 (front).
 // User character default placement (~60%) before any persisted owner
@@ -62,6 +66,14 @@ function todayDateLabel(): string {
 export default function WorldPage() {
   const auth = useRequireSession();
   const router = useRouter();
+
+  const { locale } = useLocale(DEFAULT_LOCALE);
+  const [welcome, setWelcome] = useState(false);
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem("ehto:welcomed")) setWelcome(true);
+    } catch { /* private mode — skip */ }
+  }, []);
 
   // Users who landed here without ever finishing character creation (e.g.
   // signed up but bailed before naming) end up with no LS character and
@@ -527,6 +539,14 @@ export default function WorldPage() {
         <MeSheet open={meOpen} onClose={() => setMeOpen(false)} />
         <RoomInfoSheet open={roomOpen} onClose={() => setRoomOpen(false)} />
         <HistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} />
+        <WelcomeDialog
+          open={welcome}
+          copy={ONBOARDING[locale].welcome}
+          onClose={() => {
+            setWelcome(false);
+            try { localStorage.setItem("ehto:welcomed", "1"); } catch { /* ignore */ }
+          }}
+        />
       </main>
 
       {/* Composer pinned to viewport bottom across breakpoints.

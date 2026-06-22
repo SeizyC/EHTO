@@ -14,6 +14,7 @@ import { serviceClient, userClient, publicSpriteUrl } from "@/lib/supabase";
 import { ensureWorld, seedMembersIfEmpty } from "@/lib/world-seed";
 import { IMAGES_GENERATIONS_URL } from "@/lib/openai-urls";
 import { isLocale } from "@/lib/language";
+import { spendEhto, grantEhto, priceOf } from "@/lib/ehto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -121,7 +122,36 @@ export async function POST(req: NextRequest) {
     gender, skin, outfit, hairStyle, hairColor, accessory,
   });
 
-  // 3. Generate (gpt-image-1 returns PNG with transparent background
+  // 3. Charge EHTO if user already has an active character (this is a change,
+  //    not a first creation). Service client is needed here; create it once and
+  //    reuse for storage + world-seed below.
+  const svc = serviceClient();
+
+  const { data: existingChar } = await svc
+    .from("characters")
+    .select("id")
+    .eq("owner_id", userId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  let didCharge = false;
+  if (existingChar) {
+    // This is a character CHANGE → charge 5 EHTO before generating.
+    const newBalance = await spendEhto(svc, userId, priceOf("character_change")!);
+    if (newBalance === null) {
+      return NextResponse.json({ error: "EHTO가 부족해요" }, { status: 402 });
+    }
+    didCharge = true;
+  }
+
+  // Helper: refund if we charged and something goes wrong after this point.
+  async function refundIfCharged() {
+    if (didCharge) {
+      await grantEhto(svc, userId, priceOf("character_change")!).catch(() => {});
+    }
+  }
+
+  // 4. Generate (gpt-image-1 returns PNG with transparent background
   // natively — no chroma-key post-processing needed).
   let processed: Buffer;
   try {
@@ -129,22 +159,23 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "gen failed";
     console.error(`[generate-character] generation failed:`, msg);
+    await refundIfCharged();
     return NextResponse.json({ error: msg }, { status: 502 });
   }
 
-  // 4. Upload to Storage (service role bypasses RLS — owner_id verified by JWT above)
+  // 5. Upload to Storage (service role bypasses RLS — owner_id verified by JWT above)
   const characterId = randomUUID();
   const storagePath = `${userId}/${characterId}.png`;
-  const svc = serviceClient();
   const { error: upErr } = await svc.storage.from("characters").upload(storagePath, processed, {
     contentType: "image/png",
     upsert: true,
   });
   if (upErr) {
+    await refundIfCharged();
     return NextResponse.json({ error: `upload: ${upErr.message}` }, { status: 502 });
   }
 
-  // 5. Insert row in characters table (as the user, RLS enforced)
+  // 6. Insert row in characters table (as the user, RLS enforced)
   const { data: row, error: insErr } = await userSb
     .from("characters")
     .insert({
@@ -162,6 +193,7 @@ export async function POST(req: NextRequest) {
   if (insErr) {
     // best-effort cleanup of orphan object
     await svc.storage.from("characters").remove([storagePath]).catch(() => {});
+    await refundIfCharged();
     return NextResponse.json({ error: `insert: ${insErr.message}` }, { status: 502 });
   }
 

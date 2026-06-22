@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { CharacterCommitDialog } from "@/components/CharacterCommitDialog";
 import {
   GENDERS,
   SKINS,
@@ -22,16 +23,30 @@ import { PixelButton } from "@/components/PixelButton";
 import { MeGlyph } from "@/components/MeGlyph";
 import { MeSheet } from "@/components/MeSheet";
 import { useRequireSession } from "@/lib/use-require-session";
-import { currentBucket } from "@/lib/time-of-day";
-import { LOCALES, LOCALE_LABEL, DEFAULT_LOCALE, isLocale, type Locale } from "@/lib/about-content";
+import { DEFAULT_LOCALE, isLocale, type Locale } from "@/lib/about-content";
+import { useLocale } from "@/lib/use-locale";
+import { ONBOARDING, OPTION_LABELS } from "@/lib/onboarding-content";
+import { AnimatePresence, motion } from "framer-motion";
 
-const MAX_ROLLS = 3;
+type Stage = "select" | "generating" | "result" | "naming" | "error";
 
-type Stage = "select" | "generating" | "result" | "naming" | "room-naming" | "error";
-
+// Wrap in Suspense: useSearchParams() requires a Suspense boundary or the
+// page must be dynamically rendered (Next 14 App Router build requirement).
 export default function CharacterPage() {
+  return (
+    <Suspense fallback={null}>
+      <CharacterPageInner />
+    </Suspense>
+  );
+}
+
+function CharacterPageInner() {
   useRequireSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const change = searchParams.get("change") === "1";
+  const { locale } = useLocale(DEFAULT_LOCALE);
+  const t = ONBOARDING[locale].character;
   const [stage, setStage] = useState<Stage>("select");
   const [gender, setGender] = useState<GenderId>("m");
   const [skin, setSkin] = useState<SkinId>("fair");
@@ -47,12 +62,10 @@ export default function CharacterPage() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [characterId, setCharacterId] = useState<string | null>(null);
   const [rolledHair, setRolledHair] = useState<string | undefined>();
-  const [rollsUsed, setRollsUsed] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
   const [meOpen, setMeOpen] = useState(false);
 
-  const remaining = MAX_ROLLS - rollsUsed;
-  const canRoll = remaining > 0;
+  const [confirming, setConfirming] = useState(false);
 
   // Entry guard — character identity is locked once created.
   //   ・ character + handle → /home (returning users land in the plaza
@@ -63,6 +76,10 @@ export default function CharacterPage() {
   //   ・ neither in LS      → fetch from server (fresh-browser returning user);
   //                          if server also has nothing, stay in select flow
   useEffect(() => {
+    // change=1 mode: user is re-creating their character (costs 5 EHTO).
+    // Skip all redirects that would send them away from the select stage.
+    if (change) return;
+
     const cached = loadCharacter();
     if (cached) {
       if (cached.handle) {
@@ -107,7 +124,7 @@ export default function CharacterPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [router]);
+  }, [router, change]);
 
   // Default the plaza language to the user's current UI locale. useLocale
   // persists the picked locale to this same localStorage key on the public
@@ -122,19 +139,13 @@ export default function CharacterPage() {
   }, []);
 
   async function generate() {
-    // Hard cap — same counter for first-make, re-roll, and re-select paths.
-    if (rollsUsed >= MAX_ROLLS) {
-      setErrorMsg("이번 라운드 티켓을 다 썼어요. 결과 중에서 골라주세요.");
-      setStage("error");
-      return;
-    }
     setStage("generating");
     setErrorMsg("");
     try {
       // 1. Session must already exist — useRequireSession guards this page.
       const sb = browserClient();
       const { data: sess } = await sb.auth.getSession();
-      if (!sess.session) throw new Error("세션 없음 — 다시 로그인해줘");
+      if (!sess.session) throw new Error(t.genNoSession);
 
       // 2. Call API with token
       const r = await fetch("/api/generate-character", {
@@ -153,10 +164,9 @@ export default function CharacterPage() {
       setImageUrl(j.publicUrl);
       setCharacterId(j.character?.id ?? null);
       setRolledHair(j.rolled?.hair);
-      setRollsUsed((n) => n + 1);
       setStage("result");
     } catch (e: unknown) {
-      setErrorMsg(e instanceof Error ? e.message : "오류");
+      setErrorMsg(e instanceof Error ? e.message : t.genGeneric);
       setStage("error");
     }
   }
@@ -180,9 +190,6 @@ export default function CharacterPage() {
       <header className="mb-4 flex items-center justify-between">
         <BackLink stage={stage} onBack={() => goBack(stage, setStage, router)} />
         <div className="flex items-center gap-2.5">
-          {(stage === "select" || stage === "result") && (
-            <TicketChip remaining={remaining} max={MAX_ROLLS} />
-          )}
           <MeGlyph onOpen={() => setMeOpen(true)} />
         </div>
       </header>
@@ -191,13 +198,9 @@ export default function CharacterPage() {
         <SelectView
           gender={gender} skin={skin} outfit={outfit}
           hairStyle={hairStyle} hairColor={hairColor} accessory={accessory}
-          language={language}
           onGender={setGender} onSkin={setSkin} onOutfit={setOutfit}
           onHairStyle={setHairStyle} onHairColor={setHairColor} onAccessory={setAccessory}
-          onLanguage={setLanguage}
-          onGenerate={generate}
-          canGenerate={canRoll}
-          remaining={remaining}
+          onRequestCreate={() => setConfirming(true)}
         />
       )}
 
@@ -206,23 +209,12 @@ export default function CharacterPage() {
       {stage === "result" && imageUrl && (
         <ResultView
           imageUrl={imageUrl}
-          remaining={remaining}
-          canRoll={canRoll}
-          onReroll={generate}
-          onBackToSelect={() => setStage("select")}
           onConfirm={confirmEnter}
         />
       )}
 
       {stage === "naming" && imageUrl && (
         <NamingView
-          imageUrl={imageUrl}
-          onDone={() => setStage("room-naming")}
-        />
-      )}
-
-      {stage === "room-naming" && imageUrl && (
-        <RoomNamingView
           imageUrl={imageUrl}
           onDone={() => router.push("/world")}
         />
@@ -236,6 +228,13 @@ export default function CharacterPage() {
         />
       )}
 
+      <CharacterCommitDialog
+        open={confirming}
+        copy={ONBOARDING[locale].character}
+        onConfirm={() => { setConfirming(false); generate(); }}
+        onCancel={() => setConfirming(false)}
+      />
+
       <MeSheet open={meOpen} onClose={() => setMeOpen(false)} />
     </main>
   );
@@ -246,85 +245,80 @@ export default function CharacterPage() {
 function SelectView(props: {
   gender: GenderId; skin: SkinId; outfit: OutfitId;
   hairStyle: HairStyleId; hairColor: HairColorId; accessory: AccessoryId;
-  language: Locale;
   onGender: (g: GenderId) => void;
   onSkin: (s: SkinId) => void;
   onOutfit: (o: OutfitId) => void;
   onHairStyle: (h: HairStyleId) => void;
   onHairColor: (c: HairColorId) => void;
   onAccessory: (a: AccessoryId) => void;
-  onLanguage: (l: Locale) => void;
-  onGenerate: () => void;
-  canGenerate: boolean;
-  remaining: number;
+  onRequestCreate: () => void;
 }) {
+  const { locale } = useLocale(DEFAULT_LOCALE);
+  const t = ONBOARDING[locale].character;
+  const nav = ONBOARDING[locale].start; // 다음 / 뒤로 labels (shared funnel copy)
+  const [step, setStep] = useState(0);
+  const TOTAL = 6;
+  const isLast = step === TOTAL - 1;
+
   return (
     <div className="animate-fade-in flex flex-1 flex-col">
-      <section className="mb-7">
-        <h2 className="text-[20px] font-medium leading-[1.4]">
-          어떤 모습으로 머무를까요
-        </h2>
-        <p className="text-sub mt-2 text-[13px] leading-[1.7]">
-          여섯 가지 항목으로 결을 잡아요.
-        </p>
+      <section className="mb-5">
+        <h2 className="text-[20px] font-medium leading-[1.4]">{t.selTitle}</h2>
+        <p className="text-sub mt-2 text-[13px] leading-[1.7]">{t.selSub}</p>
       </section>
 
-      <section className="flex flex-1 flex-col gap-7">
-        <PillRow label="성별"   options={GENDERS}     value={props.gender}    onChange={props.onGender} />
-        <PillRow label="피부톤" options={SKINS}       value={props.skin}      onChange={props.onSkin} />
-        <PillRow label="머리"   options={HAIR_STYLES} value={props.hairStyle} onChange={props.onHairStyle} />
-        <PillRow label="머리색" options={HAIR_COLORS} value={props.hairColor} onChange={props.onHairColor} />
-        <PillRow label="착장"   options={OUTFITS}     value={props.outfit}    onChange={props.onOutfit} />
-        <PillRow label="장신구" options={ACCESSORIES} value={props.accessory} onChange={props.onAccessory} />
+      {/* Step progress */}
+      <div className="mb-6 flex items-center gap-1.5">
+        {Array.from({ length: TOTAL }).map((_, i) => (
+          <span
+            key={i}
+            className={[
+              "h-1.5 rounded-full transition-all duration-300",
+              i === step ? "bg-ink w-6" : i < step ? "bg-ink/40 w-3" : "bg-line w-3",
+            ].join(" ")}
+          />
+        ))}
+        <span className="text-sub ml-auto text-[12px] tabular-nums">{step + 1} / {TOTAL}</span>
+      </div>
 
-        {/* Plaza language — sets worlds.language for the world this character
-            founds. Defaults to the user's UI locale; drives native member
-            generation + ambient language. Same pill style as the rows above. */}
-        <div>
-          <div className="text-sub mb-2.5 text-[10px] uppercase tracking-[0.22em]">
-            광장 언어
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {LOCALES.map((l) => {
-              const active = l === props.language;
-              return (
-                <button
-                  key={l}
-                  type="button"
-                  onClick={() => props.onLanguage(l)}
-                  aria-pressed={active}
-                  className={[
-                    "rounded-full border px-4 py-2 text-[13px] font-semibold transition",
-                    active
-                      ? "border-ink bg-ink text-bg"
-                      : "border-line text-sub active:bg-panel hover:border-dim",
-                  ].join(" ")}
-                >
-                  {LOCALE_LABEL[l]}
-                </button>
-              );
-            })}
-          </div>
-          <p className="text-sub mt-2 text-[11px] leading-relaxed">
-            머무는 사람들의 언어 · 나중에 광장 설정에서 바꿀 수 있어요
-          </p>
-        </div>
+      {/* One attribute per step */}
+      <section className="flex flex-1 flex-col">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={step}
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -16 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {step === 0 && <PillRow label={t.secGender}    options={GENDERS}     value={props.gender}    onChange={props.onGender} />}
+            {step === 1 && <PillRow label={t.secSkin}      options={SKINS}       value={props.skin}      onChange={props.onSkin} />}
+            {step === 2 && <PillRow label={t.secHair}      options={HAIR_STYLES} value={props.hairStyle} onChange={props.onHairStyle} />}
+            {step === 3 && <PillRow label={t.secHairColor} options={HAIR_COLORS} value={props.hairColor} onChange={props.onHairColor} />}
+            {step === 4 && <PillRow label={t.secOutfit}    options={OUTFITS}     value={props.outfit}    onChange={props.onOutfit} />}
+            {step === 5 && <PillRow label={t.secAccessory} options={ACCESSORIES} value={props.accessory} onChange={props.onAccessory} />}
+          </motion.div>
+        </AnimatePresence>
       </section>
 
       <footer className="mt-7 flex flex-col gap-3">
         <PixelButton
-          block
+          variant="primary"
           size="lg"
-          onClick={props.onGenerate}
-          disabled={!props.canGenerate}
+          block
+          onClick={isLast ? props.onRequestCreate : () => setStep(step + 1)}
         >
-          {props.canGenerate
-            ? `내 캐릭터 만들기 · 티켓 ${props.remaining}장`
-            : "티켓 소진 (결과 중 하나 선택)"}
+          {isLast ? t.selCreate : nav.next}
         </PixelButton>
-        <p className="text-sub text-center text-[11px] leading-relaxed">
-          이미지 생성엔 약 30초 · 다시 고르기 포함 총 3번까지 시도
-        </p>
+        {step > 0 && (
+          <button
+            onClick={() => setStep(step - 1)}
+            className="text-sub text-center text-[13px] active:opacity-70"
+          >
+            {nav.back}
+          </button>
+        )}
+        <p className="text-sub text-center text-[11px] leading-relaxed">{t.selHint}</p>
       </footer>
     </div>
   );
@@ -342,8 +336,11 @@ function BackLink({
   stage: Stage;
   onBack: () => void;
 }) {
+  const { locale } = useLocale(DEFAULT_LOCALE);
+  const t = ONBOARDING[locale].character;
+
   if (stage === "generating") return <span />; // reserve header space, no action
-  const label = stage === "select" ? "← 홈으로" : "← 뒤로";
+  const label = stage === "select" ? t.backHome : t.backStep;
   return (
     <button
       type="button"
@@ -365,37 +362,9 @@ function goBack(
     case "select":      router.push("/"); return;
     case "result":      setStage("select"); return;
     case "naming":      setStage("result"); return;
-    case "room-naming": setStage("naming"); return;
     case "error":       setStage("select"); return;
     case "generating":  return; // no-op
   }
-}
-
-// Small ticket counter shown in the page header during select/result stages.
-// Three dots: filled = unused tickets, empty = spent.
-function TicketChip({ remaining, max }: { remaining: number; max: number }) {
-  return (
-    <div
-      aria-label={`남은 티켓 ${remaining}장 / ${max}`}
-      className="border-line bg-surface flex items-center gap-1.5 rounded-full border px-2.5 py-1"
-    >
-      <span className="text-sub text-[10px] tracking-wide">티켓</span>
-      <span className="flex items-center gap-1">
-        {Array.from({ length: max }, (_, i) => (
-          <span
-            key={i}
-            className={
-              "block h-1.5 w-1.5 rounded-full " +
-              (i < remaining ? "bg-accent" : "bg-line")
-            }
-          />
-        ))}
-      </span>
-      <span className="text-ink ml-0.5 text-[10px] tabular-nums">
-        {remaining}/{max}
-      </span>
-    </div>
-  );
 }
 
 // Per-step duration (ms). Tuned so total ≈ 18–20s, matching typical
@@ -403,26 +372,22 @@ function TicketChip({ remaining, max }: { remaining: number; max: number }) {
 // natural ("polish" is slow). If gen finishes early, stage transitions
 // out anyway. If it's still running on the last step, the bar keeps
 // crawling toward 100% instead of standing still.
-const GEN_STEPS: { label: string; ms: number }[] = [
-  { label: "캔버스에 자리를 잡는 중",        ms: 2800 },
-  { label: "전체 골격을 세우는 중",          ms: 3000 },
-  { label: "피부 톤을 입히는 중",            ms: 3200 },
-  { label: "어울리는 옷을 골라 입히는 중",   ms: 3400 },
-  { label: "머리 모양을 정하는 중",          ms: 3600 },
-  { label: "마지막 디테일을 다듬는 중",      ms: 21000 },
-];
+const GEN_STEP_DURATIONS: number[] = [2800, 3000, 3200, 3400, 3600, 21000];
 
 function GeneratingView() {
   const [step, setStep] = useState(0);
+  const { locale } = useLocale(DEFAULT_LOCALE);
+  const t = ONBOARDING[locale].character;
 
   // Advance through steps one-by-one using the per-step duration.
   useEffect(() => {
-    if (step >= GEN_STEPS.length - 1) return; // stay on last step
-    const t = setTimeout(() => setStep((s) => s + 1), GEN_STEPS[step].ms);
-    return () => clearTimeout(t);
+    if (step >= GEN_STEP_DURATIONS.length - 1) return; // stay on last step
+    const timer = setTimeout(() => setStep((s) => s + 1), GEN_STEP_DURATIONS[step]);
+    return () => clearTimeout(timer);
   }, [step]);
 
-  const { label, ms } = GEN_STEPS[step];
+  const ms = GEN_STEP_DURATIONS[step];
+  const label = t.genSteps[step];
 
   return (
     <section className="animate-fade-in spotlight relative flex flex-1 flex-col items-center justify-center gap-10 overflow-hidden px-2">
@@ -440,7 +405,7 @@ function GeneratingView() {
             {label}
           </span>
           <span className="text-dim text-[10.5px] tracking-wide">
-            {step + 1} / {GEN_STEPS.length}
+            {step + 1} / {t.genSteps.length}
           </span>
         </div>
         <div className="bg-line h-2 w-full overflow-hidden rounded-full">
@@ -460,12 +425,11 @@ function GeneratingView() {
 
 function ResultView(props: {
   imageUrl: string;
-  remaining: number;
-  canRoll: boolean;
-  onReroll: () => void;
-  onBackToSelect: () => void;
   onConfirm: () => void;
 }) {
+  const { locale } = useLocale(DEFAULT_LOCALE);
+  const t = ONBOARDING[locale].character;
+
   return (
     <div className="animate-fade-in flex flex-1 flex-col">
       {/* Stage with theatrical lighting */}
@@ -490,26 +454,11 @@ function ResultView(props: {
       </section>
 
       <footer className="mt-3 flex flex-col gap-3">
+        {/* One-shot: the result is final — only proceed to naming. The
+            commit dialog already gave the "go back" option before generation. */}
         <PixelButton block size="lg" onClick={props.onConfirm}>
-          이 모습으로 들어가기
+          {t.resEnter}
         </PixelButton>
-
-        {props.canRoll ? (
-          <PixelButton block variant="muted" onClick={props.onReroll}>
-            다시 만들기 · {props.remaining}번 남음
-          </PixelButton>
-        ) : (
-          <PixelButton block variant="muted" disabled>
-            티켓으로 한 번 더 (잠금)
-          </PixelButton>
-        )}
-
-        <button
-          onClick={props.onBackToSelect}
-          className="text-sub hover:text-ink mt-1 text-center text-[11px] underline-offset-4 transition hover:underline"
-        >
-          다시 고르기
-        </button>
       </footer>
     </div>
   );
@@ -519,6 +468,8 @@ function NamingView(props: { imageUrl: string; onDone: () => void }) {
   const [name, setName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const { locale } = useLocale(DEFAULT_LOCALE);
+  const t = ONBOARDING[locale].character;
 
   const trimmed = name.trim();
   const valid = trimmed.length >= 1 && trimmed.length <= 12;
@@ -532,8 +483,8 @@ function NamingView(props: { imageUrl: string; onDone: () => void }) {
     if (error) {
       setErr(
         error.toLowerCase().includes("duplicate")
-          ? "이미 누군가 쓰고 있어요"
-          : "지금은 저장이 어려워요",
+          ? t.nameErrDup
+          : t.nameErrSave,
       );
       return;
     }
@@ -563,10 +514,10 @@ function NamingView(props: { imageUrl: string; onDone: () => void }) {
       <section className="mt-3 space-y-4 px-1">
         <div className="space-y-1.5">
           <h2 className="text-ink text-[18px] font-medium">
-            어떻게 불릴까요
+            {t.nameTitle}
           </h2>
           <p className="text-sub text-[12.5px] leading-relaxed">
-            세계에서 당신을 부르는 이름. 1–12자.
+            {t.nameSub}
           </p>
         </div>
 
@@ -578,7 +529,7 @@ function NamingView(props: { imageUrl: string; onDone: () => void }) {
               setName(e.target.value.slice(0, 12));
               setErr(null);
             }}
-            placeholder="이름…"
+            placeholder={t.namePlaceholder}
             maxLength={12}
             autoFocus
             className="text-ink placeholder:text-dim flex-1 bg-transparent text-[14px] outline-none"
@@ -601,112 +552,10 @@ function NamingView(props: { imageUrl: string; onDone: () => void }) {
           disabled={!valid || submitting}
           onClick={submit}
         >
-          {submitting ? "들어가는 중…" : "이 이름으로 들어가기"}
+          {submitting ? t.nameSubmitting : t.nameSubmit}
         </PixelButton>
         <p className="text-sub text-center text-[11px]">
-          이름은 나중에 설정에서 바꿀 수 있어요
-        </p>
-      </footer>
-    </div>
-  );
-}
-
-function RoomNamingView(props: { imageUrl: string; onDone: () => void }) {
-  const [name, setName] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const bucket = currentBucket().id;
-  const plazaBg = `/sprites/rooms/states/empty_${bucket}.png`;
-
-  const trimmed = name.trim();
-  const valid = trimmed.length >= 1 && trimmed.length <= 16;
-
-  async function submit() {
-    if (!valid || submitting) return;
-    setSubmitting(true);
-    setErr(null);
-    try {
-      const sb = browserClient();
-      const { data: sess } = await sb.auth.getSession();
-      if (!sess.session) throw new Error("세션이 끊겼어요");
-      const r = await fetch("/api/world/name", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${sess.session.access_token}`,
-        },
-        body: JSON.stringify({ name: trimmed }),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error ?? "이름 설정 실패");
-      props.onDone();
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "오류");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <div className="animate-fade-in flex flex-1 flex-col">
-      {/* Plaza preview — the world they're about to name */}
-      <section className="border-line relative my-2 overflow-hidden rounded-xl border" style={{ aspectRatio: "3 / 2" }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={plazaBg}
-          alt="광장 미리보기"
-          className="absolute inset-0 h-full w-full object-cover"
-          draggable={false}
-        />
-        {/* Soft vignette so the heading remains legible over bright bgs */}
-        <div className="from-bg/55 pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t to-transparent" />
-      </section>
-
-      <section className="mt-3 space-y-4 px-1">
-        <div className="space-y-1.5">
-          <h2 className="text-ink text-[18px] font-medium">
-            이 세계의 이름을 정해주세요
-          </h2>
-          <p className="text-sub text-[12.5px] leading-relaxed">
-            당신만의 작은 사회. 나중에 바꿀 수 있어요.
-          </p>
-        </div>
-
-        <div className="border-line bg-surface flex items-center rounded-full border px-4 py-3">
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value.slice(0, 16));
-              setErr(null);
-            }}
-            placeholder="예) 새벽 광장, 비 오는 카페…"
-            maxLength={16}
-            autoFocus
-            className="text-ink placeholder:text-dim flex-1 bg-transparent text-[14px] outline-none"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && valid) submit();
-            }}
-          />
-          <span className="text-dim ml-2 text-[10.5px] tabular-nums">
-            {trimmed.length} / 16
-          </span>
-        </div>
-
-        {err && <p className="text-accent text-[11.5px]">{err}</p>}
-      </section>
-
-      <footer className="mt-auto flex flex-col gap-2.5 pb-2">
-        <PixelButton
-          block
-          size="lg"
-          disabled={!valid || submitting}
-          onClick={submit}
-        >
-          {submitting ? "들어가는 중…" : "이 세계로 들어가기"}
-        </PixelButton>
-        <p className="text-sub text-center text-[11px] leading-relaxed">
-          처음엔 아무도 없어요 · 잠시 후 한 명씩 들어옵니다
+          {t.nameHint}
         </p>
       </footer>
     </div>
@@ -714,16 +563,19 @@ function RoomNamingView(props: { imageUrl: string; onDone: () => void }) {
 }
 
 function ErrorView(props: { message: string; onRetry: () => void; onBack: () => void }) {
+  const { locale } = useLocale(DEFAULT_LOCALE);
+  const t = ONBOARDING[locale].character;
+
   return (
     <section className="animate-fade-in flex flex-1 flex-col items-center justify-center gap-5">
       <p className="text-sub text-center text-[14px] leading-[1.7]">
-        지금은 잘 안 만들어져요.
+        {t.errMsg}
         <br />
         <span className="text-dim mt-1 inline-block text-[11px]">{props.message}</span>
       </p>
       <div className="flex gap-3">
-        <PixelButton onClick={props.onRetry}>다시 시도</PixelButton>
-        <PixelButton variant="muted" onClick={props.onBack}>돌아가기</PixelButton>
+        <PixelButton onClick={props.onRetry}>{t.errRetry}</PixelButton>
+        <PixelButton variant="muted" onClick={props.onBack}>{t.errBack}</PixelButton>
       </div>
     </section>
   );
@@ -737,6 +589,8 @@ function PillRow<T extends string>(props: {
   value: T;
   onChange: (v: T) => void;
 }) {
+  const { locale } = useLocale(DEFAULT_LOCALE);
+
   return (
     <div>
       <div className="text-sub mb-2.5 text-[10px] uppercase tracking-[0.22em]">
@@ -756,7 +610,7 @@ function PillRow<T extends string>(props: {
                   : "border-line text-sub active:bg-panel hover:border-dim",
               ].join(" ")}
             >
-              {opt.label}
+              {OPTION_LABELS[locale][opt.id] ?? opt.label}
             </button>
           );
         })}

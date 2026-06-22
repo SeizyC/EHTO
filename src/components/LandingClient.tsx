@@ -40,7 +40,7 @@ export function LandingClient({ initialLocale }: { initialLocale: Locale }) {
           </div>
 
           <div>
-            <PixelLink href="/signup" size="lg" block className="font-pixel">
+            <PixelLink href="/start" size="lg" block className="font-pixel">
               {t.cta}
             </PixelLink>
           </div>

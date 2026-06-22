@@ -8,6 +8,7 @@ import { banMember, useMembers } from "@/lib/members-store";
 import { CURATED_KPOP_ARTISTS, type WorldBias } from "@/lib/world-bias";
 import { browserClient } from "@/lib/supabase";
 import { LOCALES, LOCALE_LABEL, type Locale } from "@/lib/about-content";
+import { InvitePanel } from "@/components/InvitePanel";
 
 type Props = {
   open: boolean;
@@ -67,6 +68,8 @@ export function RoomInfoSheet({ open, onClose }: Props) {
                   tags={world.tags ?? []}
                 />
               )}
+
+              {world?.owner && <InvitePanel open={open} />}
 
               {/* Owner-only: 세계 정체성 (bias). v1 supports K-pop +
                   artist; planted in the system prompt and as extra news
