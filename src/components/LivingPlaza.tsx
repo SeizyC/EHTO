@@ -13,10 +13,10 @@ import type { Locale } from "@/lib/about-content";
 
 const ROOM = "/sprites/rooms";
 const SCENES = {
-  morning: `${ROOM}/states/empty_morning.png`,
-  afternoon: `${ROOM}/states/empty_afternoon.png`,
-  evening: `${ROOM}/states/empty_evening.png`,
-  night: `${ROOM}/states/empty_night.png`,
+  morning: `${ROOM}/states/empty_morning.land.webp`,
+  afternoon: `${ROOM}/states/empty_afternoon.land.webp`,
+  evening: `${ROOM}/states/empty_evening.land.webp`,
+  night: `${ROOM}/states/empty_night.land.webp`,
 } as const;
 type Scene = keyof typeof SCENES;
 
@@ -52,26 +52,26 @@ function Shadow({ opacity }: { opacity: number }) {
 
 type Obj = { key: string; src: string; x: number; y: number; h: number; flip?: boolean };
 const OBJECTS: Obj[] = [
-  { key: "tree-l", src: `${ROOM}/objects/tree.png`, x: 14, y: 52, h: 27 },
-  { key: "tree-r", src: `${ROOM}/objects/tree.png`, x: 87, y: 50, h: 27, flip: true },
-  { key: "lamp", src: `${ROOM}/objects/lamp.png`, x: 72, y: 45, h: 26 },
-  { key: "fountain", src: `${ROOM}/objects/fountain.png`, x: 50, y: 31, h: 28 },
-  { key: "bench-l", src: `${ROOM}/objects/bench.png`, x: 13, y: 13, h: 13 },
-  { key: "bench-r", src: `${ROOM}/objects/bench.png`, x: 88, y: 12, h: 13, flip: true },
+  { key: "tree-l", src: `${ROOM}/objects/tree.land.webp`, x: 14, y: 52, h: 27 },
+  { key: "tree-r", src: `${ROOM}/objects/tree.land.webp`, x: 87, y: 50, h: 27, flip: true },
+  { key: "lamp", src: `${ROOM}/objects/lamp.land.webp`, x: 72, y: 45, h: 26 },
+  { key: "fountain", src: `${ROOM}/objects/fountain.land.webp`, x: 50, y: 31, h: 28 },
+  { key: "bench-l", src: `${ROOM}/objects/bench.land.webp`, x: 13, y: 13, h: 13 },
+  { key: "bench-r", src: `${ROOM}/objects/bench.land.webp`, x: 88, y: 12, h: 13, flip: true },
 ];
 
-const DOG = { src: `${ROOM}/objects/dog_maltese_wagging.png`, x: 24, y: 3, h: 8 };
+const DOG = { src: `${ROOM}/objects/dog_maltese_wagging.land.webp`, x: 24, y: 3, h: 8 };
 
 type Fig = { src: string; y: number; h: number; dur: number; start: number; min: number; max: number };
 // Two far-back residents cross the rear walkway (their lanes span the centre
 // so they pass BEHIND the fountain via depth order). Rest are mid/front.
 const FIGURES: Fig[] = [
-  { src: "/sprites/hero/test_01.png", y: 43, h: 11, dur: 3.2, start: 30, min: 18, max: 52 }, // far-back (behind fountain)
-  { src: "/sprites/hero/test_05.png", y: 41, h: 11, dur: 3.4, start: 64, min: 48, max: 82 }, // far-back (behind fountain)
-  { src: "/sprites/hero/test_02.png", y: 16, h: 14, dur: 2.6, start: 22, min: 16, max: 40 }, // mid-left
-  { src: "/sprites/hero/test_04.png", y: 15, h: 14, dur: 2.9, start: 64, min: 56, max: 80 }, // mid-right
-  { src: "/sprites/hero/test_03.png", y: 5, h: 17, dur: 2.4, start: 44, min: 34, max: 52 }, // front-left
-  { src: "/sprites/hero/test_01.png", y: 4, h: 17, dur: 2.6, start: 64, min: 56, max: 74 }, // front-right
+  { src: "/sprites/hero/test_01.land.webp", y: 43, h: 11, dur: 3.2, start: 30, min: 18, max: 52 }, // far-back (behind fountain)
+  { src: "/sprites/hero/test_05.land.webp", y: 41, h: 11, dur: 3.4, start: 64, min: 48, max: 82 }, // far-back (behind fountain)
+  { src: "/sprites/hero/test_02.land.webp", y: 16, h: 14, dur: 2.6, start: 22, min: 16, max: 40 }, // mid-left
+  { src: "/sprites/hero/test_04.land.webp", y: 15, h: 14, dur: 2.9, start: 64, min: 56, max: 80 }, // mid-right
+  { src: "/sprites/hero/test_03.land.webp", y: 5, h: 17, dur: 2.4, start: 44, min: 34, max: 52 }, // front-left
+  { src: "/sprites/hero/test_01.land.webp", y: 4, h: 17, dur: 2.6, start: 64, min: 56, max: 74 }, // front-right
 ];
 
 // Ambient chat lines + video shares, localized to the visitor's locale so the

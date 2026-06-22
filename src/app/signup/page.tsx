@@ -80,7 +80,7 @@ export default function SignupPage() {
       <header className="flex items-start justify-between">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/logo_ehto_wordmark.png"
+          src="/logo_ehto_wordmark.webp"
           alt="EHTO"
           width={170}
           height={66}

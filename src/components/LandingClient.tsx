@@ -16,10 +16,10 @@ export function LandingClient({ initialLocale }: { initialLocale: Locale }) {
       <header className="mx-auto flex w-full max-w-[680px] items-start justify-between px-6 pt-7">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/logo_ehto_wordmark.png"
+          src="/logo_ehto_wordmark.webp"
           alt="EHTO"
-          width={92}
-          height={36}
+          width={78}
+          height={30}
           className="pixelated"
           draggable={false}
         />
