@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { Locale } from "@/lib/about-content";
+import { type Scene, sceneForHour } from "@/lib/plaza-scene";
 
 // Landing hero: a layered, living plaza built from sprites (no buildings).
 // Empty tiled floor (time-of-day by local hour) + furniture sprites
@@ -18,15 +19,6 @@ const SCENES = {
   evening: `${ROOM}/states/empty_evening.land.webp`,
   night: `${ROOM}/states/empty_night.land.webp`,
 } as const;
-type Scene = keyof typeof SCENES;
-
-function sceneForHour(h: number): Scene {
-  if (h >= 5 && h < 10) return "morning";
-  if (h >= 10 && h < 17) return "afternoon";
-  if (h >= 17 && h < 20) return "evening";
-  return "night";
-}
-
 function shadowFor(scene: Scene): number {
   if (scene === "night") return 0;
   if (scene === "evening") return 0.13;
@@ -264,8 +256,11 @@ function MusicCard({ locale }: { locale: Locale }) {
   );
 }
 
-export function LivingPlaza({ locale }: { locale: Locale }) {
-  const [scene, setScene] = useState<Scene>("afternoon");
+export function LivingPlaza({ locale, initialScene = "afternoon" }: { locale: Locale; initialScene?: Scene }) {
+  // Server picks the scene from the visitor's country so SSR renders the right
+  // background up front (no LCP-hurting swap). The client then corrects to the
+  // device's real local hour — a no-op (same src, no reload) when it matches.
+  const [scene, setScene] = useState<Scene>(initialScene);
   useEffect(() => {
     setScene(sceneForHour(new Date().getHours()));
   }, []);

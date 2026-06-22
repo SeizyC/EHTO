@@ -6,8 +6,9 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { LangToggle } from "@/components/LangToggle";
 import { useLocale } from "@/lib/use-locale";
 import { LANDING, type Locale } from "@/lib/about-content";
+import type { Scene } from "@/lib/plaza-scene";
 
-export function LandingClient({ initialLocale }: { initialLocale: Locale }) {
+export function LandingClient({ initialLocale, initialScene }: { initialLocale: Locale; initialScene?: Scene }) {
   const { locale, pick } = useLocale(initialLocale);
   const t = LANDING[locale];
 
@@ -27,7 +28,7 @@ export function LandingClient({ initialLocale }: { initialLocale: Locale }) {
       </header>
 
       <div className="flex flex-1 flex-col justify-center gap-8 pb-4">
-        <LivingPlaza locale={locale} />
+        <LivingPlaza locale={locale} initialScene={initialScene} />
 
         <section className="mx-auto w-full max-w-[680px] space-y-7 px-6">
           <div className="animate-fade-up space-y-4">

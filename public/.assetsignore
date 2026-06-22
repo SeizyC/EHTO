@@ -1,0 +1,4 @@
+# Files here are copied into the OpenNext asset bundle but excluded from the
+# Cloudflare upload by wrangler. Keeps cruft out of the deployed asset list.
+.DS_Store
+**/.DS_Store

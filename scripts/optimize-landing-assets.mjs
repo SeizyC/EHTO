@@ -12,7 +12,8 @@ const PUB = path.resolve("public");
 // [src, out, { width | height }] — target ~2x the max on-screen size.
 const JOBS = [
   // Wordmark: max display 170x66 (login/signup). 512w covers 3x.
-  ["logo_ehto_wordmark.png", "logo_ehto_wordmark.webp", { width: 512 }],
+  // Master lives in assets-src/ (kept out of public/ so it isn't deployed).
+  ["../assets-src/masters/logo_ehto_wordmark.png", "logo_ehto_wordmark.webp", { width: 512 }],
   // Scene backgrounds: rendered ≤680px wide. 1024w is ample.
   ["sprites/rooms/states/empty_morning.png", "sprites/rooms/states/empty_morning.land.webp", { width: 1024 }],
   ["sprites/rooms/states/empty_afternoon.png", "sprites/rooms/states/empty_afternoon.land.webp", { width: 1024 }],
