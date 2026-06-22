@@ -114,6 +114,8 @@ function PlazaObject({ o, shadow }: { o: Obj; shadow: number }) {
         src={o.src}
         alt=""
         draggable={false}
+        // decorative — keep off the LCP preload flood so the scene image wins
+        loading="lazy"
         className="pixelated h-full w-auto object-contain object-bottom"
         style={o.flip ? { transform: "scaleX(-1)" } : undefined}
       />
@@ -163,6 +165,7 @@ function Resident({ fig, bubbles, shadow }: { fig: Fig; bubbles: Bubble[]; shado
           src={fig.src}
           alt=""
           draggable={false}
+          loading="lazy"
           className="pixelated h-full w-auto object-contain object-bottom"
           // right = default sprite; left = mirrored
           style={{ transform: `scaleX(${faceRight ? 1 : -1})` }}
@@ -217,6 +220,7 @@ function Dog({ shadow }: { shadow: number }) {
         src={DOG.src}
         alt=""
         draggable={false}
+        loading="lazy"
         className="pixelated h-full w-auto object-contain object-bottom"
       />
     </motion.div>
