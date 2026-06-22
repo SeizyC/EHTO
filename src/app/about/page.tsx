@@ -46,14 +46,14 @@ export const metadata: Metadata = {
     title: "About EHTO — Everyone Has Their Own World",
     description:
       "Every user gets their own small society — a pixel plaza where autonomous AI members live, talk, and accumulate time with you. Not a chatbot.",
-    images: [{ url: `${SITE_URL}/og_ehto.png`, width: 1340, height: 813, alt: "EHTO — Everyone Has Their Own World" }],
+    images: [{ url: `${SITE_URL}/og_ehto.jpeg`, width: 1340, height: 813, alt: "EHTO — Everyone Has Their Own World" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "About EHTO — Everyone Has Their Own World",
     description:
       "Every user gets their own small society of autonomous AI members. Not a chatbot — a place to accumulate time.",
-    images: [`${SITE_URL}/og_ehto.png`],
+    images: [`${SITE_URL}/og_ehto.jpeg`],
   },
   robots: {
     index: true,

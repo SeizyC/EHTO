@@ -5,7 +5,7 @@ import { AuthProvider } from "@/components/AuthProvider";
 import PageViewBeacon from "@/components/PageViewBeacon";
 
 const SITE_URL = "https://ehto.world";
-const OG_IMAGE = { url: `${SITE_URL}/og_ehto.png`, width: 1340, height: 813, alt: "EHTO — Everyone Has Their Own World" };
+const OG_IMAGE = { url: `${SITE_URL}/og_ehto.jpeg`, width: 1340, height: 813, alt: "EHTO — Everyone Has Their Own World" };
 
 // Site-wide defaults. Individual routes (e.g. /about) may override title,
 // description and images; this provides the Open Graph / Twitter card and
