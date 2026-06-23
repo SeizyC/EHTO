@@ -34,10 +34,11 @@ const SEED: Seed[] = [
   { category: "pet", h: 6, label: "고양이", topics: ["반려", "귀여움", "쉼"], desc: "a small orange tabby cat sitting" },
 ];
 
-// Trim the edge frame AND output webp — sharp-re-encoded PNGs blow past the
-// storage bucket's file-size limit (and bloat the plaza), webp is ~1/10 with
-// transparency intact.
-async function trimToWebp(buf: Buffer): Promise<Buffer> {
+// Trim the edge frame AND output a PALETTE png — the bucket only allows
+// image/png and caps files at 2MB; sharp's full-colour PNG re-encode blows
+// past that, so we quantize to a 256-colour palette PNG (~hundreds of KB,
+// transparency intact).
+async function trimToPng(buf: Buffer): Promise<Buffer> {
   const m = await sharp(buf).metadata();
   const W = m.width ?? 0, H = m.height ?? 0;
   const ring = W && H ? Math.max(4, Math.round(W * 0.006)) : 0;
@@ -47,12 +48,12 @@ async function trimToWebp(buf: Buffer): Promise<Buffer> {
       .extract({ left: ring, top: ring, width: W - 2 * ring, height: H - 2 * ring })
       .extend({ top: ring, bottom: ring, left: ring, right: ring, background: { r: 0, g: 0, b: 0, alpha: 0 } });
   }
-  return pipe.webp({ quality: 85 }).toBuffer();
+  return pipe.png({ palette: true, quality: 90, compressionLevel: 9, effort: 10 }).toBuffer();
 }
 
-async function uploadWebp(sb: ReturnType<typeof serviceClient>, buf: Buffer): Promise<string | null> {
-  const path = `objects/curated/${randomUUID()}.webp`;
-  const { error } = await sb.storage.from("characters").upload(path, buf, { contentType: "image/webp", upsert: false });
+async function uploadPng(sb: ReturnType<typeof serviceClient>, buf: Buffer): Promise<string | null> {
+  const path = `objects/curated/${randomUUID()}.png`;
+  const { error } = await sb.storage.from("characters").upload(path, buf, { contentType: "image/png", upsert: false });
   if (error) { console.warn("upload:", error.message); return null; }
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/characters/${path}`;
 }
@@ -68,8 +69,8 @@ async function main() {
     try {
       const png = await generateObjectSpriteBytes(s.desc, apiKey, s.category);
       if (!png) { console.warn(`✗ gen failed: ${s.label}`); continue; }
-      const webp = await trimToWebp(png);
-      const url = await uploadWebp(sb, webp);
+      const trimmed = await trimToPng(png);
+      const url = await uploadPng(sb, trimmed);
       if (!url) { console.warn(`✗ upload failed: ${s.label}`); continue; }
       const typeKey = `cur_${createHash("sha256").update(randomUUID()).digest("hex").slice(0, 16)}`;
       const created = await insertObjectType(sb, {

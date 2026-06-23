@@ -40,10 +40,10 @@ async function main() {
         .ensureAlpha()
         .extract({ left: ring, top: ring, width: W - 2 * ring, height: H - 2 * ring })
         .extend({ top: ring, bottom: ring, left: ring, right: ring, background: { r: 0, g: 0, b: 0, alpha: 0 } })
-        .webp({ quality: 85 }) // webp: sharp-re-encoded PNG blows past the bucket size limit
+        .png({ palette: true, quality: 90, compressionLevel: 9, effort: 10 }) // palette PNG: bucket allows only image/png ≤2MB
         .toBuffer();
-      const path = `objects/curated/${randomUUID()}.webp`;
-      const up = await sb.storage.from(BUCKET).upload(path, out, { contentType: "image/webp", upsert: false });
+      const path = `objects/curated/${randomUUID()}.png`;
+      const up = await sb.storage.from(BUCKET).upload(path, out, { contentType: "image/png", upsert: false });
       if (up.error) { console.warn("upload fail", id, up.error.message); continue; }
       const newUrl = `${base}/storage/v1/object/public/${BUCKET}/${path}`;
       const upd = await sb.from("object_variants").update({ sprite_url: newUrl }).eq("id", id);
