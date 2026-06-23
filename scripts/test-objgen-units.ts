@@ -13,6 +13,10 @@ const skyP = buildObjectPromptForTest("a balloon", "sky");
 assert.ok(propP.includes("street furniture"));
 assert.ok(skyP.includes("floating"));
 assert.ok(!skyP.includes("rests on the bottom edge"));
+// sky = flying side profile; ground = isometric above-front
+assert.ok(skyP.includes("side-profile"));
+assert.ok(propP.includes("isometric"));
+assert.ok(!skyP.includes("isometric"));
 
 console.log("✅ objgen units pass");
 

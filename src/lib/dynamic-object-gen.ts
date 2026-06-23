@@ -148,14 +148,20 @@ export async function composeObject(
 }
 
 function buildObjectPrompt(description: string, category: Category = "landmark"): string {
+  // Sky objects (plane/bird/cloud/balloon) are shown FLYING, so they need a
+  // level side profile — NOT the ground objects' isometric 3/4 above-front view.
+  const viewLine =
+    category === "sky"
+      ? "pixel art, level side-profile view seen straight-on at eye level, flying/drifting horizontally to the right,"
+      : "isometric pixel art, 3/4 perspective view from above-front,";
   const groundLine =
     category === "sky"
-      ? "transparent background, floating, no ground,"
+      ? "transparent background, floating in open air, no ground,"
       : "the object fills most of the frame and rests on the bottom edge, minimal empty margin, transparent background, no ground, no floor,";
   return [
     `A single isolated ${description},`,
     `${CATEGORY_CUE[category]},`,
-    "isometric pixel art, 3/4 perspective view from above-front,",
+    viewLine,
     "painterly soft pixel art style matching Stardew Valley town and Habbo plaza aesthetic,",
     "soft 1px outline edges, chunky readable proportions,",
     "one single object, the entire object fully in frame and not cropped,",
