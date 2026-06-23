@@ -11,7 +11,7 @@
 // store realtime channel for live updates (works because the plaza is
 // public).
 
-import { use, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { PlazaCanvas, type PlazaCharacter } from "@/components/PlazaCanvas";
@@ -57,9 +57,9 @@ const PLAZA_H = 1600;
 export default function VisitorPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }) {
-  const { id } = use(params);
+  const { id } = params;
   const [data, setData] = useState<VisitorPayload | null>(null);
   const [err, setErr] = useState<string | null>(null);
 

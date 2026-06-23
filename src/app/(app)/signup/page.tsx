@@ -11,6 +11,7 @@ import { useLocale } from "@/lib/use-locale";
 import { DEFAULT_LOCALE } from "@/lib/about-content";
 import { LangToggle } from "@/components/LangToggle";
 import { ONBOARDING } from "@/lib/onboarding-content";
+import { SessionRedirectModal } from "@/components/SessionRedirectModal";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export default function SignupPage() {
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [redirectPath, setRedirectPath] = useState<string | null>(null);
   // Track that this mount initiated a signup so the session effect below
   // doesn't race the manual router.replace to /character.
   const justSignedUp = useRef(false);
@@ -36,10 +38,10 @@ export default function SignupPage() {
     let cancelled = false;
     (async () => {
       const path = await landingPathForSession(session.access_token);
-      if (!cancelled) router.replace(path);
+      if (!cancelled) setRedirectPath(path);
     })();
     return () => { cancelled = true; };
-  }, [sessLoading, session, router]);
+  }, [sessLoading, session]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -77,6 +79,7 @@ export default function SignupPage() {
 
   return (
     <main className="grain mx-auto flex min-h-dvh max-w-[420px] flex-col px-6 pb-10 pt-10">
+      {redirectPath && <SessionRedirectModal path={redirectPath} />}
       <header className="flex items-start justify-between">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img

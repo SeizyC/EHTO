@@ -11,6 +11,7 @@ import { useLocale } from "@/lib/use-locale";
 import { DEFAULT_LOCALE } from "@/lib/about-content";
 import { LangToggle } from "@/components/LangToggle";
 import { ONBOARDING } from "@/lib/onboarding-content";
+import { SessionRedirectModal } from "@/components/SessionRedirectModal";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,23 +20,23 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [redirectPath, setRedirectPath] = useState<string | null>(null);
 
   const { locale, pick } = useLocale(DEFAULT_LOCALE);
   const t = ONBOARDING[locale].login;
 
   useEffect(() => {
-    // Already-signed-in visit: resolve destination here (LS first, then
-    // /api/character/me) and replace directly. Routing through /character
-    // first caused a visible flash of the creation screen on returning
-    // users.
+    // Already-signed-in visit: resolve the destination, then show a brief
+    // "이미 로그인되어 있어요" modal before moving — rather than flashing the
+    // empty login form and silently redirecting.
     if (sessLoading || !session) return;
     let cancelled = false;
     (async () => {
       const path = await landingPathForSession(session.access_token);
-      if (!cancelled) router.replace(path);
+      if (!cancelled) setRedirectPath(path);
     })();
     return () => { cancelled = true; };
-  }, [sessLoading, session, router]);
+  }, [sessLoading, session]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -59,6 +60,7 @@ export default function LoginPage() {
 
   return (
     <main className="grain mx-auto flex min-h-dvh max-w-[420px] flex-col px-6 pb-10 pt-10">
+      {redirectPath && <SessionRedirectModal path={redirectPath} />}
       <header className="flex items-start justify-between">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { browserClient } from "@/lib/supabase";
 import { EHTO_ACTIONS } from "@/lib/ehto";
 import type { EhtoAction } from "@/lib/ehto";
+import { EhtoPurchaseModal } from "@/components/EhtoPurchaseModal";
 
 // EHTO currency wallet for the /me sheet. Lists the EHTO action catalog with
 // the user's current balance. Tappable rows spend EHTO via the spend API.
@@ -13,6 +14,7 @@ export function EhtoWallet() {
   const router = useRouter();
   const [balance, setBalance] = useState<number | null>(null);
   const [busy, setBusy] = useState<EhtoAction | null>(null);
+  const [buyOpen, setBuyOpen] = useState(false);
 
   async function fetchBalance() {
     try {
@@ -82,22 +84,22 @@ export function EhtoWallet() {
 
   return (
     <div className="mt-6 px-6">
-      {/* Header: label + balance */}
-      <div className="mb-1 flex items-center justify-between">
+      {/* Header: label + balance. Tap the balance → EHTO 구입 modal. */}
+      <div className="mb-4 flex items-center justify-between">
         <p className="text-sub text-[11.5px]">EHTO</p>
-        {balance !== null && (
-          <span
-            className="tabular-nums text-[13px] font-semibold"
-            style={balance > 0 ? { color: "#E89B6C" } : undefined}
-          >
-            {balance > 0 ? (
-              <span style={{ color: "#E89B6C" }}>◆ {balance}</span>
-            ) : (
-              <span className="text-dim">◆ {balance}</span>
-            )}
+        <button
+          onClick={() => setBuyOpen(true)}
+          aria-label="EHTO 구입"
+          className="border-line flex items-center gap-1.5 rounded-full border px-2.5 py-1 transition active:bg-panel"
+        >
+          <span className="tabular-nums text-[13px] font-semibold" style={{ color: "#E89B6C" }}>
+            ◆ {balance ?? "—"}
           </span>
-        )}
+          <span className="text-sub text-[11px]">＋ 구입</span>
+        </button>
       </div>
+
+      <EhtoPurchaseModal open={buyOpen} onClose={() => { setBuyOpen(false); fetchBalance(); }} />
 
       <ul className="flex flex-col">
         {EHTO_ACTIONS.map((a) => {
