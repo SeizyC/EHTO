@@ -3,8 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { PlazaCanvas, type PlazaCharacter } from "@/components/PlazaCanvas";
-import { PLAZA_PRESETS, type PlazaState } from "@/lib/plaza-objects";
+import { PLAZA_PRESETS, type PlazaState, type PlazaObject } from "@/lib/plaza-objects";
 import { currentBucket } from "@/lib/time-of-day";
+import { browserClient } from "@/lib/supabase";
+import type { ObjectType } from "@/lib/object-catalog";
 
 const TIME_BUCKETS = [
   { id: "dawn",      label: "새벽" },
@@ -29,8 +31,48 @@ export default function DemoPlaza() {
   const [presetKey, setPresetKey] = useState<keyof typeof PLAZA_PRESETS>("empty");
   const [bucket, setBucket] = useState<string>(currentBucket().id);
   const [showChars, setShowChars] = useState(true);
+  // "전체 카탈로그" mode: lay out every DB object type (static + curated) by
+  // category depth band, so curated objects can be eyeballed in-scene without
+  // waiting for plaza-grow milestone gates. Admin-only fetch.
+  const [catalog, setCatalog] = useState<PlazaState | null>(null);
+  const [loadingCat, setLoadingCat] = useState(false);
 
-  const state: PlazaState = PLAZA_PRESETS[presetKey].state;
+  async function loadCatalog() {
+    setLoadingCat(true);
+    try {
+      const sb = browserClient();
+      const { data } = await sb.auth.getSession();
+      const r = await fetch("/api/admin/objects", {
+        headers: data.session ? { Authorization: `Bearer ${data.session.access_token}` } : {},
+      });
+      const j = await r.json();
+      const types: ObjectType[] = j.types ?? [];
+      const BAND_Y: Record<string, number> = { sky: 34, building: 60, landmark: 70, prop: 82, pet: 86 };
+      const groups: Record<string, ObjectType[]> = {};
+      for (const t of types) (groups[t.category] ??= []).push(t);
+      const objects: PlazaObject[] = [];
+      for (const [cat, list] of Object.entries(groups)) {
+        const y = BAND_Y[cat] ?? 80;
+        list.forEach((t, i) => {
+          const x = list.length === 1 ? 50 : 8 + (84 * i) / (list.length - 1);
+          objects.push({
+            id: t.id,
+            type: t.typeKey,
+            x,
+            y,
+            spriteUrl: t.variants[0]?.spriteUrl ?? null,
+            nativeHeightPct: t.nativeHeightPct,
+            labelKo: t.labelKo,
+          });
+        });
+      }
+      setCatalog({ objects });
+    } finally {
+      setLoadingCat(false);
+    }
+  }
+
+  const state: PlazaState = catalog ?? PLAZA_PRESETS[presetKey].state;
   // Empty plaza bgs per time-of-day — objects layer on top cleanly without
   // duplicating baked-in furniture (unlike the full plaza_*.png variants).
   const bgPath = `/sprites/rooms/states/empty_${bucket}.png`;
@@ -67,12 +109,15 @@ export default function DemoPlaza() {
           {Object.entries(PLAZA_PRESETS).map(([key, preset]) => (
             <Pill
               key={key}
-              active={key === presetKey}
-              onClick={() => setPresetKey(key as keyof typeof PLAZA_PRESETS)}
+              active={key === presetKey && !catalog}
+              onClick={() => { setCatalog(null); setPresetKey(key as keyof typeof PLAZA_PRESETS); }}
             >
               {preset.label}
             </Pill>
           ))}
+          <Pill active={!!catalog} onClick={loadCatalog}>
+            {loadingCat ? "불러오는 중…" : "전체 카탈로그"}
+          </Pill>
         </ControlRow>
 
         <ControlRow label="시간대">
