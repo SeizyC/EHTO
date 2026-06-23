@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { OBJECT_CATALOG, type PlazaObjectType, type PlazaState } from "@/lib/plaza-objects";
 import { currentBucket, type TimeBucket } from "@/lib/time-of-day";
 import { hasEmbed, renderMessage } from "@/lib/message-render";
+import { AtmosphereLayer } from "@/components/plaza/AtmosphereLayer";
 
 // Shell that adds the downward-pointing triangle tail under any bubble.
 // Used by both the idle name tag and the active message bubble so the
@@ -423,6 +424,9 @@ export function PlazaCanvas({
         className="absolute inset-0 h-full w-full object-cover"
         draggable={false}
       />
+
+      {/* Time-of-day atmosphere over the sky band, behind every item. */}
+      <AtmosphereLayer bucket={bucket} />
 
       {/* click ripple feedback */}
       {ripple && (
