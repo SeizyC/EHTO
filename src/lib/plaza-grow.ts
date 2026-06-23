@@ -15,6 +15,34 @@ import { aggregateImplicit } from "@/lib/implicit-pref";
 import { catalogAll, catalogByTypeKey, pickRandomVariant, type ObjectType } from "@/lib/object-catalog";
 import { tryGenerateDynamicType, tryGenerateVariant } from "@/lib/dynamic-object-gen";
 
+// Depth bands (taxonomy spec §3). Placement y is clamped into the band so
+// a milestone's slot can never escape its layer: buildings sit at the back
+// (behind characters via PlazaCanvas's y-sort), landmarks mid, props/pets
+// up front where people roam.
+type Band = "back" | "mid" | "front";
+type Tier = "prop" | "landmark" | "building" | "pet";
+const BAND_Y: Record<Band, [number, number]> = {
+  back: [38, 52],   // building band — top of the floor, renders behind people
+  mid: [52, 66],    // landmark band
+  front: [66, 82],  // prop / pet / people band
+};
+// Representative size (native_height_pct) per tier — used when matching
+// curated catalog objects / driving generation for a slot, replacing the
+// old "size derived from the static default type" approach.
+const HEIGHT_BY_TIER: Record<Tier, number> = { prop: 14, landmark: 32, building: 60, pet: 4.5 };
+function clampToBand(y: number, band: Band): number {
+  const [lo, hi] = BAND_Y[band];
+  return Math.min(hi, Math.max(lo, y));
+}
+// "Special building" gate (spec §4): the back slot is the biggest, most
+// expensive piece, so it only fills when the user's top implicit topic is
+// strong/persistent. Below this it stays empty (the skyline fills the back
+// once that layer ships). Tunable.
+const T_BUILDING = 2;
+function passesBuildingGate(topTopicWeight: number): boolean {
+  return topTopicWeight >= T_BUILDING;
+}
+
 type Milestone = {
   /** 1-based stage number, monotonic. */
   stage: number;
@@ -22,8 +50,13 @@ type Milestone = {
   daysMin: number;
   /** Minimum cumulative message count in the world. */
   messagesMin: number;
-  /** Object to place when this stage advances. */
-  place: { type: PlazaObjectType; x: number; y: number; scale?: number };
+  /** Depth band (render layer + y clamp) and category tier this slot accepts. */
+  band: Band;
+  tier: Tier;
+  /** Slot placement. `type` is the static default for prop/landmark/pet
+   *  milestones; building slots omit it (they fill only from curated
+   *  catalog / generation, gated by topic strength). */
+  place: { type?: PlazaObjectType; x: number; y: number; scale?: number };
   /** Optional alternates with the same placement size. When set AND
    *  implicit preferences have any signal, we pick from
    *  [place.type, ...alternates] weighted by catalog topic overlap.
@@ -40,27 +73,32 @@ const MILESTONES: Milestone[] = [
   {
     stage: 1,
     daysMin: 3, messagesMin: 50,
-    place: { type: "fountain", x: 50, y: 60, scale: 0.95 },
+    band: "mid", tier: "landmark",
+    place: { type: "fountain", x: 50, y: 58, scale: 0.95 },
   },
   {
     stage: 2,
     daysMin: 7, messagesMin: 200,
-    place: { type: "lamp", x: 82, y: 56 },
+    band: "mid", tier: "landmark",
+    place: { type: "lamp", x: 82, y: 54 },
   },
   {
     stage: 3,
     daysMin: 14, messagesMin: 500,
-    place: { type: "tree", x: 16, y: 52 },
+    band: "mid", tier: "landmark",
+    place: { type: "tree", x: 16, y: 53 },
   },
   {
     stage: 4,
     daysMin: 30, messagesMin: 1000,
+    band: "front", tier: "prop",
     place: { type: "planter", x: 62, y: 76 },
   },
   {
     stage: 5,
     daysMin: 60, messagesMin: 2500,
-    place: { type: "tree", x: 88, y: 72, scale: 0.9 },
+    band: "mid", tier: "landmark",
+    place: { type: "tree", x: 88, y: 64, scale: 0.9 },
   },
   // Dogs — add warmth/playfulness on top of the architectural objects.
   // Spaced tighter than the building stages (7d → 13d → 25d) because
@@ -74,26 +112,47 @@ const MILESTONES: Milestone[] = [
   {
     stage: 6,
     daysMin: 5, messagesMin: 120,
+    band: "front", tier: "pet",
     place: { type: "dog_shiba", x: 35, y: 78 },
     alternates: ["dog_maltese", "dog_retriever", "dog_dachshund"],
   },
   {
     stage: 7,
     daysMin: 12, messagesMin: 380,
+    band: "front", tier: "pet",
     place: { type: "dog_maltese", x: 48, y: 73 },
     alternates: ["dog_shiba", "dog_retriever", "dog_dachshund"],
   },
   {
     stage: 8,
     daysMin: 25, messagesMin: 720,
+    band: "front", tier: "pet",
     place: { type: "dog_retriever", x: 22, y: 76 },
     alternates: ["dog_shiba", "dog_maltese", "dog_dachshund"],
   },
   {
     stage: 9,
     daysMin: 50, messagesMin: 1700,
+    band: "front", tier: "pet",
     place: { type: "dog_dachshund", x: 70, y: 75 },
     alternates: ["dog_shiba", "dog_maltese", "dog_retriever"],
+  },
+  // Special building (back band). No static default — fills only from a
+  // topic-matched curated/generated building, and only when the user's top
+  // implicit topic is strong enough (passesBuildingGate). Until then the
+  // back slot is held empty. Two slots flank the back so a town can grow a
+  // small skyline of its own as topics persist.
+  {
+    stage: 10,
+    daysMin: 14, messagesMin: 400,
+    band: "back", tier: "building",
+    place: { x: 30, y: 44, scale: 1.0 },
+  },
+  {
+    stage: 11,
+    daysMin: 45, messagesMin: 1400,
+    band: "back", tier: "building",
+    place: { x: 68, y: 46, scale: 1.0 },
   },
 ];
 
@@ -165,44 +224,42 @@ export async function tickPlazaGrowth(
     if (m.stage <= stage) continue;
     if (days < m.daysMin || messages < m.messagesMin) break;
 
-    // Pick the actual type key.
-    //   1. Static alternates weighted by implicit topic overlap.
-    //   2. If we landed on the milestone default AND implicit has a
-    //      hot topic AND the world's daily dynamic quota is open,
-    //      try generating a brand-new type for this slot. While the
-    //      OpenAI gate is closed (lib/dynamic-object-gen.ts) this is
-    //      a guaranteed null — flow falls back to the static pick.
-    const staticCandidates: PlazaObjectType[] = m.alternates
-      ? [m.place.type, ...m.alternates]
-      : [m.place.type];
-    let chosenTypeKey: string = staticCandidates.length === 1
-      ? m.place.type
-      : pickByTopicOverlap(staticCandidates, implicitTopicMap, m.place.type);
+    // Building tier is gated + has no static default. Hold the back slot
+    // empty until the user's top implicit topic is strong/persistent enough
+    // (a town doesn't sprout a café on day one). The skyline layer fills the
+    // back visually, so an empty slot reads fine.
+    const isBuilding = m.tier === "building";
+    if (isBuilding && !passesBuildingGate(implicit.topics[0]?.weight ?? 0)) {
+      console.log(`[plaza-grow] stage ${m.stage} building slot held (top topic < ${T_BUILDING})`);
+      break;
+    }
 
-    // Curated catalog exposure: a pre-made object whose topics match the user
-    // beats the static default. Runtime generation stays the last resort.
-    const slotMeta = OBJECT_CATALOG[m.place.type];
-    if (chosenTypeKey === m.place.type && implicit.topics.length > 0) {
+    // Pick the type key for this slot:
+    //   1. Static default (+ topic-weighted alternates) — prop/landmark/pet.
+    //   2. Curated catalog object whose category===tier and topics overlap.
+    //   3. Runtime generation (tier-guided) when the daily quota is open.
+    // Building has no step-1 default, so it relies on 2/3 (else holds).
+    const tierMeta = { category: m.tier as ObjectType["category"], heightPct: HEIGHT_BY_TIER[m.tier] };
+    let chosenTypeKey: string | null = isBuilding ? null : m.place.type!;
+    if (!isBuilding && m.alternates) {
+      chosenTypeKey = pickByTopicOverlap([m.place.type!, ...m.alternates], implicitTopicMap, m.place.type!);
+    }
+    // "Still on the slot default" — the point at which a topic-matched
+    // curated/generated object is allowed to take over.
+    const atDefault = () => (isBuilding ? chosenTypeKey === null : chosenTypeKey === m.place.type);
+
+    if (atDefault() && implicit.topics.length > 0) {
       const catalog = await catalogAll(sb);
-      const curated = selectCuratedForSlot(
-        catalog,
-        { category: slotMeta.category, heightPct: slotMeta.nativeHeightPct },
-        implicitTopicMap,
-        mutedTypeIds,
-      );
+      const curated = selectCuratedForSlot(catalog, tierMeta, implicitTopicMap, mutedTypeIds);
       if (curated) chosenTypeKey = curated.typeKey;
     }
 
-    if (
-      chosenTypeKey === m.place.type &&
-      implicit.topics.length > 0 &&
-      dynQuotaAvailable
-    ) {
+    if (atDefault() && implicit.topics.length > 0 && dynQuotaAvailable) {
       const dyn = await tryGenerateDynamicType(sb, {
         topic: implicit.topics[0].topic,
-        slotHeightPct: slotMeta.nativeHeightPct,
-        slotTopics: slotMeta.topics ?? [],
-        category: slotMeta.category,
+        slotHeightPct: tierMeta.heightPct,
+        slotTopics: [],
+        category: tierMeta.category,
       });
       if (dyn) {
         chosenTypeKey = dyn.typeKey;
@@ -212,6 +269,13 @@ export async function tickPlazaGrowth(
           .update({ last_dynamic_gen_at: new Date().toISOString() })
           .eq("id", worldId);
       }
+    }
+
+    // Building slot with no topic-matched fill → hold it (don't advance);
+    // a future tick retries once a matching building exists.
+    if (chosenTypeKey === null) {
+      console.log(`[plaza-grow] stage ${m.stage} building slot empty (no match) — hold`);
+      break;
     }
 
     // Resolve catalog row + skip if the user has muted this type.
@@ -243,7 +307,9 @@ export async function tickPlazaGrowth(
       type: chosenTypeKey,          // legacy column for compatibility
       variant_id: variant.id,
       x: m.place.x,
-      y: m.place.y,
+      // Clamp into the slot's depth band so a slot can never escape its
+      // render layer (buildings stay at the back, behind people).
+      y: clampToBand(m.place.y, m.band),
       scale: m.place.scale ?? 1.0,
     });
     if (insErr) {
@@ -280,9 +346,9 @@ export async function tickPlazaGrowth(
     // `placed` retains the legacy PlazaObjectType[] for the return
     // shape; dynamic types fall back to the milestone default key for
     // log purposes since they aren't enum members.
-    placed.push((chosenTypeKey in OBJECT_CATALOG ? chosenTypeKey : m.place.type) as PlazaObjectType);
+    placed.push((chosenTypeKey in OBJECT_CATALOG ? chosenTypeKey : (m.place.type ?? chosenTypeKey)) as PlazaObjectType);
     console.log(
-      `[plaza-grow] world ${worldId.slice(0, 8)} → stage ${m.stage} (${chosenTypeKey}${chosenTypeKey !== m.place.type ? ` swap from ${m.place.type}` : ""})`,
+      `[plaza-grow] world ${worldId.slice(0, 8)} → stage ${m.stage} ${m.tier}/${m.band} (${chosenTypeKey}${m.place.type && chosenTypeKey !== m.place.type ? ` swap from ${m.place.type}` : ""})`,
     );
   }
 
