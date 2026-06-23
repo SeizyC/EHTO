@@ -293,13 +293,17 @@ function AddObjectModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
     if (!dataUrl) { setErr("먼저 생성하거나 업로드하세요"); return; }
     setBusy("save"); setErr(null);
     try {
+      // Trim again at save so a stale/pre-trim preview or an uploaded file with
+      // a frame is cleaned too. The extra ring on an already-trimmed sprite is
+      // a couple of imperceptible pixels.
+      const finalUrl = await trimFrame(dataUrl);
       const r = await fetch("/api/admin/objects", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({
           label, category, nativeHeightPct: height,
           topics: topics.split(",").map((s) => s.trim()).filter(Boolean),
-          genDescription: desc || null, isExemplar: exemplar, dataUrl,
+          genDescription: desc || null, isExemplar: exemplar, dataUrl: finalUrl,
         }),
       });
       const j = await r.json();
