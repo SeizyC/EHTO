@@ -211,10 +211,13 @@ function ObjectCard({ type: t, onDelete }: { type: ObjectType; onDelete?: () => 
   );
 }
 
+// Default render heights (% of plaza). Reference: character ≈12%, static
+// fountain 24 / lamp 33 / tree 44. Conservative so curated objects don't dwarf
+// the scene — fine-tune per object via the 높이% field.
 const CATEGORIES: Array<{ key: "prop" | "landmark" | "building" | "sky" | "pet"; label: string; h: number }> = [
-  { key: "prop", label: "소품", h: 14 },
-  { key: "landmark", label: "랜드마크", h: 28 },
-  { key: "building", label: "건물", h: 56 },
+  { key: "prop", label: "소품", h: 13 },
+  { key: "landmark", label: "랜드마크", h: 22 },
+  { key: "building", label: "건물", h: 38 },
   { key: "sky", label: "하늘/공중", h: 10 },
   { key: "pet", label: "펫", h: 6 },
 ];
