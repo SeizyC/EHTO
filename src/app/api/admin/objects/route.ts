@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID, createHash } from "node:crypto";
 import { requireAdmin } from "@/lib/admin-auth";
 import { serviceClient } from "@/lib/supabase";
-import { catalogAll } from "@/lib/object-catalog";
+import { catalogAll, invalidateCatalog } from "@/lib/object-catalog";
 import { uploadObjectSprite, insertObjectType } from "@/lib/dynamic-object-gen";
 
 // GET /api/admin/objects — return every object type with variants
@@ -78,5 +78,6 @@ export async function DELETE(req: NextRequest) {
   }
   const { error } = await svc.from("object_types").delete().eq("id", id); // cascades variants
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  invalidateCatalog(); // else the 5-min catalog cache keeps serving the deleted type
   return NextResponse.json({ ok: true });
 }
