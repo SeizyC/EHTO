@@ -20,6 +20,13 @@ import { localizeIdentity } from "@/lib/member-identity";
 // out — but activation never exceeds the plan cap.
 const SEED_COUNT = 12;
 
+// Max members to admit in a single activation tick. Even when several
+// dormant members are *eligible* at once — e.g. the owner returns after a
+// long absence and a backlog of scheduled arrivals has piled up — we let
+// them in one at a time (one per ~30s poll) so arrivals feel like people
+// walking in, not a crowd materializing at once with a burst of greetings.
+const MAX_ACTIVATIONS_PER_TICK = 1;
+
 export async function ensureWorld(
   sb: SupabaseClient,
   ownerId: string,
@@ -233,22 +240,44 @@ export async function tickMemberActivations(
     .maybeSingle();
   const cap = memberCap((w?.plan ?? "free") as Plan);
   const language = ((w?.language ?? "ko") as Locale);
-  const { count: activeCount } = await sb
+  // Pull the active roster (not just a count) so we can both enforce the
+  // cap AND avoid admitting a member whose sprite a present resident
+  // already wears — two identical-looking characters in one room reads as
+  // a bug. (Only 5 hero sprites exist today, so this can only de-dup up to
+  // the first 5 residents; beyond that a repeat is unavoidable until more
+  // sprites ship.)
+  const { data: active } = await sb
     .from("members")
-    .select("id", { count: "exact", head: true })
+    .select("persona")
     .eq("current_location_world_id", worldId)
     .not("activated_at", "is", null)
     .not("status", "in", "(ghost,banned)");
-  const free = Math.max(0, cap - (activeCount ?? 0));
+  const activeCount = active?.length ?? 0;
+  const usedSprites = new Set(
+    (active ?? [])
+      .map((m) => (m.persona as { sprite?: string } | null)?.sprite)
+      .filter(Boolean) as string[],
+  );
+  const free = Math.max(0, cap - activeCount);
   if (free === 0) return { activated: [] };
 
   const nowIso = new Date().toISOString();
-  const ids = [...eligible]
-    .sort(
-      (a, b) =>
-        (a.activation_offset_seconds ?? 0) - (b.activation_offset_seconds ?? 0),
-    )
-    .slice(0, free)
+  // Earliest-scheduled first, but bubble up candidates whose sprite isn't
+  // already on the floor so a one-at-a-time admission still lands a
+  // visually distinct newcomer when one is available.
+  const ordered = [...eligible].sort(
+    (a, b) =>
+      (a.activation_offset_seconds ?? 0) - (b.activation_offset_seconds ?? 0),
+  );
+  const spriteOf = (m: (typeof ordered)[number]) =>
+    (m.persona as { sprite?: string } | null)?.sprite;
+  const distinct = ordered.filter((m) => {
+    const s = spriteOf(m);
+    return !s || !usedSprites.has(s);
+  });
+  const pickFrom = distinct.length > 0 ? distinct : ordered;
+  const ids = pickFrom
+    .slice(0, Math.min(free, MAX_ACTIVATIONS_PER_TICK))
     .map((m) => m.id);
 
   // Race-safe activation: only flip rows that are still dormant.

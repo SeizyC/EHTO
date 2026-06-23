@@ -95,7 +95,7 @@ function YoutubeThumb({ url, videoId }: { url: string; videoId: string }) {
         <iframe
           src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`}
           title="YouTube 영상"
-          allow="autoplay; encrypted-media; picture-in-picture"
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
           allowFullScreen
           className="absolute inset-0 h-full w-full"
           style={{ border: 0 }}

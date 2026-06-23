@@ -316,9 +316,14 @@ function _appendFreshMessage(row: DbMessage): void {
     : row.owner_user_id ? "me" : (row.owner_member_id ?? "unknown");
   const now = Date.now();
   const isChat = kind === "chat";
+  // "..." typing beat before a peer's bubble reveals. Scales with message
+  // length so a long line reads as genuinely "being typed" rather than
+  // popping instantly. ~1.4s floor + ~55ms/char (capped at 28 chars) +
+  // small jitter → roughly 1.7s (short) to 3.2s (full line). Own messages
+  // and system/recap lines reveal immediately (no typing beat).
   const typingUntil =
     isChat && fromCharId !== "me"
-      ? now + 1200 + Math.floor(Math.random() * 800)
+      ? now + 1400 + Math.min(row.text.length, 28) * 55 + Math.floor(Math.random() * 500)
       : undefined;
   const revealedAt = typingUntil ?? now;
   const feedRevealAt = isChat ? revealedAt + FEED_REVEAL_DELAY_MS : now;

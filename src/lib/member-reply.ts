@@ -550,6 +550,16 @@ function clean(text: string): string {
       }
     } catch { /* not valid JSON — fall through to plain cleanup */ }
   }
+  // Defensive: the model occasionally echoes the prompt scaffolding itself
+  // ([형식]/[상황]/[최근 대화]/예시 결: …) instead of composing a line —
+  // observed in prod as a bubble literally reading
+  // "[형식] 한 줄, 22자 이하. MiMi한테 lofi 뭔지 …". Cut everything from the
+  // first such marker so the scaffolding never reaches a bubble. If the
+  // marker sits at the very start the line collapses to "" → caller drops it.
+  const scaffold = text.search(
+    /(^|\s)(\[(형식|상황|최근 대화|최근 자주 떠올랐던 결|광장 정체성|회피|장면|뉴스|기억)\]|예시( 안 좋은)? 결\s*[:：])/,
+  );
+  if (scaffold !== -1) text = text.slice(0, scaffold);
   return text
     .replace(/^["'`]+|["'`]+$/g, "")
     .replace(/^[가-힣A-Za-z_]+\s*[:：]\s*/, "")
