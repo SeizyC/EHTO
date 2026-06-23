@@ -21,6 +21,7 @@ import {
   type SpeechIntent,
 } from "@/lib/member-reply";
 import type { Locale } from "@/lib/language";
+import { recentlySharedYoutubeIds } from "@/lib/youtube-share";
 import { peerHintLine } from "@/lib/prompt-i18n";
 import { fetchRecentMemory } from "@/lib/memory-engine";
 import { extractTopic, fetchPeerRelations, recordInteraction } from "@/lib/member-relations";
@@ -392,6 +393,12 @@ export async function tickAmbientConversation(
   // turns; let the model respond naturally with whatever shape fits.
   const skipShape = intent.type === "reply-user" || intent.type === "reply-user-mention";
   const shape = skipShape ? undefined : pickShape(intent.type);
+  // Only user-directed turns can fire the video-share tool; compute the
+  // recently-shared ids just for those so a fulfilled "영상 공유해줘" doesn't
+  // surface a thumbnail another member already has up.
+  const excludeVideoIds = skipShape
+    ? await recentlySharedYoutubeIds(sb, worldId)
+    : undefined;
   const text = await generateAmbientLine(speaker, transcript, {
     language,
     intent,
@@ -404,6 +411,7 @@ export async function tickAmbientConversation(
     sceneHint,
     biasHint,
     implicitHint,
+    excludeVideoIds,
   });
   if (!text) {
     console.warn(`[ambient] gen returned null for ${speaker.name}`);

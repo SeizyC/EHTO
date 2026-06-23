@@ -356,6 +356,9 @@ export async function generateAmbientLine(
      *  joined keyword string. Surfaced as a softer parallel to biasHint
      *  so the room drifts toward the user's recent threads. */
     implicitHint?: string | null;
+    /** Video ids recently shared in this world — passed to the share tool
+     *  so a fulfilled "영상 공유해줘" never repeats a thumbnail already up. */
+    excludeVideoIds?: Set<string>;
   },
 ): Promise<string | null> {
   // For user-driven turns we expose the YouTube share tool so the model
@@ -496,7 +499,7 @@ export async function generateAmbientLine(
   ].filter(Boolean).join("\n");
 
   if (allowVideoTool) {
-    const result = await chatCompleteWithVideo({ system, user: userPrompt, maxTokens: MAX_TOKENS, model });
+    const result = await chatCompleteWithVideo({ system, user: userPrompt, maxTokens: MAX_TOKENS, model, excludeVideoIds: opts.excludeVideoIds });
     if (!result) return null;
     const cleaned = clean(result.text);
     if (result.video) {

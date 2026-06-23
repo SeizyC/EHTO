@@ -139,7 +139,40 @@ type YtSearchItem = {
  *  - We pass through the API's snippet thumbnail URL as a sanity flag,
  *    though message-render still derives the displayed thumb from the
  *    video id (hqdefault.jpg) for consistency. */
-export async function searchYoutubeVideo(query: string): Promise<DiscoveredVideo | null> {
+// Pull the 11-char video id out of any youtube watch / youtu.be / embed URL.
+export function youtubeIdFromUrl(text: string): string | null {
+  const m = text.match(
+    /(?:youtube(?:-nocookie)?\.com\/(?:watch\?v=|embed\/)|youtu\.be\/|i\.ytimg\.com\/vi\/)([\w-]{11})/,
+  );
+  return m ? m[1] : null;
+}
+
+// Video ids shared in the most recent messages of a world. Used to keep two
+// members from displaying the same thumbnail — the search picks the first
+// result NOT in this set.
+export async function recentlySharedYoutubeIds(
+  sb: SupabaseClient,
+  worldId: string,
+  limit = 40,
+): Promise<Set<string>> {
+  const { data } = await sb
+    .from("messages")
+    .select("text")
+    .eq("world_id", worldId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  const ids = new Set<string>();
+  for (const r of data ?? []) {
+    const id = youtubeIdFromUrl((r as { text: string }).text ?? "");
+    if (id) ids.add(id);
+  }
+  return ids;
+}
+
+export async function searchYoutubeVideo(
+  query: string,
+  exclude?: Set<string>,
+): Promise<DiscoveredVideo | null> {
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
     console.warn("[yt] YOUTUBE_API_KEY missing — skipping video share");
@@ -170,6 +203,7 @@ export async function searchYoutubeVideo(query: string): Promise<DiscoveredVideo
     for (const item of j.items ?? []) {
       const vid = item.id?.videoId;
       if (!vid) continue;
+      if (exclude?.has(vid)) continue; // already shared in this world recently
       const sn = item.snippet ?? {};
       return {
         url: `https://www.youtube.com/watch?v=${vid}`,
@@ -274,7 +308,8 @@ export async function tickYoutubeShare(
   if (!speaker) return { shared: null, reason: "pick-failed" };
 
   const query = pickQuery(bias, implicitTopic);
-  const video = await searchYoutubeVideo(query);
+  const exclude = await recentlySharedYoutubeIds(sb, worldId);
+  const video = await searchYoutubeVideo(query, exclude);
   if (!video) {
     // Roll back the stamp so we retry on next tick — the failure was
     // network/api, not "we don't want to share today".

@@ -16,6 +16,7 @@ import { ParticipantList } from "@/components/ParticipantList";
 import { HistorySheet } from "@/components/HistorySheet";
 import { MusicShareStack } from "@/components/MusicShareStack";
 import { YoutubePlayerModal } from "@/components/YoutubePlayerModal";
+import { PlazaLoading } from "@/components/PlazaLoading";
 import { useCharacter, loadCharacter } from "@/lib/character-store";
 import { useSession } from "@/components/AuthProvider";
 import { useMembers, refreshMembers, type Member } from "@/lib/members-store";
@@ -388,7 +389,7 @@ export default function WorldPage() {
             <section className="relative lg:hidden">
               <div
                 ref={scrollerRef}
-                className="no-scrollbar overflow-auto"
+                className="no-scrollbar relative overflow-auto"
                 style={{
                   // Taller scroll area paired with the 2400×1600 canvas
                   // so mobile users actually see most of the plaza
@@ -427,6 +428,11 @@ export default function WorldPage() {
                     aspectRatio: "auto",
                   }}
                 />
+                {!world && (
+                  <div className="bg-bg absolute inset-0 z-10 flex items-center justify-center">
+                    <PlazaLoading />
+                  </div>
+                )}
               </div>
               <div className="from-bg pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r to-transparent" />
               <div className="to-bg pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-r from-transparent" />
@@ -463,6 +469,11 @@ export default function WorldPage() {
                     aspectRatio: "auto",
                   }}
                 />
+                {!world && (
+                  <div className="bg-bg absolute inset-0 z-10 flex items-center justify-center">
+                    <PlazaLoading />
+                  </div>
+                )}
                 {/* PC: music stack inside the bordered plaza container. */}
                 <MusicShareStack />
               </div>

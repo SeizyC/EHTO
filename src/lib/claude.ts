@@ -144,6 +144,9 @@ export async function chatCompleteWithVideo(opts: {
   user: string;
   maxTokens: number;
   model?: string;
+  /** Video ids already shared in this world recently — the search skips
+   *  them so two members never surface the same thumbnail. */
+  excludeVideoIds?: Set<string>;
 }): Promise<{ text: string; video: DiscoveredVideo | null } | null> {
   const client = claudeClient();
   if (!client) {
@@ -186,7 +189,7 @@ export async function chatCompleteWithVideo(opts: {
         if (block.name === "share_youtube_video") {
           const input = block.input as { query?: string };
           const query = (input.query ?? "").trim();
-          const video = query ? await searchYoutubeVideo(query) : null;
+          const video = query ? await searchYoutubeVideo(query, opts.excludeVideoIds) : null;
           if (video) chosenVideo = video;
           toolResults.push({
             type: "tool_result",

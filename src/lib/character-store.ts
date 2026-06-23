@@ -59,17 +59,18 @@ export function clearCharacter() {
 }
 
 /** Decide where a freshly-authenticated user should land WITHOUT having
- *  to bounce through /character first. Returns "/home" when the user
- *  already has a character + handle (LS first, server fallback) so a
- *  returning login is one redirect, not two. Otherwise returns
- *  "/character" so the creation/naming flow can take over.
+ *  to bounce through /character first. Returns "/world" (the user's OWN
+ *  plaza) when they already have a character + handle (LS first, server
+ *  fallback) so a returning login lands them at home base — not the
+ *  public directory (/home). Otherwise returns "/character" so the
+ *  creation/naming flow can take over.
  *
  *  Note: same-tab flow uses LS cache (instant). Fresh-browser flow
  *  hits /api/character/me once — adds ~1 RTT but only on first sign-in
  *  on that device, which is the right place to spend the latency. */
 export async function landingPathForSession(accessToken: string): Promise<string> {
   const cached = loadCharacter();
-  if (cached?.handle) return "/home";
+  if (cached?.handle) return "/world";
 
   try {
     const r = await fetch("/api/character/me", {
@@ -90,7 +91,7 @@ export async function landingPathForSession(accessToken: string): Promise<string
       handle: ch.handle,
       createdAt: ch.createdAt,
     });
-    return ch.handle ? "/home" : "/character";
+    return ch.handle ? "/world" : "/character";
   } catch {
     return "/character";
   }
