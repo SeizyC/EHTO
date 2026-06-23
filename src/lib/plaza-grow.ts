@@ -12,7 +12,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { OBJECT_CATALOG, type PlazaObjectType } from "@/lib/plaza-objects";
 import { aggregateImplicit } from "@/lib/implicit-pref";
-import { catalogByTypeKey, pickRandomVariant } from "@/lib/object-catalog";
+import { catalogAll, catalogByTypeKey, pickRandomVariant, type ObjectType } from "@/lib/object-catalog";
 import { tryGenerateDynamicType, tryGenerateVariant } from "@/lib/dynamic-object-gen";
 
 type Milestone = {
@@ -179,16 +179,30 @@ export async function tickPlazaGrowth(
       ? m.place.type
       : pickByTopicOverlap(staticCandidates, implicitTopicMap, m.place.type);
 
+    // Curated catalog exposure: a pre-made object whose topics match the user
+    // beats the static default. Runtime generation stays the last resort.
+    const slotMeta = OBJECT_CATALOG[m.place.type];
+    if (chosenTypeKey === m.place.type && implicit.topics.length > 0) {
+      const catalog = await catalogAll(sb);
+      const curated = selectCuratedForSlot(
+        catalog,
+        { category: slotMeta.category, heightPct: slotMeta.nativeHeightPct },
+        implicitTopicMap,
+        mutedTypeIds,
+      );
+      if (curated) chosenTypeKey = curated.typeKey;
+    }
+
     if (
       chosenTypeKey === m.place.type &&
       implicit.topics.length > 0 &&
       dynQuotaAvailable
     ) {
-      const meta = OBJECT_CATALOG[m.place.type];
       const dyn = await tryGenerateDynamicType(sb, {
         topic: implicit.topics[0].topic,
-        slotHeightPct: meta.nativeHeightPct,
-        slotTopics: meta.topics ?? [],
+        slotHeightPct: slotMeta.nativeHeightPct,
+        slotTopics: slotMeta.topics ?? [],
+        category: slotMeta.category,
       });
       if (dyn) {
         chosenTypeKey = dyn.typeKey;
@@ -273,6 +287,31 @@ export async function tickPlazaGrowth(
   }
 
   return { advanced, placed };
+}
+
+/** Choose the best curated catalog object for a milestone slot, or null.
+ *  Filters by category + size band + not-muted, scores by implicit topic
+ *  overlap, requires a positive score (no signal → caller keeps static pick). */
+export function selectCuratedForSlot(
+  catalog: ObjectType[],
+  slot: { category: ObjectType["category"]; heightPct: number },
+  topicWeights: Map<string, number>,
+  mutedTypeIds: Set<string>,
+): ObjectType | null {
+  const lo = slot.heightPct * 0.6;
+  const hi = slot.heightPct * 1.6;
+  let best: ObjectType | null = null;
+  let bestScore = 0;
+  for (const t of catalog) {
+    if (t.category !== slot.category) continue;
+    if (t.variants.length === 0) continue;
+    if (mutedTypeIds.has(t.id)) continue;
+    if (t.nativeHeightPct < lo || t.nativeHeightPct > hi) continue;
+    let score = 0;
+    for (const tp of t.topics) score += topicWeights.get(tp) ?? 0;
+    if (score > bestScore) { bestScore = score; best = t; }
+  }
+  return bestScore > 0 ? best : null;
 }
 
 /** Weighted pick across `candidates` by catalog topic overlap with the
