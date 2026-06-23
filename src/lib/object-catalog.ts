@@ -26,6 +26,7 @@ export type ObjectType = {
   labelKo: string;
   nativeHeightPct: number;
   topics: string[];
+  category: "prop" | "landmark" | "building" | "sky" | "pet";
   origin: "static" | "dynamic";
   originTopic: string | null;
   originDescKey: string | null;
@@ -49,7 +50,7 @@ async function loadCatalog(sb: SupabaseClient): Promise<CacheEntry> {
   // API enrich path comfortably.
   const { data: typeRows, error } = await sb
     .from("object_types")
-    .select("id, type_key, label_ko, native_height_pct, topics, origin, origin_topic, origin_desc_key, usage_count, object_variants(id, variant_idx, sprite_url)");
+    .select("id, type_key, label_ko, native_height_pct, topics, category, origin, origin_topic, origin_desc_key, usage_count, object_variants(id, variant_idx, sprite_url)");
   if (error) {
     console.warn("[catalog] load failed:", error.message);
     return { at: Date.now(), byId: new Map(), byKey: new Map(), byVariantId: new Map() };
@@ -68,6 +69,7 @@ async function loadCatalog(sb: SupabaseClient): Promise<CacheEntry> {
       labelKo: r.label_ko as string,
       nativeHeightPct: r.native_height_pct as number,
       topics: (r.topics ?? []) as string[],
+      category: ((r as { category?: string }).category ?? "prop") as ObjectType["category"],
       origin: r.origin as "static" | "dynamic",
       originTopic: (r.origin_topic ?? null) as string | null,
       originDescKey: (r.origin_desc_key ?? null) as string | null,
