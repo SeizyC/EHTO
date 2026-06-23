@@ -3,23 +3,28 @@
 import { motion } from "framer-motion";
 import type { TimeBucket } from "@/lib/time-of-day";
 
-// Time-of-day atmosphere drawn over the scene's sky band (top ~38%), behind
-// every plaza item. Pure CSS/gradients + framer drift — no assets, no clicks.
-// Day → slow clouds; evening/night → stars + moon. Positions are FIXED
-// (no Math.random) so the SSR'd markup matches the client and there's no
-// hydration flicker; only the drift/twinkle animate on the client.
+// Time-of-day atmosphere drawn ONLY inside the sky band at the very top of
+// the canvas, behind every plaza item, pointer-events-none. The band is
+// clipped (overflow hidden) and sits well above the floor (FLOOR_Y_MIN=32),
+// so clouds/stars/moon can never drape down onto the ground. Day → slow
+// clouds; evening/night → stars + moon. Positions are FIXED (no Math.random)
+// so SSR markup matches the client — no hydration flicker.
 
-// Fixed cloud slots: top/left in %, scale, and a drift duration (s).
+// Height of the sky band as % of the full canvas. Kept under the floor's
+// back edge (32%) so nothing overlaps the ground.
+const SKY_BAND_PCT = 26;
+
+// Cloud slots — top/left/width as % of the SKY BAND, drift duration (s).
 const CLOUDS = [
-  { top: 8, left: 12, w: 120, dur: 90 },
-  { top: 16, left: 58, w: 90, dur: 70 },
-  { top: 5, left: 78, w: 70, dur: 110 },
+  { top: 22, left: 12, w: 26, dur: 90 },
+  { top: 48, left: 56, w: 20, dur: 70 },
+  { top: 14, left: 78, w: 16, dur: 110 },
 ];
 
-// Fixed star field (top band). Each twinkles with a staggered delay.
+// Star field — [left%, top%] within the sky band. Twinkle with staggered delay.
 const STARS = [
-  [10, 14], [22, 8], [31, 20], [44, 6], [55, 16], [63, 10], [72, 22],
-  [80, 7], [88, 18], [16, 26], [38, 28], [50, 30], [68, 30], [84, 27],
+  [10, 18], [22, 10], [31, 36], [44, 8], [55, 28], [63, 14], [72, 40],
+  [80, 9], [88, 30], [16, 52], [38, 60], [50, 70], [68, 64], [84, 50],
 ] as const;
 
 export function AtmosphereLayer({ bucket }: { bucket: TimeBucket }) {
@@ -27,20 +32,24 @@ export function AtmosphereLayer({ bucket }: { bucket: TimeBucket }) {
   const night = bucket === "night" || bucket === "evening";
 
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+    <div
+      className="pointer-events-none absolute left-0 right-0 top-0 overflow-hidden"
+      style={{ height: `${SKY_BAND_PCT}%` }}
+      aria-hidden
+    >
       {day &&
         CLOUDS.map((c, i) => (
           <motion.div
             key={`cloud-${i}`}
             initial={{ x: 0 }}
-            animate={{ x: [0, 26, 0] }}
+            animate={{ x: ["0%", "60%", "0%"] }}
             transition={{ duration: c.dur, repeat: Infinity, ease: "easeInOut" }}
             style={{
               position: "absolute",
               top: `${c.top}%`,
               left: `${c.left}%`,
-              width: c.w,
-              height: c.w * 0.42,
+              width: `${c.w}%`,
+              height: `${c.w * 0.5}%`,
               borderRadius: "50%",
               background:
                 "radial-gradient(closest-side, rgba(255,255,255,0.55), rgba(255,255,255,0.18) 60%, transparent 72%)",
@@ -70,11 +79,11 @@ export function AtmosphereLayer({ bucket }: { bucket: TimeBucket }) {
               }}
             />
           ))}
-          {/* Moon — softer/warmer at evening, cool white at deep night. */}
+          {/* Moon — warmer at evening, cool white at deep night. */}
           <div
             style={{
               position: "absolute",
-              top: "9%",
+              top: "20%",
               right: "12%",
               width: 46,
               height: 46,
