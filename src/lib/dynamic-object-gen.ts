@@ -152,7 +152,7 @@ function buildObjectPrompt(description: string, category: Category = "landmark")
   // level side profile — NOT the ground objects' isometric 3/4 above-front view.
   const viewLine =
     category === "sky"
-      ? "pixel art, level side-profile view seen straight-on at eye level, flying/drifting horizontally to the right,"
+      ? "pixel art side-profile (side elevation) view, the whole object perfectly horizontal and level, front/nose pointing straight to the right, in level horizontal flight, NOT tilted, NOT ascending, no upward angle, not a 3/4 or above-view,"
       : "isometric pixel art, 3/4 perspective view from above-front,";
   const groundLine =
     category === "sky"
@@ -169,6 +169,8 @@ function buildObjectPrompt(description: string, category: Category = "landmark")
     // Hard no-shadow: gpt-image-1 otherwise bakes a soft cast shadow under the
     // object that reads wrong against the plaza floor. Flat, even lighting.
     "absolutely no shadow, no cast shadow, no drop shadow, no ground shadow, flat even lighting,",
+    // gpt-image-1 sometimes draws a faint rectangle/frame at the image edge — forbid it.
+    "no frame, no border, no box, no rectangle outline around the image, no panel background,",
     "no scenery — the object only, a contemporary urban small-plaza prop, not fantasy.",
   ].join(" ");
 }
