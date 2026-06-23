@@ -15,8 +15,9 @@ async function main() {
   const t0 = Date.now();
   const res = await tryGenerateDynamicType(sb, {
     topic,
-    slotHeightPct: 24,
+    slotHeightPct: 26,
     slotTopics: ["게임", "retro", "arcade"],
+    category: "landmark",
   });
   console.log(`← returned in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
   console.log(JSON.stringify(res, null, 2));
