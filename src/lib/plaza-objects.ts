@@ -44,6 +44,9 @@ type CatalogEntry = {
    *  user's implicit preferences. Empty means "no signal" — falls
    *  through to milestone default. */
   topics?: string[];
+  /** Render band + size tier + generation prompt family. Mirrors the
+   *  object_types.category column (see 20260623000001 migration). */
+  category: "prop" | "landmark" | "building" | "sky" | "pet";
 };
 
 // nativeHeightPct = display height as % of plaza container, measured at
@@ -61,17 +64,17 @@ type CatalogEntry = {
 //   lamp     ~2.8× char  →  street lamp towers
 //   tree     ~3.7× char  →  tallest thing in the plaza
 export const OBJECT_CATALOG: Record<PlazaObjectType, CatalogEntry> = {
-  fountain: { src: "/sprites/rooms/objects/fountain.png", nativeHeightPct: 24,  label: "분수대", topics: ["중앙", "공공", "클래식"] },
-  bench:    { src: "/sprites/rooms/objects/bench.png",    nativeHeightPct: 12,  label: "벤치",   topics: ["휴식", "독서", "대화"] },
-  planter:  { src: "/sprites/rooms/objects/planter.png",  nativeHeightPct: 8.5, label: "화분",   topics: ["식물", "소소함"] },
-  lamp:     { src: "/sprites/rooms/objects/lamp.png",     nativeHeightPct: 33,  label: "가로등", topics: ["밤", "분위기", "거리"] },
-  tree:     { src: "/sprites/rooms/objects/tree.png",     nativeHeightPct: 44,  label: "나무",   topics: ["자연", "계절", "쉼"] },
+  fountain: { src: "/sprites/rooms/objects/fountain.png", nativeHeightPct: 24,  label: "분수대", topics: ["중앙", "공공", "클래식"], category: "landmark" },
+  bench:    { src: "/sprites/rooms/objects/bench.png",    nativeHeightPct: 12,  label: "벤치",   topics: ["휴식", "독서", "대화"],   category: "prop" },
+  planter:  { src: "/sprites/rooms/objects/planter.png",  nativeHeightPct: 8.5, label: "화분",   topics: ["식물", "소소함"],         category: "prop" },
+  lamp:     { src: "/sprites/rooms/objects/lamp.png",     nativeHeightPct: 33,  label: "가로등", topics: ["밤", "분위기", "거리"],   category: "landmark" },
+  tree:     { src: "/sprites/rooms/objects/tree.png",     nativeHeightPct: 44,  label: "나무",   topics: ["자연", "계절", "쉼"],     category: "landmark" },
   // Dogs — ~0.35× character (was 0.55× — felt "huge dog" 2026-05-31).
   // Sleeping retriever stays a tick shorter (curled up posture).
-  dog_shiba:     { src: "/sprites/rooms/objects/dog_shiba_sitting.png",      nativeHeightPct: 4.5, label: "시바",     topics: ["반려", "활기", "귀여움"] },
-  dog_maltese:   { src: "/sprites/rooms/objects/dog_maltese_wagging.png",    nativeHeightPct: 4.5, label: "말티즈",   topics: ["반려", "귀여움"] },
-  dog_retriever: { src: "/sprites/rooms/objects/dog_retriever_sleeping.png", nativeHeightPct: 3,   label: "리트리버", topics: ["반려", "쉼"] },
-  dog_dachshund: { src: "/sprites/rooms/objects/dog_dachshund_standing.png", nativeHeightPct: 4.5, label: "닥스훈트", topics: ["반려", "귀여움"] },
+  dog_shiba:     { src: "/sprites/rooms/objects/dog_shiba_sitting.png",      nativeHeightPct: 4.5, label: "시바",     topics: ["반려", "활기", "귀여움"], category: "pet" },
+  dog_maltese:   { src: "/sprites/rooms/objects/dog_maltese_wagging.png",    nativeHeightPct: 4.5, label: "말티즈",   topics: ["반려", "귀여움"],         category: "pet" },
+  dog_retriever: { src: "/sprites/rooms/objects/dog_retriever_sleeping.png", nativeHeightPct: 3,   label: "리트리버", topics: ["반려", "쉼"],             category: "pet" },
+  dog_dachshund: { src: "/sprites/rooms/objects/dog_dachshund_standing.png", nativeHeightPct: 4.5, label: "닥스훈트", topics: ["반려", "귀여움"],         category: "pet" },
 };
 
 export type PlazaState = {
