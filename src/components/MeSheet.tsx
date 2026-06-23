@@ -66,16 +66,19 @@ export function MeSheet({ open, onClose }: Props) {
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "tween", duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-            className="bg-surface fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[85dvh] min-h-[60dvh] max-w-[420px] flex-col rounded-t-2xl pb-8 shadow-[0_-12px_40px_-8px_rgba(0,0,0,0.6)]"
+            className="bg-surface fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[85dvh] min-h-[60dvh] max-w-[420px] flex-col overflow-hidden rounded-t-2xl shadow-[0_-12px_40px_-8px_rgba(0,0,0,0.6)]"
           >
+            {/* Drag handle stays pinned; everything below scrolls so the
+                logout footer is always reachable even when content > 85dvh. */}
             <button
               onClick={onClose}
               aria-label="닫기"
-              className="self-center pt-3"
+              className="shrink-0 self-center pt-3"
             >
               <span className="bg-line block h-1 w-12 rounded-full" />
             </button>
 
+            <div className="no-scrollbar flex flex-1 flex-col overflow-y-auto overscroll-contain pb-8">
             <section className="spotlight relative flex flex-col items-center px-6 pb-4 pt-2">
               <div className="relative h-[180px] w-[140px]">
                 {character?.imageUrl ? (
@@ -147,6 +150,7 @@ export function MeSheet({ open, onClose }: Props) {
                 로그아웃
               </button>
             </footer>
+            </div>
           </motion.aside>
         </>
       )}
