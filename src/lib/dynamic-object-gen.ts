@@ -23,6 +23,17 @@ import { chatComplete } from "@/lib/claude";
 import { IMAGES_GENERATIONS_URL } from "@/lib/openai-urls";
 
 const HAIKU_MODEL = "claude-haiku-4-5-20251001";
+
+type Category = "prop" | "landmark" | "building" | "sky" | "pet";
+
+const CATEGORY_CUE: Record<Category, string> = {
+  prop: "a small piece of street furniture or a small object (knee-to-waist height), sits on the ground",
+  landmark: "a medium-to-large plaza installation (a person-and-a-half tall), a clear focal piece, sits on the ground",
+  building: "a small storefront-style building seen front-on, ground floor readable, sits on the ground",
+  sky: "a small aerial object seen from the side, floating, no ground",
+  pet: "a small friendly animal, sits or stands on the ground",
+};
+
 const IMG_MODEL = "gpt-image-1";
 const IMG_SIZE = "1024x1024";
 const IMG_TIMEOUT_MS = 90_000;
@@ -34,6 +45,7 @@ export type DynamicGenArgs = {
   topic: string;
   slotHeightPct: number;
   slotTopics: string[];
+  category?: Category;
 };
 
 /** OpenAI key when generation is allowed; null disables the whole pipeline
@@ -56,6 +68,7 @@ type TypeRow = {
   label_ko: string;
   native_height_pct: number;
   topics: string[] | null;
+  category?: string | null;
   origin: "static" | "dynamic";
   origin_topic: string | null;
   origin_desc_key: string | null;
@@ -64,7 +77,7 @@ type TypeRow = {
 };
 
 const TYPE_SELECT =
-  "id, type_key, label_ko, native_height_pct, topics, origin, origin_topic, origin_desc_key, usage_count, object_variants(id, variant_idx, sprite_url)";
+  "id, type_key, label_ko, native_height_pct, topics, category, origin, origin_topic, origin_desc_key, usage_count, object_variants(id, variant_idx, sprite_url)";
 
 function rowToType(r: TypeRow): ObjectType {
   const variants = (r.object_variants ?? [])
@@ -76,6 +89,7 @@ function rowToType(r: TypeRow): ObjectType {
     labelKo: r.label_ko,
     nativeHeightPct: r.native_height_pct,
     topics: r.topics ?? [],
+    category: (r.category ?? "prop") as ObjectType["category"],
     origin: r.origin,
     originTopic: r.origin_topic,
     originDescKey: r.origin_desc_key,
@@ -94,26 +108,30 @@ function descKeyOf(description: string): string {
 export async function composeObject(
   topic: string,
   slotTopics: string[],
-  variationHint?: string,
+  opts: { category?: Category; exemplars?: string[]; variationHint?: string } = {},
 ): Promise<{ desc: string; label: string } | null> {
+  const cat = opts.category ?? "landmark";
+  const exampleBlock =
+    opts.exemplars && opts.exemplars.length
+      ? `\n참고용 톤 예시 (스타일만 맞추고 베끼지 말 것):\n- ${opts.exemplars.slice(0, 4).join("\n- ")}`
+      : "";
   const system = [
-    "당신은 작은 도시 광장에 놓을 단일 오브제의 시각 description을 작성합니다.",
+    `당신은 작은 도시 광장에 놓을 단일 ${cat} 오브제의 시각 description을 작성합니다.`,
     "반드시 아래 JSON 한 줄만 출력하세요. 다른 텍스트 금지:",
     '{"desc":"<english>","label":"<korean>"}',
     "규칙:",
-    '- desc: 영어 10-20단어. 구체적인 단일 사물 1개 (카테고리 X — "a guitar"가 아니라 "a worn black classical guitar leaning on a wooden stand").',
-    "- 분위기: contemporary urban small plaza prop, not fantasy, not a person, not an animal.",
-    '- label: 그 사물의 짧은 한글 이름 (2-6자, 예: "게이밍 의자", "네온 간판").',
-    variationHint ? `- 변형 지시: ${variationHint}` : "",
+    `- desc: 영어 10-20단어. 구체적인 단일 사물 1개. (${CATEGORY_CUE[cat]})`,
+    "- 분위기: contemporary urban small plaza prop, not fantasy, not a person.",
+    "- label: 그 사물의 짧은 한글 이름 (2-6자).",
+    opts.variationHint ? `- 변형 지시: ${opts.variationHint}` : "",
+    exampleBlock,
   ]
     .filter(Boolean)
     .join("\n");
-  const user = `토픽: ${topic}\n슬롯 톤(참고): ${slotTopics.join(", ") || "—"}\n이 토픽 결을 가진 광장 가구 하나.`;
+  const user = `토픽: ${topic}\n슬롯 톤(참고): ${slotTopics.join(", ") || "—"}\n이 토픽 결을 가진 광장 ${cat} 하나.`;
 
   const out = await chatComplete({ system, user, maxTokens: 220, model: HAIKU_MODEL });
   if (!out) return null;
-
-  // Tolerant parse: pull the first {...} block.
   const m = out.match(/\{[\s\S]*\}/);
   if (m) {
     try {
@@ -129,18 +147,19 @@ export async function composeObject(
   return desc ? { desc: desc.slice(0, 300), label: topic.slice(0, 24) } : null;
 }
 
-function buildObjectPrompt(description: string): string {
+function buildObjectPrompt(description: string, category: Category = "landmark"): string {
+  const groundLine =
+    category === "sky"
+      ? "transparent background, floating, no ground, no shadow, no scenery — the object only,"
+      : "the object fills most of the frame and rests on the bottom edge, minimal empty margin, transparent background, no ground, no floor, no shadow, no scenery — the object only,";
   return [
     `A single isolated ${description},`,
+    `${CATEGORY_CUE[category]},`,
     "isometric pixel art, 3/4 perspective view from above-front,",
     "painterly soft pixel art style matching Stardew Valley town and Habbo plaza aesthetic,",
     "soft 1px outline edges, chunky readable proportions,",
     "one single object, the entire object fully in frame and not cropped,",
-    // Fill the frame and sit on the bottom edge so the renderer's
-    // object-bottom anchoring matches the static catalog sprites (which are
-    // tightly cropped to the object). Minimal transparent margin.
-    "the object fills most of the frame and rests on the bottom edge, minimal empty margin,",
-    "transparent background, no ground, no floor, no shadow, no scenery — the object only,",
+    groundLine,
     "a contemporary urban small-plaza prop, not fantasy.",
   ].join(" ");
 }
@@ -177,8 +196,9 @@ async function genSpritePng(prompt: string, apiKey: string): Promise<Buffer | nu
 export async function generateObjectSpriteBytes(
   description: string,
   apiKey: string,
+  category: Category = "landmark",
 ): Promise<Buffer | null> {
-  const prompt = buildObjectPrompt(description);
+  const prompt = buildObjectPrompt(description, category);
   for (let attempt = 0; attempt < SPRITE_RETRIES; attempt++) {
     const png = await genSpritePng(prompt, apiKey);
     if (png) return png;
@@ -208,8 +228,9 @@ async function generateAndUploadSprite(
   sb: SupabaseClient,
   description: string,
   apiKey: string,
+  category: Category = "landmark",
 ): Promise<string | null> {
-  const png = await generateObjectSpriteBytes(description, apiKey);
+  const png = await generateObjectSpriteBytes(description, apiKey, category);
   if (!png) return null;
   return uploadObjectSprite(sb, png, "dynamic");
 }
@@ -225,6 +246,9 @@ export async function insertObjectType(
     labelKo: string;
     nativeHeightPct: number;
     topics: string[];
+    category: Category;
+    genDescription: string | null;
+    isExemplar?: boolean;
     originTopic: string | null;
     originDescKey: string | null;
     spriteUrl: string;
@@ -237,6 +261,9 @@ export async function insertObjectType(
       label_ko: params.labelKo,
       native_height_pct: params.nativeHeightPct,
       topics: params.topics,
+      category: params.category,
+      gen_description: params.genDescription,
+      is_exemplar: params.isExemplar ?? false,
       origin: "dynamic",
       origin_topic: params.originTopic,
       origin_desc_key: params.originDescKey,
@@ -267,6 +294,7 @@ export async function insertObjectType(
     labelKo: params.labelKo,
     nativeHeightPct: params.nativeHeightPct,
     topics: params.topics,
+    category: params.category,
     origin: "dynamic",
     originTopic: params.originTopic,
     originDescKey: params.originDescKey,
@@ -290,6 +318,24 @@ async function fetchTypeByOriginKey(
   return rowToType(data as TypeRow);
 }
 
+/** Approved (is_exemplar) gen descriptions for a category — the few-shot guide. */
+export async function fetchExemplars(
+  sb: SupabaseClient,
+  category: Category,
+  limit = 4,
+): Promise<string[]> {
+  const { data } = await sb
+    .from("object_types")
+    .select("gen_description")
+    .eq("category", category)
+    .eq("is_exemplar", true)
+    .not("gen_description", "is", null)
+    .limit(limit);
+  return (data ?? [])
+    .map((r) => (r as { gen_description: string | null }).gen_description)
+    .filter((d): d is string => !!d);
+}
+
 export async function tryGenerateDynamicType(
   sb: SupabaseClient,
   args: DynamicGenArgs,
@@ -297,8 +343,11 @@ export async function tryGenerateDynamicType(
   const apiKey = genKey();
   if (!apiKey) return null;
 
-  // 1. Description + label (Haiku).
-  const composed = await composeObject(args.topic, args.slotTopics);
+  const category: Category = args.category ?? "landmark";
+
+  // 1. Description + label (Haiku), with category cue + few-shot exemplars.
+  const exemplars = await fetchExemplars(sb, category);
+  const composed = await composeObject(args.topic, args.slotTopics, { category, exemplars });
   if (!composed) return null;
   const descKey = descKeyOf(composed.desc);
 
@@ -307,60 +356,33 @@ export async function tryGenerateDynamicType(
   if (existing && existing.variants.length > 0) return existing;
 
   // 3. Sprite (retried internally).
-  const spriteUrl = await generateAndUploadSprite(sb, composed.desc, apiKey);
+  const spriteUrl = await generateAndUploadSprite(sb, composed.desc, apiKey, category);
   if (!spriteUrl) return null;
 
-  // 4. INSERT type + first variant.
+  // 4. INSERT type + first variant (handles race via unique constraint).
   const typeKey = `dyn_${descKey}`;
-  const { data: typeRow, error: typeErr } = await sb
-    .from("object_types")
-    .insert({
-      type_key: typeKey,
-      label_ko: composed.label,
-      native_height_pct: args.slotHeightPct,
-      topics: [args.topic, ...args.slotTopics],
-      origin: "dynamic",
-      origin_topic: args.topic,
-      origin_desc_key: descKey,
-    })
-    .select("id")
-    .single();
-
-  if (typeErr || !typeRow) {
-    // unique(origin_topic, origin_desc_key) — a concurrent world won the race.
-    // Reuse theirs (our uploaded sprite becomes a harmless orphan).
-    const raced = await fetchTypeByOriginKey(sb, args.topic, descKey);
-    if (raced && raced.variants.length > 0) return raced;
-    console.warn("[dyn-obj] type insert failed:", typeErr?.message);
-    return null;
-  }
-
-  const typeId = (typeRow as { id: string }).id;
-  const { data: varRow, error: varErr } = await sb
-    .from("object_variants")
-    .insert({ type_id: typeId, variant_idx: 1, sprite_url: spriteUrl })
-    .select("id, variant_idx, sprite_url")
-    .single();
-  if (varErr || !varRow) {
-    console.warn("[dyn-obj] variant insert failed:", varErr?.message);
-    return null;
-  }
-
-  invalidateCatalog(); // so plaza-grow's next catalogByTypeKey sees the new type
-
-  const v = varRow as { id: string; variant_idx: number; sprite_url: string };
-  return {
-    id: typeId,
+  const inserted = await insertObjectType(sb, {
     typeKey,
     labelKo: composed.label,
     nativeHeightPct: args.slotHeightPct,
     topics: [args.topic, ...args.slotTopics],
-    origin: "dynamic",
+    category,
+    genDescription: composed.desc,
     originTopic: args.topic,
     originDescKey: descKey,
-    usageCount: 0,
-    variants: [{ id: v.id, variantIdx: v.variant_idx, spriteUrl: v.sprite_url }],
-  };
+    spriteUrl,
+  });
+
+  if (!inserted) {
+    // unique(origin_topic, origin_desc_key) — a concurrent world won the race.
+    // Reuse theirs (our uploaded sprite becomes a harmless orphan).
+    const raced = await fetchTypeByOriginKey(sb, args.topic, descKey);
+    if (raced && raced.variants.length > 0) return raced;
+    console.warn("[dyn-obj] type insert failed (race)");
+    return null;
+  }
+
+  return inserted;
 }
 
 /** Variant lazy generation — fire-and-forget after a placement when a type
@@ -381,10 +403,10 @@ export async function tryGenerateVariant(sb: SupabaseClient, typeId: string): Pr
   // We don't persist the original English description, so regenerate from the
   // topic with an explicit "make it clearly different" hint for visual variety.
   const topic = type.originTopic ?? type.topics[0] ?? type.labelKo;
-  const composed = await composeObject(topic, type.topics, "원본과 색/재질/실루엣이 뚜렷이 다른 같은 종류의 변형.");
+  const composed = await composeObject(topic, type.topics, { category: type.category, variationHint: "원본과 색/재질/실루엣이 뚜렷이 다른 같은 종류의 변형." });
   if (!composed) return false;
 
-  const spriteUrl = await generateAndUploadSprite(sb, composed.desc, apiKey);
+  const spriteUrl = await generateAndUploadSprite(sb, composed.desc, apiKey, type.category);
   if (!spriteUrl) return false;
 
   const { error: insErr } = await sb
@@ -398,3 +420,7 @@ export async function tryGenerateVariant(sb: SupabaseClient, typeId: string): Pr
   invalidateCatalog();
   return true;
 }
+
+// Test-only surface (pure functions; no network).
+export const descKeyForTest = descKeyOf;
+export function buildObjectPromptForTest(d: string, c: Category) { return buildObjectPrompt(d, c); }
