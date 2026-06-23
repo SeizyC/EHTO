@@ -15,7 +15,24 @@ let _loading = false;
 let _rtBoundWorldId: string | null = null;
 let _rtUnsub: (() => void) | null = null;
 const _listeners = new Set<() => void>();
-function _notify() { for (const fn of _listeners) fn(); }
+
+// Mirror placements to localStorage so a hard reload (e.g. returning from a
+// Stripe redirect) repaints the plaza from cache INSTANTLY, then revalidates.
+// Hydrated inside the hook (not at module load) to avoid SSR/CSR mismatch.
+const LS_KEY = "ehto:objects-cache:v1";
+let _lsHydrated = false;
+function _loadFromLs(): PlazaObject[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(LS_KEY);
+    return raw ? (JSON.parse(raw) as PlazaObject[]) : null;
+  } catch { return null; }
+}
+function _saveToLs() {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(LS_KEY, JSON.stringify(_objects)); } catch { /* quota/private — ignore */ }
+}
+function _notify() { _saveToLs(); for (const fn of _listeners) fn(); }
 
 export function clearPlazaObjects() {
   _objects = [];
@@ -117,10 +134,17 @@ export async function refreshPlazaObjects(): Promise<void> {
 export function usePlazaObjects(): PlazaObject[] {
   const [snap, setSnap] = useState<PlazaObject[]>(_objects);
   useEffect(() => {
+    if (!_lsHydrated) {
+      _lsHydrated = true;
+      if (_objects.length === 0) {
+        const cached = _loadFromLs();
+        if (cached && cached.length) _objects = cached;
+      }
+    }
     const sync = () => setSnap(_objects.slice());
     sync();
     _listeners.add(sync);
-    if (_objects.length === 0) refreshPlazaObjects();
+    refreshPlazaObjects(); // always revalidate in the background (stale-while-revalidate)
     return () => { _listeners.delete(sync); };
   }, []);
   return snap;

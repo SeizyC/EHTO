@@ -51,7 +51,24 @@ let _energy: EnergyView | null = null;
 let _rtBoundWorldId: string | null = null;
 let _rtUnsub: (() => void) | null = null;
 const _listeners = new Set<() => void>();
-function _notify() { for (const fn of _listeners) fn(); }
+
+// Mirror the roster to localStorage so a hard reload (e.g. returning from a
+// Stripe redirect) repaints residents INSTANTLY, then revalidates. Hydrated in
+// the hook (not at module load) to avoid SSR/CSR mismatch.
+const LS_KEY = "ehto:members-cache:v1";
+let _lsHydrated = false;
+function _loadFromLs(): Member[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(LS_KEY);
+    return raw ? (JSON.parse(raw) as Member[]) : null;
+  } catch { return null; }
+}
+function _saveToLs() {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(LS_KEY, JSON.stringify(_members)); } catch { /* quota/private — ignore */ }
+}
+function _notify() { _saveToLs(); for (const fn of _listeners) fn(); }
 
 /** Wipe in-memory members cache (e.g. on sign-out or account switch). */
 export function clearMembers() {
@@ -182,10 +199,17 @@ export async function refreshMembers(): Promise<void> {
 export function useMembers(): Member[] {
   const [snap, setSnap] = useState<Member[]>(_members);
   useEffect(() => {
+    if (!_lsHydrated) {
+      _lsHydrated = true;
+      if (_members.length === 0) {
+        const cached = _loadFromLs();
+        if (cached && cached.length) _members = cached;
+      }
+    }
     const sync = () => setSnap(_members.slice());
     sync();
     _listeners.add(sync);
-    if (_members.length === 0) refreshMembers();
+    refreshMembers(); // always revalidate in the background (stale-while-revalidate)
     return () => { _listeners.delete(sync); };
   }, []);
   return snap;

@@ -13,6 +13,7 @@ import { clearCharacter } from "@/lib/character-store";
 import { clearChat } from "@/lib/chat-store";
 import { clearMembers } from "@/lib/members-store";
 import { clearWorld } from "@/lib/world-store";
+import { clearPlazaObjects } from "@/lib/objects-store";
 
 /** Reset every per-user cache (server-derived state + localStorage). */
 function clearAllUserCaches() {
@@ -20,6 +21,7 @@ function clearAllUserCaches() {
   clearChat();
   clearMembers();
   clearWorld();
+  clearPlazaObjects();
 }
 
 type AuthCtx = {
