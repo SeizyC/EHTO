@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { browserClient } from "@/lib/supabase";
@@ -21,6 +21,11 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [redirectPath, setRedirectPath] = useState<string | null>(null);
+  // True once the user submits the login form. The "이미 로그인되어 있어요"
+  // modal is ONLY for visitors who arrive already-authed — when a fresh
+  // sign-in flips `session`, this guard stops that effect from flashing the
+  // modal on top of onSubmit's own redirect.
+  const loggingIn = useRef(false);
 
   const { locale, pick } = useLocale(DEFAULT_LOCALE);
   const t = ONBOARDING[locale].login;
@@ -28,8 +33,9 @@ export default function LoginPage() {
   useEffect(() => {
     // Already-signed-in visit: resolve the destination, then show a brief
     // "이미 로그인되어 있어요" modal before moving — rather than flashing the
-    // empty login form and silently redirecting.
-    if (sessLoading || !session) return;
+    // empty login form and silently redirecting. Skipped when the session
+    // just appeared because the user logged in here (onSubmit redirects).
+    if (sessLoading || !session || loggingIn.current) return;
     let cancelled = false;
     (async () => {
       const path = await landingPathForSession(session.access_token);
@@ -43,6 +49,7 @@ export default function LoginPage() {
     if (submitting) return;
     setErr(null);
     setSubmitting(true);
+    loggingIn.current = true;
     const sb = browserClient();
     const { data, error } = await sb.auth.signInWithPassword({
       email: email.trim(),
@@ -50,6 +57,7 @@ export default function LoginPage() {
     });
     setSubmitting(false);
     if (error) {
+      loggingIn.current = false; // failed → allow the already-authed modal later
       setErr(messageForError(error.message, t));
       return;
     }
