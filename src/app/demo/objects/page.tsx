@@ -31,8 +31,8 @@ export default function DemoObjectsPage() {
           </p>
         </div>
         <nav className="flex gap-3 text-[12px]">
-          <Link href="/demo/plaza" className="text-sub hover:text-ink transition">
-            /demo/plaza
+          <Link href="/admin/demo/plaza" className="text-sub hover:text-ink transition">
+            /admin/demo/plaza
           </Link>
           <Link href="/world" className="text-sub hover:text-ink transition">
             /world
