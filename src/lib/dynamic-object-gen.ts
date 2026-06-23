@@ -150,8 +150,8 @@ export async function composeObject(
 function buildObjectPrompt(description: string, category: Category = "landmark"): string {
   const groundLine =
     category === "sky"
-      ? "transparent background, floating, no ground, no shadow, no scenery — the object only,"
-      : "the object fills most of the frame and rests on the bottom edge, minimal empty margin, transparent background, no ground, no floor, no shadow, no scenery — the object only,";
+      ? "transparent background, floating, no ground,"
+      : "the object fills most of the frame and rests on the bottom edge, minimal empty margin, transparent background, no ground, no floor,";
   return [
     `A single isolated ${description},`,
     `${CATEGORY_CUE[category]},`,
@@ -160,7 +160,10 @@ function buildObjectPrompt(description: string, category: Category = "landmark")
     "soft 1px outline edges, chunky readable proportions,",
     "one single object, the entire object fully in frame and not cropped,",
     groundLine,
-    "a contemporary urban small-plaza prop, not fantasy.",
+    // Hard no-shadow: gpt-image-1 otherwise bakes a soft cast shadow under the
+    // object that reads wrong against the plaza floor. Flat, even lighting.
+    "absolutely no shadow, no cast shadow, no drop shadow, no ground shadow, flat even lighting,",
+    "no scenery — the object only, a contemporary urban small-plaza prop, not fantasy.",
   ].join(" ");
 }
 

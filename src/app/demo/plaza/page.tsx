@@ -47,25 +47,23 @@ export default function DemoPlaza() {
       });
       const j = await r.json();
       const types: ObjectType[] = j.types ?? [];
-      const BAND_Y: Record<string, number> = { sky: 34, building: 60, landmark: 70, prop: 82, pet: 86 };
-      const groups: Record<string, ObjectType[]> = {};
-      for (const t of types) (groups[t.category] ??= []).push(t);
-      const objects: PlazaObject[] = [];
-      for (const [cat, list] of Object.entries(groups)) {
-        const y = BAND_Y[cat] ?? 80;
-        list.forEach((t, i) => {
-          const x = list.length === 1 ? 50 : 8 + (84 * i) / (list.length - 1);
-          objects.push({
-            id: t.id,
-            type: t.typeKey,
-            x,
-            y,
-            spriteUrl: t.variants[0]?.spriteUrl ?? null,
-            nativeHeightPct: t.nativeHeightPct,
-            labelKo: t.labelKo,
-          });
-        });
-      }
+      // Depth band per category (y = feet). Spread EVERY object across its own
+      // x lane so tall objects (buildings) never sit on top of a high, small
+      // sky object — PlazaCanvas paints low-y first (behind), so shared lanes
+      // would hide the back items. Distinct x lanes keep all visible.
+      const BAND_Y: Record<string, number> = { sky: 20, building: 58, landmark: 68, prop: 80, pet: 84 };
+      const ORDER: Record<string, number> = { sky: 0, building: 1, landmark: 2, prop: 3, pet: 4 };
+      const sorted = types.slice().sort((a, b) => (ORDER[a.category] ?? 9) - (ORDER[b.category] ?? 9));
+      const n = sorted.length;
+      const objects: PlazaObject[] = sorted.map((t, i) => ({
+        id: t.id,
+        type: t.typeKey,
+        x: n <= 1 ? 50 : 8 + (84 * i) / (n - 1),
+        y: BAND_Y[t.category] ?? 80,
+        spriteUrl: t.variants[0]?.spriteUrl ?? null,
+        nativeHeightPct: t.nativeHeightPct,
+        labelKo: t.labelKo,
+      }));
       setCatalog({ objects });
     } finally {
       setLoadingCat(false);
