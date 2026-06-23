@@ -108,6 +108,7 @@ export type OnboardingCopy = {
     ticketLabel: string;
     ticketAria: string; // "… {n} / {max}"
     genSteps: [string, string, string, string, string, string];
+    genAlmostDone: string; // shown under the bar on the last gen step
     resEnter: string;
     resRegen: string; // "… {n} …"
     resRegenLocked: string;
@@ -245,6 +246,7 @@ const ko: OnboardingCopy = {
       "머리 모양을 정하는 중",
       "마지막 디테일을 다듬는 중",
     ],
+    genAlmostDone: "거의 다되가요!",
     resEnter: "이 모습으로 들어가기",
     resRegen: "다시 만들기 · {n}번 남음",
     resRegenLocked: "티켓으로 한 번 더 (잠금)",
@@ -382,6 +384,7 @@ const en: OnboardingCopy = {
       "Styling the hair",
       "Polishing the last details",
     ],
+    genAlmostDone: "Almost there!",
     resEnter: "Enter as this look",
     resRegen: "Make again · {n} left",
     resRegenLocked: "One more with a ticket (locked)",
@@ -519,6 +522,7 @@ const ja: OnboardingCopy = {
       "髪型を決めています",
       "最後のディテールを整えています",
     ],
+    genAlmostDone: "もうすぐです！",
     resEnter: "この姿で入る",
     resRegen: "作り直す · 残り{n}回",
     resRegenLocked: "チケットでもう一度（ロック）",

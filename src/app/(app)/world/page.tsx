@@ -6,6 +6,7 @@ import { AmbientHeader } from "@/components/AmbientHeader";
 import { EnergyMeter } from "@/components/EnergyMeter";
 import { MeGlyph } from "@/components/MeGlyph";
 import { EhtoBadge } from "@/components/EhtoBadge";
+import { RandomPlazaDice } from "@/components/RandomPlazaDice";
 import { PlazaCanvas, type PlazaCharacter } from "@/components/PlazaCanvas";
 import { AmbientFeed } from "@/components/AmbientFeed";
 import { Composer } from "@/components/Composer";
@@ -102,6 +103,19 @@ export default function WorldPage() {
   const [meOpen, setMeOpen] = useState(false);
   const [roomOpen, setRoomOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  // Admin-only entry points (e.g. the 🌐 plaza-home jump is hidden from regular
+  // users for now). Lightweight probe; defaults to non-admin.
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    if (auth.loading || !auth.session) return;
+    let cancelled = false;
+    fetch("/api/admin/me", { headers: { Authorization: `Bearer ${auth.session.access_token}` } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (!cancelled && j?.admin) setIsAdmin(true); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [auth.loading, auth.session]);
 
   // Mobile plaza zoom — controls the displayed pixel dimensions of
   // the canvas while keeping internal % coords unchanged. Steps tuned
@@ -302,37 +316,42 @@ export default function WorldPage() {
   const headerNode = (
     <header className="flex items-start justify-between px-5 pb-3 pt-5 lg:px-0">
       <div className="flex flex-col gap-1">
-        <button
-          onClick={() => setRoomOpen(true)}
-          className="group text-ink hover:opacity-90 flex items-center gap-1.5 text-[18px] font-medium leading-none transition"
-          aria-label="방 정보"
-        >
-          {world?.name ? (
-            <>
-              <span>{world.name}</span>
-              <span className="text-sub group-hover:text-ink text-[12px] transition">›</span>
-            </>
-          ) : world && !world.name ? (
-            <>
-              <span className="text-sub font-normal">이름 짓기</span>
-              <span className="text-sub group-hover:text-ink text-[12px] transition">›</span>
-            </>
-          ) : (
-            <span className="bg-line block h-[18px] w-28 animate-pulse rounded-md" />
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setRoomOpen(true)}
+            className="group text-ink hover:opacity-90 flex items-center gap-1.5 text-[18px] font-medium leading-none transition"
+            aria-label="방 정보"
+          >
+            {world?.name ? (
+              <>
+                <span>{world.name}</span>
+                <span className="text-sub group-hover:text-ink text-[12px] transition">›</span>
+              </>
+            ) : world && !world.name ? (
+              <>
+                <span className="text-sub font-normal">이름 짓기</span>
+                <span className="text-sub group-hover:text-ink text-[12px] transition">›</span>
+              </>
+            ) : (
+              <span className="bg-line block h-[18px] w-28 animate-pulse rounded-md" />
+            )}
+          </button>
+          <RandomPlazaDice />
+        </div>
         <AmbientHeader mood={mood.label} onPeek={() => setRoomOpen(true)} />
       </div>
       <div className="flex items-center gap-4">
         <EnergyMeter />
-        <a
-          href="/home"
-          aria-label="광장 홈"
-          title="광장 홈"
-          className="text-[26px] leading-none transition hover:opacity-100 opacity-90"
-        >
-          🌐
-        </a>
+        {isAdmin && (
+          <a
+            href="/home"
+            aria-label="광장 홈"
+            title="광장 홈 (관리자)"
+            className="text-[26px] leading-none transition hover:opacity-100 opacity-90"
+          >
+            🌐
+          </a>
+        )}
         <EhtoBadge />
         <MeGlyph onOpen={() => setMeOpen(true)} />
       </div>

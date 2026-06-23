@@ -9,6 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const EHTO_KIND = "ehto" as const;
 export const START_GRANT = 10; // EHTO granted once at onboarding finalize
+export const RANDOM_VISIT_PRICE = 1; // EHTO to roll the dice → a random public plaza
 
 export type EhtoAction =
   | "character_change"

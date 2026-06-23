@@ -420,6 +420,10 @@ function GeneratingView() {
             style={{ animation: `barFill ${ms}ms ease-out forwards` }}
           />
         </div>
+        {/* Reassurance on the final step, under the bar. */}
+        {step === t.genSteps.length - 1 && (
+          <p className="text-sub animate-fade-up text-center text-[12px]">{t.genAlmostDone}</p>
+        )}
       </div>
     </section>
   );
