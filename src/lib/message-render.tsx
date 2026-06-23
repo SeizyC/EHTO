@@ -13,7 +13,8 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
+import { openYoutube } from "@/lib/youtube-player-store";
 
 const SPOTIFY_RE =
   /https?:\/\/open\.spotify\.com\/(track|album|playlist|episode)\/([a-zA-Z0-9]+)(?:\?[^\s]*)?/g;
@@ -73,36 +74,17 @@ export function renderMessage(text: string): React.ReactNode {
 }
 
 function YoutubeThumb({ url, videoId }: { url: string; videoId: string }) {
-  // Click-to-play. We start with a lightweight thumbnail (no iframe load
-  // cost up-front, especially important when many cards appear in the
-  // feed at once) and swap to an autoplaying iframe on click. The
-  // outbound link only fires if the user middle/cmd-clicks — primary
-  // left-click is intercepted to mount the player.
+  // Click-to-play. The thumbnail is lightweight (no iframe load cost
+  // up-front, especially with many cards in the feed). A plain left-click
+  // opens the shared centered player overlay (youtube-player-store) rather
+  // than mounting an iframe in place — floating speech bubbles are
+  // ephemeral and tiny, so an inline player there vanishes mid-watch. The
+  // outbound link still fires on middle/cmd-click.
   //
   // hqdefault gotcha: YouTube serves a 120×90 gray "video unavailable"
   // placeholder with 200 OK for deleted/private videos. We detect via
   // naturalWidth (real hqdefault is 480×360) and hide it.
-  const [playing, setPlaying] = useState(false);
   const thumb = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
-
-  if (playing) {
-    return (
-      <div
-        className="border-line relative my-1.5 block overflow-hidden rounded-lg border"
-        style={{ width: 240, aspectRatio: "16 / 9", background: "#000" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <iframe
-          src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`}
-          title="YouTube 영상"
-          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-          allowFullScreen
-          className="absolute inset-0 h-full w-full"
-          style={{ border: 0 }}
-        />
-      </div>
-    );
-  }
 
   return (
     <a
@@ -111,11 +93,11 @@ function YoutubeThumb({ url, videoId }: { url: string; videoId: string }) {
       rel="noopener noreferrer"
       onClick={(e) => {
         // Modifier-clicks / middle-click → let the browser open YouTube.
-        // Plain left-click → play inline.
+        // Plain left-click → open the shared player overlay.
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
         e.preventDefault();
         e.stopPropagation();
-        setPlaying(true);
+        openYoutube(videoId);
       }}
       className="border-line hover:bg-panel relative my-1.5 block overflow-hidden rounded-lg border transition"
       style={{ width: 240, background: "#0a0a0a" }}

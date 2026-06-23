@@ -16,6 +16,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { PlazaCanvas, type PlazaCharacter } from "@/components/PlazaCanvas";
 import { renderMessage } from "@/lib/message-render";
+import { YoutubePlayerModal } from "@/components/YoutubePlayerModal";
 import type { PlazaObject } from "@/lib/plaza-objects";
 import { currentBucket } from "@/lib/time-of-day";
 
@@ -157,6 +158,7 @@ export default function VisitorPage({
 
   return (
     <>
+      <YoutubePlayerModal />
       <main
         className={
           "grain mx-auto flex min-h-dvh max-w-[420px] flex-col pb-[24px] " +

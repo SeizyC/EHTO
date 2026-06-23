@@ -15,6 +15,7 @@ import { RoomInfoSheet } from "@/components/RoomInfoSheet";
 import { ParticipantList } from "@/components/ParticipantList";
 import { HistorySheet } from "@/components/HistorySheet";
 import { MusicShareStack } from "@/components/MusicShareStack";
+import { YoutubePlayerModal } from "@/components/YoutubePlayerModal";
 import { useCharacter, loadCharacter } from "@/lib/character-store";
 import { useSession } from "@/components/AuthProvider";
 import { useMembers, refreshMembers, type Member } from "@/lib/members-store";
@@ -360,6 +361,7 @@ export default function WorldPage() {
 
   return (
     <>
+      <YoutubePlayerModal />
       <main
         className={
           "grain mx-auto flex min-h-dvh max-w-[420px] flex-col pb-[88px] " +
