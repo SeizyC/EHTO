@@ -222,6 +222,31 @@ const CATEGORIES: Array<{ key: "prop" | "landmark" | "building" | "sky" | "pet";
   { key: "pet", label: "펫", h: 6 },
 ];
 
+/** Strip gpt-image-1's occasional thin edge frame: clear a small transparent
+ *  border ring via canvas. The object is centered with margin, so a ~6px ring
+ *  (of a 1024px sprite) is imperceptible. Browser-only — runs before save. */
+async function trimFrame(dataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = img.width;
+      c.height = img.height;
+      const ctx = c.getContext("2d");
+      if (!ctx) { resolve(dataUrl); return; }
+      ctx.drawImage(img, 0, 0);
+      const ring = Math.max(4, Math.round(img.width * 0.006));
+      ctx.clearRect(0, 0, c.width, ring);
+      ctx.clearRect(0, c.height - ring, c.width, ring);
+      ctx.clearRect(0, 0, ring, c.height);
+      ctx.clearRect(c.width - ring, 0, ring, c.height);
+      resolve(c.toDataURL("image/png"));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 function AddObjectModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]["key"]>("landmark");
   const [topic, setTopic] = useState("");
@@ -250,7 +275,7 @@ function AddObjectModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "생성 실패");
-      setDataUrl(j.dataUrl); setDesc(j.desc);
+      setDataUrl(await trimFrame(j.dataUrl)); setDesc(j.desc);
       if (!label) setLabel(j.label);
       if (!topics && topic) setTopics(topic);
     } catch (e) { setErr(e instanceof Error ? e.message : "생성 실패"); }
