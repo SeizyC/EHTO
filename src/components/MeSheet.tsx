@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCharacter, saveHandle, clearCharacter } from "@/lib/character-store";
 import { EhtoWallet } from "@/components/EhtoWallet";
+import { InvitePanel } from "@/components/InvitePanel";
 import { worldAge } from "@/lib/age";
 import { useSession } from "@/components/AuthProvider";
 import { browserClient } from "@/lib/supabase";
@@ -103,8 +104,14 @@ export function MeSheet({ open, onClose }: Props) {
               <HandleEditor initial={character?.handle ?? null} />
             </section>
 
-            {/* EHTO wallet — balance + spend (초대 / 이어서 보기) */}
+            {/* EHTO wallet — balance + spend (먼저 부르기 / 이어서 보기) */}
             <EhtoWallet />
+
+            {/* My invite codes — a personal/account thing, so it lives in the
+                profile menu (was previously buried in the room-info sheet). */}
+            <div className="mt-4 px-6">
+              <InvitePanel open={open} />
+            </div>
 
             {/* Menu — PRD §5.4 aligned */}
             <nav className="mt-6 flex flex-col px-6">

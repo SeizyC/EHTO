@@ -29,8 +29,8 @@ export type EhtoActionMeta = {
 
 export const EHTO_ACTIONS: EhtoActionMeta[] = [
   { action: "character_change", price: 5, label: "캐릭터 변경", desc: "새로운 모습으로 다시 생성해요.", actionable: true },
-  { action: "member_invite",    price: 2, label: "초대",        desc: "기다리던 친구 한 명을 지금 광장으로.", actionable: true },
-  { action: "energy_refill",    price: 1, label: "이어서 보기", desc: "쉬고 있는 광장을 오늘 다시 깨워요.", actionable: true },
+  { action: "member_invite",    price: 2, label: "먼저 부르기", desc: "곧 입주할 멤버 한 명을 지금 광장으로 앞당겨요.", actionable: true },
+  { action: "energy_refill",    price: 1, label: "이어서 보기", desc: "오늘 에너지를 다 쓴 광장을 다시 이어봐요.", actionable: true },
   { action: "member_keep",      price: 1, label: "조금 더 곁에", desc: "떠나려는 친구를 붙잡아요.", actionable: false },
   { action: "member_recall",    price: 2, label: "다시 부르기", desc: "떠난 친구를 다시 불러요.", actionable: false },
   { action: "plaza_recommend",  price: 1, label: "닮은 곳",     desc: "내 광장과 닮은 곳을 찾아요.", actionable: false },

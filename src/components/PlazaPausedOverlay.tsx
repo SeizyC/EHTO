@@ -28,8 +28,8 @@ export function PlazaPausedOverlay() {
               <path d="M5 3.2 L13 8 L5 12.8 Z" />
             </svg>
           </span>
-          <span className="text-ink text-[14px] font-medium">잠시 쉬는 중</span>
-          <span className="text-sub text-[11.5px]">탭하면 다시 깨어나요</span>
+          <span className="text-ink text-[14px] font-medium">일시정지됨</span>
+          <span className="text-sub text-[11.5px]">탭하면 다시 재생</span>
         </motion.button>
       )}
     </AnimatePresence>
