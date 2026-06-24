@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { OBJECT_CATALOG, type PlazaObjectType, type PlazaState } from "@/lib/plaza-objects";
 import { currentBucket, type TimeBucket } from "@/lib/time-of-day";
 import { hasEmbed, renderMessage } from "@/lib/message-render";
+import { CelestialLayer } from "@/components/plaza/CelestialLayer";
 
 // Shell that adds the downward-pointing triangle tail under any bubble.
 // Used by both the idle name tag and the active message bubble so the
@@ -461,7 +462,10 @@ export function PlazaCanvas({
           height: `${SKY_FADE_PCT}%`,
           background: `linear-gradient(to bottom, rgba(${skyTopColor(bucket)},0.92) 0%, rgba(${skyTopColor(bucket)},0.55) 45%, rgba(${skyTopColor(bucket)},0) 100%)`,
         }}
-      />
+      >
+        {/* Moon (with phase) + occasional shooting star — night/evening. */}
+        <CelestialLayer bucket={bucket} />
+      </div>
 
       {/* click ripple feedback */}
       {ripple && (
