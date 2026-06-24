@@ -65,8 +65,9 @@ export function CelestialLayer({ bucket }: { bucket: TimeBucket }) {
           background: lit,
           WebkitMaskImage: mask,
           maskImage: mask,
-          filter: "drop-shadow(0 0 8px rgba(240,228,170,0.42))",
-          opacity: 0.85,
+          filter:
+            "drop-shadow(0 0 8px rgba(243,230,170,0.7)) drop-shadow(0 0 20px rgba(240,225,160,0.5)) drop-shadow(0 0 34px rgba(238,222,150,0.3))",
+          opacity: 0.9,
         }}
       />
 
