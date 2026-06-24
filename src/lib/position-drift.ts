@@ -28,8 +28,10 @@ import {
 // gives comfortable capacity ≈ 30 characters before stacking.
 const FLOOR_X_MIN = 5;
 const FLOOR_X_MAX = 95;
-const FLOOR_Y_MIN = 32;
-const FLOOR_Y_MAX = 82;
+// MIN raised to 42 (2026-06-24): top band reserved for the sky-fade + aerial
+// objects, so roaming people don't walk up into the "sky".
+const FLOOR_Y_MIN = 42;
+const FLOOR_Y_MAX = 88;
 // Plaza center — characters left of this face right and vice versa,
 // so the room reads as people gravitating toward the middle rather
 // than a forward-facing lineup.
@@ -40,9 +42,9 @@ const PLAZA_CENTER_X = 50;
 // front/mid/back variance. Re-tuned 2026-05-31 to span the wider y
 // floor band (32–82).
 const DEPTH_BUCKETS: Array<[number, number]> = [
-  [32, 49],   // back
-  [50, 66],   // mid
-  [67, 82],   // front
+  [42, 57],   // back
+  [58, 73],   // mid
+  [74, 88],   // front
 ];
 
 // Per-member minimum gap between two drifts. 45s gives the room a

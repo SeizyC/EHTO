@@ -102,12 +102,29 @@ function IdleNameTag({ name }: { name: string }) {
 // → 82 (more room at the front edge), X widened 8 → 5 / 92 → 95.
 const FLOOR_X_MIN = 5;
 const FLOOR_X_MAX = 95;
-const FLOOR_Y_MIN = 32;
-const FLOOR_Y_MAX = 82;
+// Ground band: characters/props stay between these. MIN raised to 42 so the
+// top (sky-fade) band is reserved for sky/aerial objects + the back skyline
+// of buildings, not roaming people.
+const FLOOR_Y_MIN = 42;
+const FLOOR_Y_MAX = 88;
 
 // Empty plaza bgs (objects layer on top cleanly) — used in /world and demo.
 function emptyBgPath(bucket: TimeBucket): string {
   return `/sprites/rooms/states/empty_${bucket}.png`;
+}
+
+// Top-edge sky fade. A time-of-day tint fading down into the floor — gives a
+// "sky" region at the top (where the aerial objects live) without new scene
+// art. SKY_FADE_PCT is how far down it reaches.
+const SKY_FADE_PCT = 40;
+function skyTopColor(bucket: TimeBucket): string {
+  switch (bucket) {
+    case "dawn":      return "40, 48, 86";
+    case "morning":   return "150, 195, 225";
+    case "afternoon": return "132, 182, 214";
+    case "evening":   return "52, 40, 64";
+    case "night":     return "8, 12, 34";
+  }
 }
 
 // Lighting filter applied to character/object sprites so they match
@@ -422,6 +439,16 @@ export function PlazaCanvas({
         alt=""
         className="absolute inset-0 h-full w-full object-cover"
         draggable={false}
+      />
+
+      {/* Top sky fade — tints the upper band into a "sky" the aerial objects
+          sit in, fading into the floor below. Above the floor, below items. */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0"
+        style={{
+          height: `${SKY_FADE_PCT}%`,
+          background: `linear-gradient(to bottom, rgba(${skyTopColor(bucket)},0.92) 0%, rgba(${skyTopColor(bucket)},0.55) 45%, rgba(${skyTopColor(bucket)},0) 100%)`,
+        }}
       />
 
       {/* click ripple feedback */}

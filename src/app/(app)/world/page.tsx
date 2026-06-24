@@ -50,8 +50,17 @@ const PLAZA_H = 1600;
 
 // Mobile zoom steps + LS key — module-level so the useEffect dep array
 // stays stable.
-const ZOOM_STEPS = [0.5, 0.65, 0.8, 1.0, 1.2, 1.5];
-const ZOOM_LS_KEY = "ehto:plaza-zoom:v1";
+// Zoom multiplies the MEASURED viewport size (see ResizeObserver below), so
+// 1.0 = the whole plaza fitted to the screen (no magnification, no empty
+// margins) and higher steps zoom in (the container scrolls / drag-pans).
+// Zoom scales a FIXED-size plaza (PLAZA_W×PLAZA_H). The window is a fixed
+// window into it — enlarging the browser reveals MORE plaza (no stretch),
+// it doesn't scale the plaza with the window. A cover-min (see renderScale)
+// keeps the plaza ≥ the viewport so there's never empty margin.
+const ZOOM_STEPS = [0.5, 0.65, 0.85, 1.1];
+const DEFAULT_ZOOM_IDX = 1; // 0.65
+// v8: fixed-plaza model with cover-min; fresh key.
+const ZOOM_LS_KEY = "ehto:plaza-zoom:v8";
 
 // "오늘"의 라벨은 KST-09:00 롤오버 기준이지만, 헤더 표시용으론 직관적
 // 인 일반 달력 날짜를 쓴다 ("2026년 5월 20일 (수)" 식). 9시 전이라면
@@ -124,20 +133,24 @@ export default function WorldPage() {
   // so "full plaza fits viewport" lives near the low end and "detail
   // mode" lives at the high end. Persisted to LS so it survives
   // reloads.
-  const [zoomIdx, setZoomIdx] = useState(1); // 0.65 default
+  const [zoomIdx, setZoomIdx] = useState(DEFAULT_ZOOM_IDX);
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(ZOOM_LS_KEY);
       if (raw === null) return;
-      const n = Number(raw);
-      if (Number.isFinite(n) && n >= 0 && n < ZOOM_STEPS.length) setZoomIdx(n);
+      const v = Number(raw);
+      if (!Number.isFinite(v)) return;
+      // Stored as a zoom VALUE — snap to the nearest available step.
+      let bi = 0, bd = Infinity;
+      ZOOM_STEPS.forEach((z, i) => { const d = Math.abs(z - v); if (d < bd) { bd = d; bi = i; } });
+      setZoomIdx(bi);
     } catch { /* ignore */ }
   }, []);
   const zoom = ZOOM_STEPS[zoomIdx];
   function setZoomStep(next: number) {
     const clamped = Math.max(0, Math.min(ZOOM_STEPS.length - 1, next));
     setZoomIdx(clamped);
-    try { window.localStorage.setItem(ZOOM_LS_KEY, String(clamped)); } catch { /* ignore */ }
+    try { window.localStorage.setItem(ZOOM_LS_KEY, String(ZOOM_STEPS[clamped])); } catch { /* ignore */ }
   }
   const me = useCharacter();
   const members = useMembers();
@@ -153,9 +166,38 @@ export default function WorldPage() {
   // _notify() and the avatar moves on the same tick as the click.
   const mePos = world?.ownerPos ?? { x: ME_X, y: ME_Y, flip: false };
   function handleFloorClick(x: number, y: number) {
+    // Swallow the click that ends a drag-pan so panning the plaza doesn't
+    // also teleport the avatar.
+    if (didPanRef.current) { didPanRef.current = false; return; }
     const flip = x < mePos.x - 0.5 ? true : x > mePos.x + 0.5 ? false : mePos.flip;
     void updateMyPosition(x, y, flip);
   }
+
+  // Mouse drag-to-pan for the (large, scrollable) plaza. Touch keeps native
+  // momentum scroll; only mouse drags pan, and a drag that actually moves
+  // sets didPanRef so the trailing click is ignored above.
+  const panRef = useRef<{ x: number; y: number; sl: number; st: number } | null>(null);
+  const didPanRef = useRef(false);
+  const panProps = {
+    onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.pointerType !== "mouse") return;
+      const el = e.currentTarget;
+      panRef.current = { x: e.clientX, y: e.clientY, sl: el.scrollLeft, st: el.scrollTop };
+    },
+    onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => {
+      const p = panRef.current;
+      if (!p) return;
+      const dx = e.clientX - p.x;
+      const dy = e.clientY - p.y;
+      if (Math.abs(dx) + Math.abs(dy) > 6) {
+        didPanRef.current = true;
+        e.currentTarget.scrollLeft = p.sl - dx;
+        e.currentTarget.scrollTop = p.st - dy;
+      }
+    },
+    onPointerUp: () => { panRef.current = null; },
+    onPointerLeave: () => { panRef.current = null; },
+  };
 
   // Live plaza state from DB (placements). PlazaCanvas expects { objects }.
   const objects = usePlazaObjects();
@@ -243,6 +285,35 @@ export default function WorldPage() {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const pcScrollerRef = useRef<HTMLDivElement | null>(null);
 
+  // Measured size of the VISIBLE plaza viewport. The canvas is sized to
+  // vp × zoom (fixed px), so zoom 1.0 fits the whole plaza to the screen with
+  // no empty margins and no magnification; higher zoom scrolls/pans. Only one
+  // scroller is display-visible per breakpoint (clientWidth>0); we track it.
+  const [vp, setVp] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const measure = () => {
+      for (const ref of [pcScrollerRef, scrollerRef]) {
+        const el = ref.current;
+        if (el && el.clientWidth > 0) { setVp({ w: el.clientWidth, h: el.clientHeight }); return; }
+      }
+    };
+    const ros = [pcScrollerRef, scrollerRef].map((ref) => {
+      const el = ref.current;
+      if (!el) return null;
+      const ro = new ResizeObserver(measure);
+      ro.observe(el);
+      return ro;
+    });
+    measure();
+    return () => { for (const r of ros) r?.disconnect(); };
+  }, []);
+
+  // Render scale = the user's zoom, but never smaller than "cover the
+  // viewport" — so the fixed plaza always fills the window (no empty margin)
+  // and a bigger window simply reveals more of it. Uniform on both axes, so
+  // the plaza never stretches non-proportionally on resize.
+  const renderScale = Math.max(zoom, vp.w / PLAZA_W || 0, vp.h / PLAZA_H || 0);
+
   /** Drop zoom to minimum and pan the visible scroll container to the
    *  plaza's geometric center. Cheap UI escape hatch when the user
    *  has zoomed/scrolled off into a corner. */
@@ -253,15 +324,12 @@ export default function WorldPage() {
     // measure and scroll.
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const z = ZOOM_STEPS[0];
-        const cx = (PLAZA_W * z) / 2;
-        const cy = (PLAZA_H * z) / 2;
         for (const ref of [scrollerRef, pcScrollerRef]) {
           const el = ref.current;
           if (!el) continue;
           el.scrollTo({
-            left: Math.max(0, cx - el.clientWidth / 2),
-            top: Math.max(0, cy - el.clientHeight / 2),
+            left: Math.max(0, el.scrollWidth / 2 - el.clientWidth / 2),
+            top: Math.max(0, el.scrollHeight / 2 - el.clientHeight / 2),
             behavior: "smooth",
           });
         }
@@ -272,8 +340,8 @@ export default function WorldPage() {
     const el = scrollerRef.current;
     if (!el) return;
     const id = requestAnimationFrame(() => {
-      const userPxX = PLAZA_W * (ME_X / 100);
-      const userPxY = PLAZA_H * (ME_Y / 100);
+      const userPxX = el.scrollWidth * (ME_X / 100);
+      const userPxY = el.scrollHeight * (ME_Y / 100);
       el.scrollLeft = Math.max(0, userPxX - el.clientWidth / 2);
       el.scrollTop  = Math.max(0, userPxY - el.clientHeight / 2);
     });
@@ -303,11 +371,11 @@ export default function WorldPage() {
     const speaker = characters.find((c) => c.id === newest!.fromCharId);
     if (!speaker) return;
 
-    const targetX = PLAZA_W * zoom * (speaker.x / 100);
     let scrolled = false;
     for (const ref of [scrollerRef, pcScrollerRef]) {
       const el = ref.current;
       if (!el || el.clientWidth === 0) continue; // hidden viewport at this breakpoint
+      const targetX = el.scrollWidth * (speaker.x / 100);
       el.scrollTo({ left: Math.max(0, targetX - el.clientWidth / 2), behavior: "smooth" });
       scrolled = true;
     }
@@ -389,6 +457,7 @@ export default function WorldPage() {
             <section className="relative lg:hidden">
               <div
                 ref={scrollerRef}
+                {...panProps}
                 className="no-scrollbar relative overflow-auto"
                 style={{
                   // Taller scroll area paired with the 2400×1600 canvas
@@ -423,8 +492,10 @@ export default function WorldPage() {
                   // 0.65 lets ~1/3 of plaza fit in viewport; +/- below
                   // lets the user trade overview for detail.
                   style={{
-                    width: PLAZA_W * zoom,
-                    height: PLAZA_H * zoom,
+                    // Fixed plaza × renderScale (uniform → no stretch). Bigger
+                    // window reveals more; never smaller than cover (no gaps).
+                    width: PLAZA_W * renderScale,
+                    height: PLAZA_H * renderScale,
                     aspectRatio: "auto",
                   }}
                 />
@@ -450,6 +521,7 @@ export default function WorldPage() {
             <section className="relative hidden lg:block">
               <div
                 ref={pcScrollerRef}
+                {...panProps}
                 className="border-line no-scrollbar relative overflow-auto rounded-xl border"
                 style={{ height: "min(80vh, 880px)" }}
               >
@@ -464,8 +536,10 @@ export default function WorldPage() {
                   }}
                   onBubbleDismiss={(id) => dismissBubble(id)}
                   style={{
-                    width: PLAZA_W * zoom,
-                    height: PLAZA_H * zoom,
+                    // Fixed plaza × renderScale (uniform → no stretch). Bigger
+                    // window reveals more; never smaller than cover (no gaps).
+                    width: PLAZA_W * renderScale,
+                    height: PLAZA_H * renderScale,
                     aspectRatio: "auto",
                   }}
                 />
