@@ -86,7 +86,7 @@ export function MusicShareStack() {
 
   return (
     <div
-      className="pointer-events-none fixed right-3 bottom-[92px] z-40 flex flex-col-reverse gap-2"
+      className="pointer-events-none absolute right-3 bottom-3 z-30 flex flex-col-reverse gap-2"
       style={{
         maxHeight: "calc(100% - 24px)",
       }}
