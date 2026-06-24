@@ -42,7 +42,7 @@ export function CelestialLayer({ bucket }: { bucket: TimeBucket }) {
 
   const size = 48;
   const R = size / 2;
-  const lit = bucket === "evening" ? "#f3d9a6" : "#dfe6fb";
+  const lit = bucket === "evening" ? "#e3c489" : "#aeb6cf";
   // Carve the shadow as a TRANSPARENT cut (same-size circle) so the dark side
   // shows the sky behind it instead of a dark disc with a visible outline.
   // cutCx: illum 0 → centered (all cut = new); illum 1 → off the disc (full).
@@ -65,8 +65,8 @@ export function CelestialLayer({ bucket }: { bucket: TimeBucket }) {
           background: lit,
           WebkitMaskImage: mask,
           maskImage: mask,
-          filter: "drop-shadow(0 0 5px rgba(220,225,255,0.45))",
-          opacity: 0.95,
+          filter: "drop-shadow(0 0 5px rgba(180,190,225,0.32))",
+          opacity: 0.82,
         }}
       />
 
