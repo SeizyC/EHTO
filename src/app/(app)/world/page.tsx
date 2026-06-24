@@ -410,6 +410,9 @@ export default function WorldPage() {
   return (
     <>
       <YoutubePlayerModal />
+      {/* Music shares — pinned to the viewport's bottom-right (above the
+          composer), one instance for all breakpoints. */}
+      <MusicShareStack />
       <main
         className={
           "grain mx-auto flex min-h-dvh max-w-[420px] flex-col pb-[88px] " +
@@ -487,10 +490,6 @@ export default function WorldPage() {
               </div>
               <div className="from-bg pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r to-transparent" />
               <div className="to-bg pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-r from-transparent" />
-              {/* Music share stack — sits in plaza bottom-right.
-                  Mobile: positioned over the scroll viewport so it stays
-                  put while plaza scrolls underneath. */}
-              <MusicShareStack />
             </section>
 
             {/* PC plaza — same fixed-pixel + scroll model as mobile so
@@ -529,8 +528,6 @@ export default function WorldPage() {
                     <PlazaLoading />
                   </div>
                 )}
-                {/* PC: music stack inside the bordered plaza container. */}
-                <MusicShareStack />
               </div>
             </section>
 
