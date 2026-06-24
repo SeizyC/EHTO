@@ -41,15 +41,19 @@ export function CelestialLayer({ bucket }: { bucket: TimeBucket }) {
   if (!night || !phase) return null;
 
   const size = 48;
+  const R = size / 2;
   const lit = bucket === "evening" ? "#f3d9a6" : "#dfe6fb";
-  const shadow = bucket === "evening" ? "#2c2238" : "#0e1738";
-  // Shadow disc (same size) slid off the lit disc by illum × size; direction
-  // by waxing/waning. illum 1 → fully off (full moon); 0 → covers all (new).
-  const shadowDx = (phase.waxing ? -1 : 1) * phase.illum * size;
+  // Carve the shadow as a TRANSPARENT cut (same-size circle) so the dark side
+  // shows the sky behind it instead of a dark disc with a visible outline.
+  // cutCx: illum 0 → centered (all cut = new); illum 1 → off the disc (full).
+  const dir = phase.waxing ? -1 : 1;
+  const cutCx = R + dir * phase.illum * 2 * R;
+  const mask = `radial-gradient(circle ${R}px at ${cutCx}px ${R}px, transparent 0 ${R - 0.5}px, #000 ${R}px)`;
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-      {/* Moon */}
+      {/* Moon — lit disc with the shadow masked out (transparent), glow hugs
+          the visible crescent via drop-shadow (no full-circle ring). */}
       <div
         style={{
           position: "absolute",
@@ -59,21 +63,12 @@ export function CelestialLayer({ bucket }: { bucket: TimeBucket }) {
           height: size,
           borderRadius: "50%",
           background: lit,
-          overflow: "hidden",
-          boxShadow: "0 0 20px rgba(220,225,255,0.35)",
-          opacity: 0.92,
+          WebkitMaskImage: mask,
+          maskImage: mask,
+          filter: "drop-shadow(0 0 5px rgba(220,225,255,0.45))",
+          opacity: 0.95,
         }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            borderRadius: "50%",
-            background: shadow,
-            transform: `translateX(${shadowDx}px)`,
-          }}
-        />
-      </div>
+      />
 
       {/* Shooting star — re-mounts on key change to replay the streak. */}
       <span
