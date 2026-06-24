@@ -54,13 +54,13 @@ const PLAZA_H = 1600;
 // 1.0 = the whole plaza fitted to the screen (no magnification, no empty
 // margins) and higher steps zoom in (the container scrolls / drag-pans).
 // Zoom scales a FIXED-size plaza (PLAZA_W×PLAZA_H). The window is a fixed
-// window into it — enlarging the browser reveals MORE plaza (no stretch),
-// it doesn't scale the plaza with the window. A cover-min (see renderScale)
-// keeps the plaza ≥ the viewport so there's never empty margin.
-const ZOOM_STEPS = [0.5, 0.65, 0.85, 1.1];
-const DEFAULT_ZOOM_IDX = 1; // 0.65
-// v8: fixed-plaza model with cover-min; fresh key.
-const ZOOM_LS_KEY = "ehto:plaza-zoom:v8";
+// window into it — enlarging the browser reveals MORE plaza (no stretch).
+// The − button steps all the way down so the user can see the whole plaza
+// smaller (with margin) if they want; + scrolls a larger plaza.
+const ZOOM_STEPS = [0.4, 0.5, 0.65, 0.85, 1.1];
+const DEFAULT_ZOOM_IDX = 2; // 0.65
+// v9: zoom applied directly (no cover-min floor) so − always shrinks.
+const ZOOM_LS_KEY = "ehto:plaza-zoom:v9";
 
 // "오늘"의 라벨은 KST-09:00 롤오버 기준이지만, 헤더 표시용으론 직관적
 // 인 일반 달력 날짜를 쓴다 ("2026년 5월 20일 (수)" 식). 9시 전이라면
@@ -285,35 +285,6 @@ export default function WorldPage() {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const pcScrollerRef = useRef<HTMLDivElement | null>(null);
 
-  // Measured size of the VISIBLE plaza viewport. The canvas is sized to
-  // vp × zoom (fixed px), so zoom 1.0 fits the whole plaza to the screen with
-  // no empty margins and no magnification; higher zoom scrolls/pans. Only one
-  // scroller is display-visible per breakpoint (clientWidth>0); we track it.
-  const [vp, setVp] = useState({ w: 0, h: 0 });
-  useEffect(() => {
-    const measure = () => {
-      for (const ref of [pcScrollerRef, scrollerRef]) {
-        const el = ref.current;
-        if (el && el.clientWidth > 0) { setVp({ w: el.clientWidth, h: el.clientHeight }); return; }
-      }
-    };
-    const ros = [pcScrollerRef, scrollerRef].map((ref) => {
-      const el = ref.current;
-      if (!el) return null;
-      const ro = new ResizeObserver(measure);
-      ro.observe(el);
-      return ro;
-    });
-    measure();
-    return () => { for (const r of ros) r?.disconnect(); };
-  }, []);
-
-  // Render scale = the user's zoom, but never smaller than "cover the
-  // viewport" — so the fixed plaza always fills the window (no empty margin)
-  // and a bigger window simply reveals more of it. Uniform on both axes, so
-  // the plaza never stretches non-proportionally on resize.
-  const renderScale = Math.max(zoom, vp.w / PLAZA_W || 0, vp.h / PLAZA_H || 0);
-
   /** Drop zoom to minimum and pan the visible scroll container to the
    *  plaza's geometric center. Cheap UI escape hatch when the user
    *  has zoomed/scrolled off into a corner. */
@@ -492,11 +463,12 @@ export default function WorldPage() {
                   // 0.65 lets ~1/3 of plaza fit in viewport; +/- below
                   // lets the user trade overview for detail.
                   style={{
-                    // Fixed plaza × renderScale (uniform → no stretch). Bigger
-                    // window reveals more; never smaller than cover (no gaps).
-                    width: PLAZA_W * renderScale,
-                    height: PLAZA_H * renderScale,
+                    // Fixed plaza × zoom. − shrinks below "fills" (margins
+                    // appear, centered); + enlarges and the container scrolls.
+                    width: PLAZA_W * zoom,
+                    height: PLAZA_H * zoom,
                     aspectRatio: "auto",
+                    margin: "auto", // center when smaller than the viewport
                   }}
                 />
                 {!world && (
@@ -536,11 +508,12 @@ export default function WorldPage() {
                   }}
                   onBubbleDismiss={(id) => dismissBubble(id)}
                   style={{
-                    // Fixed plaza × renderScale (uniform → no stretch). Bigger
-                    // window reveals more; never smaller than cover (no gaps).
-                    width: PLAZA_W * renderScale,
-                    height: PLAZA_H * renderScale,
+                    // Fixed plaza × zoom. − shrinks below "fills" (margins
+                    // appear, centered); + enlarges and the container scrolls.
+                    width: PLAZA_W * zoom,
+                    height: PLAZA_H * zoom,
                     aspectRatio: "auto",
+                    margin: "auto", // center when smaller than the viewport
                   }}
                 />
                 {!world && (
