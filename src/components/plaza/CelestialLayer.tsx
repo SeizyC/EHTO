@@ -40,7 +40,7 @@ export function CelestialLayer({ bucket }: { bucket: TimeBucket }) {
 
   if (!night || !phase) return null;
 
-  const size = 48;
+  const size = 34;
   const R = size / 2;
   const lit = bucket === "evening" ? "#e3c489" : "#e4dab4";
   // Carve the shadow as a TRANSPARENT cut (same-size circle) so the dark side
@@ -52,24 +52,32 @@ export function CelestialLayer({ bucket }: { bucket: TimeBucket }) {
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-      {/* Moon — lit disc with the shadow masked out (transparent), glow hugs
-          the visible crescent via drop-shadow (no full-circle ring). */}
-      <div
-        style={{
-          position: "absolute",
-          top: "16%",
-          right: "12%",
-          width: size,
-          height: size,
-          borderRadius: "50%",
-          background: lit,
-          WebkitMaskImage: mask,
-          maskImage: mask,
-          filter:
-            "drop-shadow(0 0 8px rgba(243,230,170,0.7)) drop-shadow(0 0 20px rgba(240,225,160,0.5)) drop-shadow(0 0 34px rgba(238,222,150,0.3))",
-          opacity: 0.9,
-        }}
-      />
+      {/* Moon: a soft glow HALO behind, then the lit disc with the shadow
+          masked out. The halo is its own element (a masked element clips its
+          own drop-shadow, which is why the glow was invisible before). */}
+      <div style={{ position: "absolute", top: "16%", right: "12%", width: size, height: size }}>
+        <div
+          style={{
+            position: "absolute",
+            inset: "-38%",
+            borderRadius: "50%",
+            background:
+              "radial-gradient(circle, rgba(245,232,175,0.28) 0%, rgba(242,228,165,0.12) 42%, rgba(240,225,160,0) 72%)",
+            filter: "blur(2px)",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            borderRadius: "50%",
+            background: lit,
+            WebkitMaskImage: mask,
+            maskImage: mask,
+            opacity: 0.92,
+          }}
+        />
+      </div>
 
       {/* Shooting star — re-mounts on key change to replay the streak. */}
       <span

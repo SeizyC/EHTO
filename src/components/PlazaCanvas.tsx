@@ -286,6 +286,10 @@ export function PlazaCanvas({
   const dogIds = state.objects.filter((o) => wanderableDogs.has(o.type as PlazaObjectType)).map((o) => o.id);
   const dogKey = dogIds.join(",");
   const [dogOffsets, setDogOffsets] = useState<Record<string, { dx: number; dy: number }>>({});
+  // Per-aerial-object size jitter, re-rolled on each animation loop so a
+  // bird/plane/balloon/cloud isn't the exact same size every pass (less
+  // monotonous). Initial 1 = SSR-safe; randomized client-side on iteration.
+  const [aerialScale, setAerialScale] = useState<Record<string, number>>({});
   useEffect(() => {
     if (dogIds.length === 0) return;
     const timers: number[] = [];
@@ -489,6 +493,13 @@ export function PlazaCanvas({
         {items.map((it) => (
           <div
             key={it.key}
+            // Aerial objects re-roll a small size jitter each animation loop so
+            // each pass looks a little different (less monotonous).
+            onAnimationIteration={
+              it.kind === "obj" && it.motion
+                ? () => setAerialScale((s) => ({ ...s, [it.key]: 0.8 + Math.random() * 0.45 }))
+                : undefined
+            }
             onClick={
               it.kind === "char" && onCharacterClick
                 ? (e) => {
@@ -583,7 +594,13 @@ export function PlazaCanvas({
                   // at dim times — faces need to stay readable even when
                   // the room reads as night.
                   filter: it.kind === "char" ? charFilter : objectFilter,
-                  transform: it.kind === "char" && it.flip ? "scaleX(-1)" : undefined,
+                  transform:
+                    it.kind === "char" && it.flip
+                      ? "scaleX(-1)"
+                      : it.kind === "obj" && it.motion && aerialScale[it.key]
+                        ? `scale(${aerialScale[it.key]})`
+                        : undefined,
+                  transformOrigin: "bottom center",
                 }}
                 draggable={false}
               />
