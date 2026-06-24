@@ -6,6 +6,7 @@ import { OBJECT_CATALOG, type PlazaObjectType, type PlazaState } from "@/lib/pla
 import { currentBucket, type TimeBucket } from "@/lib/time-of-day";
 import { hasEmbed, renderMessage } from "@/lib/message-render";
 import { CelestialLayer } from "@/components/plaza/CelestialLayer";
+import { AerialLayer, classifyAerial, type AerialDef } from "@/components/plaza/AerialLayer";
 
 // Shell that adds the downward-pointing triangle tail under any bubble.
 // Used by both the idle name tag and the active message bubble so the
@@ -118,9 +119,6 @@ function emptyBgPath(bucket: TimeBucket): string {
 // "sky" region at the top (where the aerial objects live) without new scene
 // art. SKY_FADE_PCT is how far down it reaches.
 const SKY_FADE_PCT = 40;
-// Objects above this y are "aerial" (clouds/balloon/plane/birds) and get a
-// slow horizontal drift instead of sitting still.
-const SKY_DRIFT_Y = 35;
 function skyTopColor(bucket: TimeBucket): string {
   switch (bucket) {
     case "dawn":      return "40, 48, 86";
@@ -286,10 +284,6 @@ export function PlazaCanvas({
   const dogIds = state.objects.filter((o) => wanderableDogs.has(o.type as PlazaObjectType)).map((o) => o.id);
   const dogKey = dogIds.join(",");
   const [dogOffsets, setDogOffsets] = useState<Record<string, { dx: number; dy: number }>>({});
-  // Per-aerial-object size jitter, re-rolled on each animation loop so a
-  // bird/plane/balloon/cloud isn't the exact same size every pass (less
-  // monotonous). Initial 1 = SSR-safe; randomized client-side on iteration.
-  const [aerialScale, setAerialScale] = useState<Record<string, number>>({});
   useEffect(() => {
     if (dogIds.length === 0) return;
     const timers: number[] = [];
@@ -342,7 +336,7 @@ export function PlazaCanvas({
   // separate layer rendered AFTER the y-sorted items, positioning each
   // bubble at its speaker's coordinates.
   type Item =
-    | { kind: "obj"; key: string; src: string; x: number; y: number; h: number; wandering?: boolean; motion?: "drift" | "fly-bird" | "fly-plane" }
+    | { kind: "obj"; key: string; src: string; x: number; y: number; h: number; wandering?: boolean }
     | {
         kind: "char";
         key: string;
@@ -355,6 +349,7 @@ export function PlazaCanvas({
       };
 
   const items: Item[] = [];
+  const aerialDefs: AerialDef[] = [];
   for (const o of state.objects) {
     // Prefer the enriched fields the API sends (lib/object-catalog DB
     // lookup). For realtime INSERT events the raw row arrives without
@@ -366,18 +361,15 @@ export function PlazaCanvas({
     const src = o.spriteUrl ?? meta?.src ?? null;
     const nativeH = o.nativeHeightPct ?? meta?.nativeHeightPct ?? null;
     if (!src || nativeH == null) continue;
+    // Aerial objects (bird/plane/balloon/cloud) are NOT placed on the floor —
+    // AerialLayer flies them across intermittently (≥12h between passes).
+    const aerial = classifyAerial(o.labelKo);
+    if (aerial) { aerialDefs.push({ type: aerial, sprite: src, heightPct: nativeH }); continue; }
     // Apply client-side wander offset for wanderable dogs. y also shifts
     // the perspective scale, so we re-derive h from the offset y too.
     const off = dogOffsets[o.id];
     const x = off ? o.x + off.dx : o.x;
     const y = off ? o.y + off.dy : o.y;
-    // Aerial motion: birds + planes fly one-way across the sky; clouds +
-    // balloons just drift. Classified by label since these live in the sky band.
-    let motion: "drift" | "fly-bird" | "fly-plane" | undefined;
-    if (y < SKY_DRIFT_Y) {
-      const lbl = o.labelKo ?? "";
-      motion = /새/.test(lbl) ? "fly-bird" : /비행기|plane/i.test(lbl) ? "fly-plane" : "drift";
-    }
     // Pets (dogs/cats) read a touch small at the enlarged plaza scale — give
     // them a gentle size bump. Static pets carry category in OBJECT_CATALOG;
     // curated ones fall back to a label check.
@@ -390,10 +382,8 @@ export function PlazaCanvas({
       src,
       x,
       y,
-      // Birds read as a distant flock — a touch smaller than other sky objects.
-      h: nativeH * (o.scale ?? 1) * perspectiveScale(y) * WORLD_OBJECT_SCALE * (motion === "fly-bird" ? 0.85 : 1) * (isPet ? 1.4 : 1),
+      h: nativeH * (o.scale ?? 1) * perspectiveScale(y) * WORLD_OBJECT_SCALE * (isPet ? 1.4 : 1),
       wandering: !!off,
-      motion,
     });
   }
   if (characters) {
@@ -479,6 +469,9 @@ export function PlazaCanvas({
       >
         {/* Moon (with phase) + occasional shooting star — night/evening. */}
         <CelestialLayer bucket={bucket} />
+        {/* Intermittent aerial traffic (bird/plane/balloon/cloud) — each flies
+            across once, then ≥12h before the next. */}
+        <AerialLayer items={aerialDefs} />
       </div>
 
       {/* click ripple feedback */}
@@ -493,13 +486,6 @@ export function PlazaCanvas({
         {items.map((it) => (
           <div
             key={it.key}
-            // Aerial objects re-roll a small size jitter each animation loop so
-            // each pass looks a little different (less monotonous).
-            onAnimationIteration={
-              it.kind === "obj" && it.motion
-                ? () => setAerialScale((s) => ({ ...s, [it.key]: 0.8 + Math.random() * 0.45 }))
-                : undefined
-            }
             onClick={
               it.kind === "char" && onCharacterClick
                 ? (e) => {
@@ -516,12 +502,7 @@ export function PlazaCanvas({
             }
             style={{
               position: "absolute",
-              // Flyers traverse the whole width (driven by margin-left in the
-              // plaza-fly keyframe), so they start anchored at the left edge.
-              left:
-                it.kind === "obj" && (it.motion === "fly-bird" || it.motion === "fly-plane")
-                  ? "0%"
-                  : `${it.x}%`,
+              left: `${it.x}%`,
               top: `${it.y}%`,
               height: `${it.h}%`,
               transform: "translate(-50%, -100%)",
@@ -535,20 +516,6 @@ export function PlazaCanvas({
                   : it.kind === "obj" && it.wandering
                     ? "left 1.8s ease-in-out, top 1.8s ease-in-out, height 1.8s ease-in-out"
                     : undefined,
-              // Aerial motion (margin-left, so it doesn't fight the anchor
-              // transform). Birds + planes fly one-way across (plaza-fly);
-              // clouds + balloons gently oscillate (plaza-drift). Per-object
-              // duration/delay from the key so they don't move in unison.
-              animation:
-                it.kind !== "obj"
-                  ? undefined
-                  : it.motion === "fly-bird"
-                    ? `plaza-fly ${26000 + (hashKey(it.key) % 6000)}ms linear ${hashKey(it.key) % 6000}ms infinite`
-                    : it.motion === "fly-plane"
-                      ? `plaza-fly ${36000 + (hashKey(it.key) % 8000)}ms linear ${hashKey(it.key) % 12000}ms infinite`
-                      : it.motion === "drift"
-                        ? `plaza-drift ${42000 + (hashKey(it.key) % 30000)}ms ease-in-out ${hashKey(it.key) % 9000}ms infinite`
-                        : undefined,
             }}
           >
             {/* foot shadow — only for characters, anchors them to the floor */}
@@ -594,13 +561,7 @@ export function PlazaCanvas({
                   // at dim times — faces need to stay readable even when
                   // the room reads as night.
                   filter: it.kind === "char" ? charFilter : objectFilter,
-                  transform:
-                    it.kind === "char" && it.flip
-                      ? "scaleX(-1)"
-                      : it.kind === "obj" && it.motion && aerialScale[it.key]
-                        ? `scale(${aerialScale[it.key]})`
-                        : undefined,
-                  transformOrigin: "bottom center",
+                  transform: it.kind === "char" && it.flip ? "scaleX(-1)" : undefined,
                 }}
                 draggable={false}
               />

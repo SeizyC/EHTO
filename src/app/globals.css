@@ -82,17 +82,8 @@ select:focus, select:focus-visible {
   to   { width: 100%; }
 }
 
-/* Clouds + balloons: gentle oscillating drift around their placed spot. */
-@keyframes plaza-drift {
-  0%   { margin-left: 0; }
-  25%  { margin-left: 7%; }
-  50%  { margin-left: 0; }
-  75%  { margin-left: -7%; }
-  100% { margin-left: 0; }
-}
-
-/* Birds + planes: fly one-way across the whole sky (left → right), looping
-   from just off the left edge to just off the right. */
+/* Aerial objects (bird/plane/balloon/cloud): fly one-way across the whole sky
+   (left → right). Used as a one-shot by AerialLayer's intermittent passes. */
 @keyframes plaza-fly {
   from { margin-left: -15%; }
   to   { margin-left: 115%; }

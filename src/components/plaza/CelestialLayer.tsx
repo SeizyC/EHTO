@@ -55,7 +55,7 @@ export function CelestialLayer({ bucket }: { bucket: TimeBucket }) {
       {/* Moon: a soft glow HALO behind, then the lit disc with the shadow
           masked out. The halo is its own element (a masked element clips its
           own drop-shadow, which is why the glow was invisible before). */}
-      <div style={{ position: "absolute", top: "16%", right: "12%", width: size, height: size }}>
+      <div style={{ position: "absolute", top: "8%", right: "12%", width: size, height: size }}>
         <div
           style={{
             position: "absolute",
@@ -74,6 +74,9 @@ export function CelestialLayer({ bucket }: { bucket: TimeBucket }) {
             background: lit,
             WebkitMaskImage: mask,
             maskImage: mask,
+            // Tilt the terminator ~15° clockwise so the crescent sits at a
+            // natural angle rather than a perfectly vertical cut.
+            transform: "rotate(15deg)",
             opacity: 0.92,
           }}
         />
