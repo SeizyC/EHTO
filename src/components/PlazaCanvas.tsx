@@ -117,6 +117,9 @@ function emptyBgPath(bucket: TimeBucket): string {
 // "sky" region at the top (where the aerial objects live) without new scene
 // art. SKY_FADE_PCT is how far down it reaches.
 const SKY_FADE_PCT = 40;
+// Objects above this y are "aerial" (clouds/balloon/plane/birds) and get a
+// slow horizontal drift instead of sitting still.
+const SKY_DRIFT_Y = 35;
 function skyTopColor(bucket: TimeBucket): string {
   switch (bucket) {
     case "dawn":      return "40, 48, 86";
@@ -493,6 +496,13 @@ export function PlazaCanvas({
                   : it.kind === "obj" && it.wandering
                     ? "left 1.8s ease-in-out, top 1.8s ease-in-out, height 1.8s ease-in-out"
                     : undefined,
+              // Aerial objects slowly drift across the sky (margin-left so it
+              // doesn't fight the -50%/-100% anchor transform). Per-object
+              // duration/delay from the key so they don't drift in unison.
+              animation:
+                it.kind === "obj" && it.y < SKY_DRIFT_Y
+                  ? `plaza-drift ${42000 + (hashKey(it.key) % 30000)}ms ease-in-out ${hashKey(it.key) % 9000}ms infinite`
+                  : undefined,
             }}
           >
             {/* foot shadow — only for characters, anchors them to the floor */}

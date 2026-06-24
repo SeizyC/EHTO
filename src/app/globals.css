@@ -82,6 +82,16 @@ select:focus, select:focus-visible {
   to   { width: 100%; }
 }
 
+/* Aerial plaza objects (clouds/balloon/plane/birds) slowly drift across the
+   sky. margin-left so it composes with the object's anchor transform. */
+@keyframes plaza-drift {
+  0%   { margin-left: 0; }
+  25%  { margin-left: 7%; }
+  50%  { margin-left: 0; }
+  75%  { margin-left: -7%; }
+  100% { margin-left: 0; }
+}
+
 /* Hide scrollbar but keep functionality — used by the plaza horizontal scroller */
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
