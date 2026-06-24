@@ -16,10 +16,13 @@ function moonPhase(nowMs: number): { illum: number; waxing: boolean } {
   return { illum: (1 - Math.cos(2 * Math.PI * frac)) / 2, waxing: frac < 0.5 };
 }
 
+type Star = { key: number; top: number; left: number; scale: number };
+const STAR_COOLDOWN_MS = 12 * 3600 * 1000; // ≥12h between shooting-star bursts
+
 export function CelestialLayer({ bucket }: { bucket: TimeBucket }) {
   const night = bucket === "night" || bucket === "evening";
   const [phase, setPhase] = useState<{ illum: number; waxing: boolean } | null>(null);
-  const [starKey, setStarKey] = useState(0);
+  const [stars, setStars] = useState<Star[]>([]);
 
   // Resolve the moon phase on the client (date-based).
   useEffect(() => {
@@ -27,15 +30,35 @@ export function CelestialLayer({ bucket }: { bucket: TimeBucket }) {
     setPhase(moonPhase(Date.now()));
   }, [night]);
 
-  // Schedule occasional shooting stars (re-key to retrigger the CSS streak).
+  // A shooting-star "burst": two or three stars fall (varied size + position),
+  // then nothing for ≥12h (persisted), so it stays a rare treat.
   useEffect(() => {
     if (!night) return;
-    let t: number;
-    const tick = () => {
-      t = window.setTimeout(() => { setStarKey((k) => k + 1); tick(); }, 9000 + Math.random() * 24000);
-    };
-    tick();
-    return () => window.clearTimeout(t);
+    let last = 0;
+    try { last = Number(window.localStorage.getItem("ehto:shootingstar")) || 0; } catch { /* ignore */ }
+    if (Date.now() - last < STAR_COOLDOWN_MS) return;
+    try { window.localStorage.setItem("ehto:shootingstar", String(Date.now())); } catch { /* ignore */ }
+
+    const n = 2 + Math.floor(Math.random() * 2); // 두어 번 (2–3)
+    const timers: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const delay = 5000 + i * (7000 + Math.random() * 12000) + Math.random() * 3000;
+      const t = window.setTimeout(() => {
+        const star: Star = {
+          key: Date.now() + i,
+          top: 5 + Math.random() * 24,
+          left: 8 + Math.random() * 56,
+          scale: 0.65 + Math.random() * 0.9,
+        };
+        setStars((s) => [...s, star]);
+        const rm = window.setTimeout(() => {
+          setStars((s) => s.filter((x) => x.key !== star.key));
+        }, 1400);
+        timers.push(rm);
+      }, delay);
+      timers.push(t);
+    }
+    return () => { for (const t of timers) window.clearTimeout(t); };
   }, [night]);
 
   if (!night || !phase) return null;
@@ -82,12 +105,14 @@ export function CelestialLayer({ bucket }: { bucket: TimeBucket }) {
         />
       </div>
 
-      {/* Shooting star — re-mounts on key change to replay the streak. */}
-      <span
-        key={starKey}
-        className="plaza-shooting-star"
-        style={{ top: `${8 + ((starKey * 17) % 22)}%`, left: `${12 + ((starKey * 31) % 46)}%` }}
-      />
+      {/* Shooting stars — the current burst (varied size + position). */}
+      {stars.map((s) => (
+        <span
+          key={s.key}
+          className="plaza-shooting-star"
+          style={{ top: `${s.top}%`, left: `${s.left}%`, width: 64 * s.scale, height: Math.max(1.5, 2 * s.scale) }}
+        />
+      ))}
     </div>
   );
 }
