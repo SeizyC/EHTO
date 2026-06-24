@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AmbientHeader } from "@/components/AmbientHeader";
 import { EnergyMeter } from "@/components/EnergyMeter";
 import { PausePlayButton } from "@/components/PausePlayButton";
+import { PlazaPausedOverlay } from "@/components/PlazaPausedOverlay";
 import { MeGlyph } from "@/components/MeGlyph";
 import { EhtoBadge } from "@/components/EhtoBadge";
 import { RandomPlazaDice } from "@/components/RandomPlazaDice";
@@ -490,6 +491,7 @@ export default function WorldPage() {
               {/* Pinned to the plaza viewport's bottom-right (sibling of the
                   scroller, so it stays put while the plaza scrolls under it). */}
               <MusicShareStack />
+              <PlazaPausedOverlay />
             </section>
 
             {/* PC plaza — same fixed-pixel + scroll model as mobile so
@@ -532,6 +534,7 @@ export default function WorldPage() {
               {/* Pinned to the plaza viewport's bottom-right (outside the
                   scroller so it doesn't scroll with the canvas). */}
               <MusicShareStack />
+              <PlazaPausedOverlay />
             </section>
 
             {/* Zoom controls — shared between mobile and PC, sit just
