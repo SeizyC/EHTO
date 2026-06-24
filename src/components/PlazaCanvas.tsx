@@ -333,7 +333,7 @@ export function PlazaCanvas({
   // separate layer rendered AFTER the y-sorted items, positioning each
   // bubble at its speaker's coordinates.
   type Item =
-    | { kind: "obj"; key: string; src: string; x: number; y: number; h: number; wandering?: boolean }
+    | { kind: "obj"; key: string; src: string; x: number; y: number; h: number; wandering?: boolean; motion?: "drift" | "fly-bird" | "fly-plane" }
     | {
         kind: "char";
         key: string;
@@ -362,14 +362,23 @@ export function PlazaCanvas({
     const off = dogOffsets[o.id];
     const x = off ? o.x + off.dx : o.x;
     const y = off ? o.y + off.dy : o.y;
+    // Aerial motion: birds + planes fly one-way across the sky; clouds +
+    // balloons just drift. Classified by label since these live in the sky band.
+    let motion: "drift" | "fly-bird" | "fly-plane" | undefined;
+    if (y < SKY_DRIFT_Y) {
+      const lbl = o.labelKo ?? "";
+      motion = /새/.test(lbl) ? "fly-bird" : /비행기|plane/i.test(lbl) ? "fly-plane" : "drift";
+    }
     items.push({
       kind: "obj",
       key: `o-${o.id}`,
       src,
       x,
       y,
-      h: nativeH * (o.scale ?? 1) * perspectiveScale(y),
+      // Birds read as a small distant flock — render much smaller than catalog.
+      h: nativeH * (o.scale ?? 1) * perspectiveScale(y) * (motion === "fly-bird" ? 0.45 : 1),
       wandering: !!off,
+      motion,
     });
   }
   if (characters) {
@@ -482,7 +491,12 @@ export function PlazaCanvas({
             }
             style={{
               position: "absolute",
-              left: `${it.x}%`,
+              // Flyers traverse the whole width (driven by margin-left in the
+              // plaza-fly keyframe), so they start anchored at the left edge.
+              left:
+                it.kind === "obj" && (it.motion === "fly-bird" || it.motion === "fly-plane")
+                  ? "0%"
+                  : `${it.x}%`,
               top: `${it.y}%`,
               height: `${it.h}%`,
               transform: "translate(-50%, -100%)",
@@ -496,13 +510,20 @@ export function PlazaCanvas({
                   : it.kind === "obj" && it.wandering
                     ? "left 1.8s ease-in-out, top 1.8s ease-in-out, height 1.8s ease-in-out"
                     : undefined,
-              // Aerial objects slowly drift across the sky (margin-left so it
-              // doesn't fight the -50%/-100% anchor transform). Per-object
-              // duration/delay from the key so they don't drift in unison.
+              // Aerial motion (margin-left, so it doesn't fight the anchor
+              // transform). Birds + planes fly one-way across (plaza-fly);
+              // clouds + balloons gently oscillate (plaza-drift). Per-object
+              // duration/delay from the key so they don't move in unison.
               animation:
-                it.kind === "obj" && it.y < SKY_DRIFT_Y
-                  ? `plaza-drift ${42000 + (hashKey(it.key) % 30000)}ms ease-in-out ${hashKey(it.key) % 9000}ms infinite`
-                  : undefined,
+                it.kind !== "obj"
+                  ? undefined
+                  : it.motion === "fly-bird"
+                    ? `plaza-fly ${15000 + (hashKey(it.key) % 4000)}ms linear ${hashKey(it.key) % 6000}ms infinite`
+                    : it.motion === "fly-plane"
+                      ? `plaza-fly ${36000 + (hashKey(it.key) % 8000)}ms linear ${hashKey(it.key) % 12000}ms infinite`
+                      : it.motion === "drift"
+                        ? `plaza-drift ${42000 + (hashKey(it.key) % 30000)}ms ease-in-out ${hashKey(it.key) % 9000}ms infinite`
+                        : undefined,
             }}
           >
             {/* foot shadow — only for characters, anchors them to the floor */}

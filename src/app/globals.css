@@ -82,14 +82,20 @@ select:focus, select:focus-visible {
   to   { width: 100%; }
 }
 
-/* Aerial plaza objects (clouds/balloon/plane/birds) slowly drift across the
-   sky. margin-left so it composes with the object's anchor transform. */
+/* Clouds + balloons: gentle oscillating drift around their placed spot. */
 @keyframes plaza-drift {
   0%   { margin-left: 0; }
   25%  { margin-left: 7%; }
   50%  { margin-left: 0; }
   75%  { margin-left: -7%; }
   100% { margin-left: 0; }
+}
+
+/* Birds + planes: fly one-way across the whole sky (left → right), looping
+   from just off the left edge to just off the right. */
+@keyframes plaza-fly {
+  from { margin-left: -15%; }
+  to   { margin-left: 115%; }
 }
 
 /* Hide scrollbar but keep functionality — used by the plaza horizontal scroller */
