@@ -169,7 +169,11 @@ function characterLightingFilter(bucket: TimeBucket): string | undefined {
 // crushed). Bumping back to 12% restores legibility while still
 // fitting ~34 members in the floor band (target was 30). Object
 // catalog gets a paired ×1.33 bump so relative proportions hold.
-const CHARACTER_HEIGHT_PCT = 12;
+const CHARACTER_HEIGHT_PCT = 7.5;
+// The logical plaza grew ×1.6 (see PLAZA_W/H in world page) to give a larger
+// floor to roam; objects are scaled by 1/1.6 so they keep their real size on
+// the bigger canvas instead of magnifying with it.
+const WORLD_OBJECT_SCALE = 0.625;
 
 // Iso depth cue: items higher up the screen (lower y%) are "further
 // away" and render smaller. The floor band is y 40–78 (FLOOR_Y_MIN..MAX),
@@ -377,7 +381,7 @@ export function PlazaCanvas({
       x,
       y,
       // Birds read as a distant flock — a touch smaller than other sky objects.
-      h: nativeH * (o.scale ?? 1) * perspectiveScale(y) * (motion === "fly-bird" ? 0.85 : 1),
+      h: nativeH * (o.scale ?? 1) * perspectiveScale(y) * WORLD_OBJECT_SCALE * (motion === "fly-bird" ? 0.85 : 1),
       wandering: !!off,
       motion,
     });

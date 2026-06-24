@@ -45,8 +45,12 @@ const ME_Y = 60;
 //     into a bigger absolute canvas + smaller CHARACTER_HEIGHT_PCT (9)
 //     so each mini stays a reasonable pixel size while 30 of them have
 //     real estate to spread.
-const PLAZA_W = 2400;
-const PLAZA_H = 1600;
+// Bigger logical plaza (2400×1600 → 3840×2560, ×1.6) so the floor is a larger
+// space you scroll around — even at max zoom it doesn't all fit. Sprites are
+// scaled DOWN by the same factor (CHARACTER_HEIGHT_PCT + WORLD_OBJECT_SCALE in
+// PlazaCanvas) so people/objects keep their size and simply have more room.
+const PLAZA_W = 3840;
+const PLAZA_H = 2560;
 
 // Mobile zoom steps + LS key — module-level so the useEffect dep array
 // stays stable.
@@ -60,7 +64,7 @@ const PLAZA_H = 1600;
 const ZOOM_STEPS = [0.4, 0.5, 0.65, 0.85, 1.1, 1.5, 2.0];
 const DEFAULT_ZOOM_IDX = 2; // 0.65
 // v9: zoom applied directly (no cover-min floor) so − always shrinks.
-const ZOOM_LS_KEY = "ehto:plaza-zoom:v9";
+const ZOOM_LS_KEY = "ehto:plaza-zoom:v10";
 
 // "오늘"의 라벨은 KST-09:00 롤오버 기준이지만, 헤더 표시용으론 직관적
 // 인 일반 달력 날짜를 쓴다 ("2026년 5월 20일 (수)" 식). 9시 전이라면
