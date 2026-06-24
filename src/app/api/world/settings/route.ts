@@ -28,13 +28,16 @@ export async function PATCH(req: NextRequest) {
   }
   const userId = userData.user.id;
 
-  let body: { isPublic?: unknown; tags?: unknown; bias?: unknown; language?: unknown };
+  let body: { isPublic?: unknown; tags?: unknown; bias?: unknown; language?: unknown; paused?: unknown };
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "invalid json" }, { status: 400 }); }
 
   const update: Record<string, unknown> = {};
   if (typeof body.isPublic === "boolean") {
     update.is_public = body.isPublic;
+  }
+  if (typeof body.paused === "boolean") {
+    update.ambient_paused = body.paused;
   }
   if ("bias" in body) {
     // null = clear bias; otherwise validate via parseBias which returns

@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   const { data: world } = await sb
     .from("worlds")
-    .select("id, name, created_at, is_public, tags, bias, language, owner_x, owner_y, owner_flip")
+    .select("id, name, created_at, is_public, tags, bias, language, owner_x, owner_y, owner_flip, ambient_paused")
     .eq("owner_id", userData.user.id)
     .maybeSingle();
   if (!world) return NextResponse.json({ world: null });
@@ -75,6 +75,7 @@ export async function GET(req: NextRequest) {
       createdAt: world.created_at,
       owner: true,
       isPublic: !!(world as { is_public?: boolean }).is_public,
+      paused: !!(world as { ambient_paused?: boolean }).ambient_paused,
       tags: ((world as { tags?: string[] }).tags ?? []) as string[],
       bias: ((world as { bias?: unknown }).bias ?? null) as unknown,
       language: (((world as { language?: string }).language ?? "ko") as "ko" | "en" | "ja"),

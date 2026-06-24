@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AmbientHeader } from "@/components/AmbientHeader";
 import { EnergyMeter } from "@/components/EnergyMeter";
+import { PausePlayButton } from "@/components/PausePlayButton";
 import { MeGlyph } from "@/components/MeGlyph";
 import { EhtoBadge } from "@/components/EhtoBadge";
 import { RandomPlazaDice } from "@/components/RandomPlazaDice";
@@ -386,7 +387,10 @@ export default function WorldPage() {
         <AmbientHeader mood={mood.label} onPeek={() => setRoomOpen(true)} />
       </div>
       <div className="flex items-center gap-4">
-        <EnergyMeter />
+        <div className="flex items-center gap-2">
+          <EnergyMeter />
+          <PausePlayButton />
+        </div>
         {isAdmin && (
           <a
             href="/home"

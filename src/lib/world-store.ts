@@ -10,6 +10,7 @@ export type WorldInfo = {
   createdAt: string;
   owner: boolean;
   isPublic: boolean;
+  paused: boolean;
   tags: string[];
   bias: WorldBias | null;
   language: import("@/lib/language").Locale;
@@ -138,6 +139,28 @@ export async function updateMyPosition(
       Authorization: `Bearer ${sess.session.access_token}`,
     },
     body: JSON.stringify({ x, y, flip }),
+  });
+  if (!r.ok) {
+    const j = await r.json().catch(() => ({}));
+    return { error: j.error ?? `HTTP ${r.status}` };
+  }
+  return {};
+}
+
+/** Pause/resume the plaza's ambient life. Optimistic (the toggle flips
+ *  instantly) then PATCHes; ambient stops/starts server-side immediately. */
+export async function setWorldPaused(paused: boolean): Promise<{ error?: string }> {
+  if (_cached) { _cached = { ..._cached, paused }; _saveToLs(_cached); _notify(); }
+  const sb = browserClient();
+  const { data: sess } = await sb.auth.getSession();
+  if (!sess.session) return { error: "no session" };
+  const r = await fetch("/api/world/settings", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${sess.session.access_token}`,
+    },
+    body: JSON.stringify({ paused }),
   });
   if (!r.ok) {
     const j = await r.json().catch(() => ({}));

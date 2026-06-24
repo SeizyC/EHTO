@@ -156,10 +156,16 @@ export async function tickAmbientConversation(
   // Fetch world+owner info for the check-in path (also used for cooldown).
   const { data: world } = await sb
     .from("worlds")
-    .select("owner_id, last_owner_checkin_at, bias, plan, moments_used, moments_day, interject_used, interject_day, language")
+    .select("owner_id, last_owner_checkin_at, bias, plan, moments_used, moments_day, interject_used, interject_day, language, ambient_paused")
     .eq("id", worldId)
     .maybeSingle();
   const language = (world?.language ?? "ko") as Locale;
+
+  // Owner pressed pause: generate nothing (no chatter, no energy spend) until
+  // resumed. Checked for every path (poll/cron/message) so it's immediate.
+  if (world?.ambient_paused) {
+    return { spoke: null, reason: "paused" };
+  }
   let ownerHandle: string | null = null;
   if (world?.owner_id) {
     const { data: prof } = await sb
