@@ -57,7 +57,7 @@ const PLAZA_H = 1600;
 // window into it — enlarging the browser reveals MORE plaza (no stretch).
 // The − button steps all the way down so the user can see the whole plaza
 // smaller (with margin) if they want; + scrolls a larger plaza.
-const ZOOM_STEPS = [0.4, 0.5, 0.65, 0.85, 1.1];
+const ZOOM_STEPS = [0.4, 0.5, 0.65, 0.85, 1.1, 1.5, 2.0];
 const DEFAULT_ZOOM_IDX = 2; // 0.65
 // v9: zoom applied directly (no cover-min floor) so − always shrinks.
 const ZOOM_LS_KEY = "ehto:plaza-zoom:v9";

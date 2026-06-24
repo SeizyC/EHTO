@@ -376,8 +376,8 @@ export function PlazaCanvas({
       src,
       x,
       y,
-      // Birds read as a small distant flock — render much smaller than catalog.
-      h: nativeH * (o.scale ?? 1) * perspectiveScale(y) * (motion === "fly-bird" ? 0.45 : 1),
+      // Birds read as a distant flock — a touch smaller than other sky objects.
+      h: nativeH * (o.scale ?? 1) * perspectiveScale(y) * (motion === "fly-bird" ? 0.85 : 1),
       wandering: !!off,
       motion,
     });
@@ -522,7 +522,7 @@ export function PlazaCanvas({
                 it.kind !== "obj"
                   ? undefined
                   : it.motion === "fly-bird"
-                    ? `plaza-fly ${15000 + (hashKey(it.key) % 4000)}ms linear ${hashKey(it.key) % 6000}ms infinite`
+                    ? `plaza-fly ${26000 + (hashKey(it.key) % 6000)}ms linear ${hashKey(it.key) % 6000}ms infinite`
                     : it.motion === "fly-plane"
                       ? `plaza-fly ${36000 + (hashKey(it.key) % 8000)}ms linear ${hashKey(it.key) % 12000}ms infinite`
                       : it.motion === "drift"
