@@ -374,6 +374,12 @@ export function PlazaCanvas({
       const lbl = o.labelKo ?? "";
       motion = /새/.test(lbl) ? "fly-bird" : /비행기|plane/i.test(lbl) ? "fly-plane" : "drift";
     }
+    // Pets (dogs/cats) read a touch small at the enlarged plaza scale — give
+    // them a gentle size bump. Static pets carry category in OBJECT_CATALOG;
+    // curated ones fall back to a label check.
+    const isPet =
+      OBJECT_CATALOG[o.type as PlazaObjectType]?.category === "pet" ||
+      /강아지|고양이|개|냥이|시바|말티즈|리트리버|닥스훈트/.test(o.labelKo ?? "");
     items.push({
       kind: "obj",
       key: `o-${o.id}`,
@@ -381,7 +387,7 @@ export function PlazaCanvas({
       x,
       y,
       // Birds read as a distant flock — a touch smaller than other sky objects.
-      h: nativeH * (o.scale ?? 1) * perspectiveScale(y) * WORLD_OBJECT_SCALE * (motion === "fly-bird" ? 0.85 : 1),
+      h: nativeH * (o.scale ?? 1) * perspectiveScale(y) * WORLD_OBJECT_SCALE * (motion === "fly-bird" ? 0.85 : 1) * (isPet ? 1.4 : 1),
       wandering: !!off,
       motion,
     });
