@@ -29,7 +29,7 @@ type Category = "prop" | "landmark" | "building" | "sky" | "pet";
 const CATEGORY_CUE: Record<Category, string> = {
   prop: "a small piece of street furniture or a small object (knee-to-waist height), sits on the ground",
   landmark: "a medium-to-large plaza installation (a person-and-a-half tall), a clear focal piece, sits on the ground",
-  building: "a small storefront-style building seen front-on, ground floor readable, sits on the ground",
+  building: "a small contemporary urban building, 1 to 3 stories, whose silhouette and facade clearly express what it is — vary the height, roofline, windows and signage so it reads as a distinct place, readable ground floor, sits on the ground",
   sky: "a small aerial object seen from the side, floating, no ground",
   pet: "a small friendly animal, sits or stands on the ground",
 };

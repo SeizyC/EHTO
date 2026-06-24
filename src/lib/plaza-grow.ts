@@ -22,14 +22,35 @@ import { tryGenerateDynamicType, tryGenerateVariant } from "@/lib/dynamic-object
 type Band = "back" | "mid" | "front";
 type Tier = "prop" | "landmark" | "building" | "pet";
 const BAND_Y: Record<Band, [number, number]> = {
-  back: [38, 52],   // building band — top of the floor, renders behind people
-  mid: [52, 66],    // landmark band
-  front: [66, 82],  // prop / pet / people band
+  back: [44, 54],   // building band — sits on the back of the floor, not the sky
+  mid: [56, 68],    // landmark band
+  front: [70, 86],  // prop / pet / people band
 };
 // Representative size (native_height_pct) per tier — used when matching
 // curated catalog objects / driving generation for a slot, replacing the
 // old "size derived from the static default type" approach.
 const HEIGHT_BY_TIER: Record<Tier, number> = { prop: 14, landmark: 32, building: 60, pet: 4.5 };
+// Minimum horizontal gap (in x%) between two objects sharing a band, sized to
+// each tier's visual footprint so same-layer objects never overlap. Buildings
+// are widest.
+const OBJECT_GAP_BY_TIER: Record<Tier, number> = { prop: 9, landmark: 14, building: 22, pet: 7 };
+const FLOOR_X_MIN = 8;
+const FLOOR_X_MAX = 92;
+
+/** Pick an x in the floor band that's ≥ gap from every occupied x, nearest to
+ *  the preferred x. Returns the preferred x if it's already clear, or null if
+ *  the band is too crowded to fit. */
+function clearX(preferred: number, occupied: number[], gap: number): number | null {
+  const clearAt = (x: number) => occupied.every((ox) => Math.abs(ox - x) >= gap);
+  if (clearAt(preferred)) return preferred;
+  // Spiral outward from the preferred x in 2% steps, staying in bounds.
+  for (let d = 2; d <= FLOOR_X_MAX - FLOOR_X_MIN; d += 2) {
+    for (const cand of [preferred - d, preferred + d]) {
+      if (cand >= FLOOR_X_MIN && cand <= FLOOR_X_MAX && clearAt(cand)) return cand;
+    }
+  }
+  return null;
+}
 function clampToBand(y: number, band: Band): number {
   const [lo, hi] = BAND_Y[band];
   return Math.min(hi, Math.max(lo, y));
@@ -300,16 +321,37 @@ export async function tickPlazaGrowth(
       break;
     }
 
+    const placeY = clampToBand(m.place.y, m.band);
+    // Same-layer overlap avoidance: nudge x off any object already standing in
+    // this band so two objects in the same layer never sit on top of each
+    // other. If the band is full, hold the slot for a later tick.
+    const [bandLo, bandHi] = BAND_Y[m.band];
+    const { data: bandObjs } = await sb
+      .from("plaza_objects")
+      .select("x")
+      .eq("world_id", worldId)
+      .gte("y", bandLo - 3)
+      .lte("y", bandHi + 3);
+    const placeX = clearX(
+      m.place.x,
+      (bandObjs ?? []).map((o) => (o as { x: number }).x),
+      OBJECT_GAP_BY_TIER[m.tier],
+    );
+    if (placeX === null) {
+      console.log(`[plaza-grow] stage ${m.stage} ${m.tier} band full — hold`);
+      break;
+    }
+
     // Place the object first, then bump the stage. If the insert fails
     // we don't advance — the next tick will retry the same milestone.
     const { error: insErr } = await sb.from("plaza_objects").insert({
       world_id: worldId,
       type: chosenTypeKey,          // legacy column for compatibility
       variant_id: variant.id,
-      x: m.place.x,
+      x: placeX,
       // Clamp into the slot's depth band so a slot can never escape its
       // render layer (buildings stay at the back, behind people).
-      y: clampToBand(m.place.y, m.band),
+      y: placeY,
       scale: m.place.scale ?? 1.0,
     });
     if (insErr) {
