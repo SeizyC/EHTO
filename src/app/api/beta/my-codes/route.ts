@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { userClient, serviceClient } from "@/lib/supabase";
-import { listUserCodes } from "@/lib/beta-codes";
+import { listUserCodes, issueCodesForUser } from "@/lib/beta-codes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +16,11 @@ export async function GET(req: NextRequest) {
   if (userErr || !userData.user) {
     return NextResponse.json({ error: "invalid session" }, { status: 401 });
   }
-  const codes = await listUserCodes(serviceClient(), userData.user.id);
+  const svc = serviceClient();
+  // Self-heal: a user who onboarded before codes were issued (or whose issue
+  // step was skipped) would otherwise see an empty 0/0 panel. Issuing is
+  // idempotent — a no-op once they already own their PER_USER codes.
+  await issueCodesForUser(svc, userData.user.id);
+  const codes = await listUserCodes(svc, userData.user.id);
   return NextResponse.json({ codes });
 }
