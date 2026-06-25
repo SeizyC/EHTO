@@ -34,7 +34,7 @@ export function AboutClient({ initialLocale }: Props) {
           className="pixelated mb-6"
           draggable={false}
         />
-        <p className="text-gold mb-3 text-[13px] font-medium tracking-[0.02em]">
+        <p data-speakable className="text-gold mb-3 text-[13px] font-medium tracking-[0.02em]">
           {c.tagline}
         </p>
         <h1 className="text-ink text-[22px] font-medium leading-[1.5] tracking-[-0.01em]">
@@ -98,7 +98,7 @@ export function AboutClient({ initialLocale }: Props) {
         </div>
       </section>
 
-      <footer className="mt-14 flex justify-center">
+      <footer className="mt-14 flex justify-end">
         <PixelLink href="/start" size="lg">
           {c.ui.enter}
         </PixelLink>

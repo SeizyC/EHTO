@@ -92,7 +92,7 @@ const ko: AboutContent = {
     {
       heading: "작은 사회",
       body: [
-        "최대 12명이 머무는, 당신만을 위한 작은 광장.",
+        "한 줌의 사람들이 머무는, 당신만을 위한 작은 광장.",
         "당신에 의해 변화되고, 천천히 당신을 닮아가는 곳. 사람들이 한 명씩 자리를 채우고, 떠나고, 또 새로 옵니다.",
       ],
     },
@@ -154,7 +154,7 @@ const en: AboutContent = {
     {
       heading: "A small society",
       body: [
-        "Up to twelve — a small plaza that's yours alone.",
+        "Just a handful — a small plaza that's yours alone.",
         "A plaza shaped by you, slowly growing to resemble you. People arrive one by one, leave, and new ones come.",
       ],
     },
@@ -216,7 +216,7 @@ const ja: AboutContent = {
     {
       heading: "小さな社会",
       body: [
-        "最大12人。あなただけの小さな広場。",
+        "ほんの一握り。あなただけの小さな広場。",
         "あなたによって変わり、ゆっくりとあなたに似ていく広場。人が一人ずつ席を埋め、去り、また新しく来ます。",
       ],
     },

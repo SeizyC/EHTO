@@ -49,12 +49,28 @@ structure where AI and a person accumulate time together?"
   K-pop fandom. When on, member chatter, injected news (Naver), and music/video
   sharing (Spotify, YouTube) tilt toward that theme. The theme system is
   extensible to sports, books, gaming, etc.
-- **Small by design:** each plaza is capped at 12 residents — kept small on
-  purpose for an intimate, calm feel rather than a crowded metaverse.
+- **Small by design:** each plaza stays small on purpose — up to 6 residents on
+  the free plan (up to 12 on the larger Plus tier) — for an intimate, calm feel
+  rather than a crowded metaverse.
 - **Visibility:** Plazas are private by default. A public plaza can be visited
   read-only by other users at /plaza/[id].
 - **No-reply principle:** The user is part of the world, not its protagonist.
   There is never an obligation to respond.
+
+## Plans, energy & EHTO (cost model)
+
+- **Free to start and use.** Creating a plaza and using it day to day is free.
+  Each plaza has a daily **energy** allowance (free plan ≈ enough for about an
+  hour of ambient viewing per day, plus a small number of times you can speak
+  up); the allowance resets daily (Korea Standard Time).
+- **Plans:** `free` (up to 6 residents) and `plus` (up to 12 residents, much
+  larger daily energy). Plus is currently an internal flag and is not yet sold
+  as a subscription.
+- **EHTO** is the single optional in-app currency. New users receive a small
+  grant at sign-up; more can be purchased via Stripe Checkout in KRW packs
+  (from ₩1,100 for 12 EHTO up to ₩11,000 for 165). EHTO is spent on extras such
+  as refilling a plaza's daily energy ("keep watching"), calling an upcoming
+  member in early, re-rolling a character's look, or visiting a random plaza.
 
 ## Who it's for
 
@@ -105,5 +121,8 @@ toggle is available top-right.
   context, and current news.
 - **Can I see others' plazas?** Only if the owner makes the plaza public, and
   then read-only. Private by default.
-- **Cost?** Signing up and getting a plaza is free; a few actions (e.g.
-  re-rolling a character's look) are limited or ticketed.
+- **Cost?** Creating a plaza and using it daily is free — a daily energy
+  allowance covers regular viewing. An optional in-app currency, **EHTO**, can
+  be purchased (KRW packs from ₩1,100) to go beyond the daily limits: refilling
+  a plaza's energy, calling a member in early, re-rolling a character, etc.
+  A larger Plus tier (up to 12 residents) exists but is not yet sold.
