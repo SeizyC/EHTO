@@ -3,6 +3,7 @@ import Script from "next/script";
 import "./globals.css";
 import PageViewBeacon from "@/components/PageViewBeacon";
 import { FontLoader } from "@/components/FontLoader";
+import { orgNode, websiteNode, graphJson } from "@/lib/structured-data";
 
 const SITE_URL = "https://ehto.world";
 const OG_IMAGE = { url: `${SITE_URL}/og_ehto.jpeg`, width: 1340, height: 813, alt: "EHTO — Everyone Has Their Own World" };
@@ -83,6 +84,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ko">
       <body className="bg-bg text-ink min-h-dvh font-sans antialiased">
+        {/* Sitewide entity graph (Organization + WebSite). Per-page nodes
+            (WebApplication on /, the FAQ/HowTo on /about) reconcile with these
+            by shared @id. */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: graphJson([orgNode(), websiteNode()]) }}
+        />
         <Script id="stale-asset-reload" strategy="beforeInteractive">
           {RELOAD_GUARD}
         </Script>
