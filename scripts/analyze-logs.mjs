@@ -29,7 +29,7 @@ for (const line of fs.readFileSync(path.join(process.cwd(), ".env.local"), "utf8
 }
 
 const N = parseInt(process.argv[2] ?? "100", 10);
-const ACCOUNT_ID = process.env.CF_ACCOUNT_ID ?? "REDACTED_CF_ACCOUNT_ID";
+const ACCOUNT_ID = process.env.CF_ACCOUNT_ID ?? "";
 const GATEWAY = process.env.CF_GATEWAY ?? "ehto";
 // Renamed from CF_API_TOKEN: wrangler picks up CF_API_TOKEN as its own
 // auth token, and our analyze-logs token doesn't have Workers deploy

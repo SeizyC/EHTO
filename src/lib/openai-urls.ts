@@ -9,8 +9,9 @@
 // observability/retry. The compat chat endpoint and its modelId() helper
 // are gone — only the openai-specific images path remains.
 
+// Account id stays out of source (public repo) — see CF_ACCOUNT_ID in claude.ts.
 const GATEWAY_BASE = process.env.CF_AI_GATEWAY_BASE
-  ?? "https://gateway.ai.cloudflare.com/v1/REDACTED_CF_ACCOUNT_ID/ehto";
+  ?? `https://gateway.ai.cloudflare.com/v1/${process.env.CF_ACCOUNT_ID ?? ""}/ehto`;
 
 /** Image generations endpoint (gpt-image-1). Provider-specific path —
  *  compat mode doesn't cover images. Model name passed as-is in the

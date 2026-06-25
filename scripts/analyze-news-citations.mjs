@@ -33,7 +33,7 @@ if (!OPENAI_KEY) { console.error("OPENAI_API_KEY missing"); process.exit(2); }
 if (!SUPA_URL || !SUPA_KEY) { console.error("Supabase creds missing"); process.exit(2); }
 
 const N = parseInt(process.argv[2] ?? "100", 10);
-const GATEWAY = "https://gateway.ai.cloudflare.com/v1/REDACTED_CF_ACCOUNT_ID/ehto/compat/chat/completions";
+const GATEWAY = `https://gateway.ai.cloudflare.com/v1/${process.env.CF_ACCOUNT_ID ?? ""}/ehto/compat/chat/completions`;
 
 const QUERIES = ["사건사고", "연예", "이슈"];
 

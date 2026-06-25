@@ -35,7 +35,7 @@ if (!apiKey) { console.error("OPENAI_API_KEY missing"); process.exit(2); }
 // CF_AI_GATEWAY_BASE=https://api.openai.com/v1 to fall back to direct
 // OpenAI (e.g. if testing the gateway itself is broken).
 const GATEWAY_BASE = process.env.CF_AI_GATEWAY_BASE
-  ?? "https://gateway.ai.cloudflare.com/v1/REDACTED_CF_ACCOUNT_ID/ehto";
+  ?? `https://gateway.ai.cloudflare.com/v1/${process.env.CF_ACCOUNT_ID ?? ""}/ehto`;
 const CHAT_URL = `${GATEWAY_BASE}/compat/chat/completions`;
 const MODEL = "openai/gpt-5.3-chat-latest";
 

@@ -14,8 +14,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { searchYoutubeVideo, type DiscoveredVideo } from "@/lib/youtube-share";
 
+// Account id is kept out of source (public repo); it comes from CF_ACCOUNT_ID
+// (Worker secret in prod, .env.local in dev). CF_AI_GATEWAY_BASE still wins if set.
 const GATEWAY_BASE = process.env.CF_AI_GATEWAY_BASE
-  ?? "https://gateway.ai.cloudflare.com/v1/REDACTED_CF_ACCOUNT_ID/ehto";
+  ?? `https://gateway.ai.cloudflare.com/v1/${process.env.CF_ACCOUNT_ID ?? ""}/ehto`;
 
 let _client: Anthropic | null = null;
 

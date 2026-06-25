@@ -1,7 +1,8 @@
 {
   "$schema": "https://unpkg.com/wrangler@latest/config-schema.json",
   "name": "ehto",
-  "account_id": "REDACTED_CF_ACCOUNT_ID",
+  // account_id is kept out of source (public repo). Deploys read it from the
+  // CLOUDFLARE_ACCOUNT_ID env var (.env.local locally, or CI).
   "main": "worker-entry.js",
   "compatibility_date": "2025-01-15",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
@@ -11,7 +12,8 @@
   }
   // Server-side secrets go via `wrangler secret put <KEY>` after deploy:
   //   OPENAI_API_KEY, SUPABASE_SERVICE_ROLE_KEY, NAVER_CLIENT_ID,
-  //   NAVER_CLIENT_SECRET, CRON_SECRET, ADMIN_EMAILS
+  //   NAVER_CLIENT_SECRET, CRON_SECRET, ADMIN_EMAILS, CF_ACCOUNT_ID,
+  //   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, YOUTUBE_API_KEY
   //
   // NEXT_PUBLIC_* vars are baked into the client bundle at build time
   // and must be set in the build environment (.env.local locally, or
