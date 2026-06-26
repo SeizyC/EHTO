@@ -64,7 +64,9 @@ const PLAZA_H = 2560;
 // The − button steps all the way down so the user can see the whole plaza
 // smaller (with margin) if they want; + scrolls a larger plaza.
 const ZOOM_STEPS = [0.4, 0.5, 0.65, 0.85, 1.1, 1.5, 2.0];
-const DEFAULT_ZOOM_IDX = 2; // 0.65
+// First entry (no stored zoom) starts fully zoomed out so the whole plaza is
+// visible at a glance; the user can zoom in from there (their choice persists).
+const DEFAULT_ZOOM_IDX = 0; // 0.4 — whole plaza in view
 // v9: zoom applied directly (no cover-min floor) so − always shrinks.
 const ZOOM_LS_KEY = "ehto:plaza-zoom:v10";
 
