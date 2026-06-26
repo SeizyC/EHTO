@@ -1,8 +1,14 @@
 "use client";
 
-import { PixelLink } from "@/components/PixelButton";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { PixelButton, PixelLink } from "@/components/PixelButton";
 import { PlazaShowcase } from "@/components/PlazaShowcase";
 import { LangToggle } from "@/components/LangToggle";
+import { SiteFooter } from "@/components/SiteFooter";
+import { AuthModal } from "@/components/AuthModal";
+import { browserClient } from "@/lib/supabase";
+import { landingPathForSession } from "@/lib/character-store";
 import { useLocale } from "@/lib/use-locale";
 import { ABOUT, type Locale } from "@/lib/about-content";
 
@@ -13,14 +19,42 @@ type Props = { initialLocale: Locale };
 export function AboutClient({ initialLocale }: Props) {
   const { locale, pick } = useLocale(initialLocale);
   const c = ABOUT[locale];
+  const router = useRouter();
+  const [authOpen, setAuthOpen] = useState(false);
+
+  // After an in-place email auth, route to the right landing for this session
+  // (existing users → their plaza; new users with no plaza → /start to enter an
+  // invite code). The Google path returns via /auth/callback, which does the
+  // same draft-less routing.
+  async function onAuthed() {
+    const sb = browserClient();
+    const { data } = await sb.auth.getSession();
+    const token = data.session?.access_token;
+    if (token) router.replace(await landingPathForSession(token));
+  }
 
   return (
-    <main className="grain mx-auto flex min-h-dvh max-w-[640px] flex-col px-6 pb-16 pt-6">
+    <>
+    <main className="grain mx-auto flex max-w-[640px] flex-col px-6 pb-16 pt-6">
       <header className="mb-10 flex items-start justify-between gap-4">
         <PixelLink href="/" variant="ghost" size="sm">
           {c.ui.backHome}
         </PixelLink>
-        <LangToggle locale={locale} onPick={pick} />
+        <div className="flex items-center gap-2">
+          <PixelButton
+            variant="primary"
+            size="sm"
+            onClick={() => setAuthOpen(true)}
+            aria-label={c.ui.enter}
+            title={c.ui.enter}
+            className="!px-3"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          </PixelButton>
+          <LangToggle locale={locale} onPick={pick} />
+        </div>
       </header>
 
       {/* Hero */}
@@ -104,5 +138,13 @@ export function AboutClient({ initialLocale }: Props) {
         </PixelLink>
       </footer>
     </main>
+    <SiteFooter />
+    <AuthModal
+      open={authOpen}
+      onClose={() => setAuthOpen(false)}
+      onAuthed={onAuthed}
+      locale={locale}
+    />
+    </>
   );
 }

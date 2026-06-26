@@ -1,24 +1,19 @@
 import type { Metadata } from "next";
-import { StaticPage, Section } from "@/components/StaticPage";
+import { headers } from "next/headers";
+import { LegalClient } from "@/components/LegalClient";
+import { countryToLocale } from "@/lib/about-content";
+import { CONTACT } from "@/lib/legal-content";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic"; // reads cf-ipcountry per request
 
 export const metadata: Metadata = {
-  title: "문의 — EHTO",
-  description: "EHTO 문의처.",
+  title: "Contact — EHTO",
+  description: "Get in touch with EHTO.",
+  alternates: { canonical: "https://ehto.world/contact" },
 };
 
 export default function ContactPage() {
-  return (
-    <StaticPage title="문의">
-      <Section h="이메일">
-        <a href="mailto:hello@ehto.world" className="text-accent hover:underline">
-          hello@ehto.world
-        </a>
-        <br />
-        제휴·제안·버그 제보 등 무엇이든 편하게 보내주세요.
-      </Section>
-      <Section h="만든 곳">
-        Fantagram Inc. — EHTO (Everyone Has Their Own World)
-      </Section>
-    </StaticPage>
-  );
+  const initialLocale = countryToLocale(headers().get("cf-ipcountry"));
+  return <LegalClient initialLocale={initialLocale} doc={CONTACT} />;
 }
