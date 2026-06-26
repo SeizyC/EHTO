@@ -126,6 +126,8 @@ export type OnboardingCopy = {
     nameSubmit: string;
     nameSubmitting: string;
     nameHint: string;
+    nameChecking: string;
+    nameAvailable: string;
     nameErrDup: string;
     nameErrSave: string;
     errMsg: string;
@@ -264,11 +266,13 @@ const ko: OnboardingCopy = {
     resRegenLocked: "티켓으로 한 번 더 (잠금)",
     resReselect: "다시 고르기",
     nameTitle: "어떻게 불릴까요",
-    nameSub: "세계에서 당신을 부르는 이름. 1–12자.",
+    nameSub: "세계에서 당신을 부르는 이름. 2–12자.",
     namePlaceholder: "이름…",
     nameSubmit: "이 이름으로 들어가기",
     nameSubmitting: "들어가는 중…",
     nameHint: "이름은 나중에 설정에서 바꿀 수 있어요",
+    nameChecking: "확인 중…",
+    nameAvailable: "사용할 수 있어요",
     nameErrDup: "이미 누군가 쓰고 있어요",
     nameErrSave: "지금은 저장이 어려워요",
     errMsg: "지금은 잘 안 만들어져요.",
@@ -407,11 +411,13 @@ const en: OnboardingCopy = {
     resRegenLocked: "One more with a ticket (locked)",
     resReselect: "Reselect",
     nameTitle: "What's your name here?",
-    nameSub: "The name this world calls you. 1–12 chars.",
+    nameSub: "The name this world calls you. 2–12 chars.",
     namePlaceholder: "Name…",
     nameSubmit: "Enter as this name",
     nameSubmitting: "Entering…",
     nameHint: "You can change your name later in settings",
+    nameChecking: "Checking…",
+    nameAvailable: "That name's available",
     nameErrDup: "Someone's already using that",
     nameErrSave: "Couldn't save right now",
     errMsg: "It's not coming out well right now.",
@@ -550,11 +556,13 @@ const ja: OnboardingCopy = {
     resRegenLocked: "チケットでもう一度（ロック）",
     resReselect: "選び直す",
     nameTitle: "何と呼ばれますか",
-    nameSub: "この世界であなたを呼ぶ名前。1〜12文字。",
+    nameSub: "この世界であなたを呼ぶ名前。2〜12文字。",
     namePlaceholder: "名前…",
     nameSubmit: "この名前で入る",
     nameSubmitting: "入っています…",
     nameHint: "名前はあとで設定から変えられます",
+    nameChecking: "確認中…",
+    nameAvailable: "使えます",
     nameErrDup: "もう誰かが使っています",
     nameErrSave: "今は保存できませんでした",
     errMsg: "今はうまく作れません。",

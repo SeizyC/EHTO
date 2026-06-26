@@ -486,7 +486,32 @@ function NamingView(props: { imageUrl: string; onDone: () => void }) {
   const t = ONBOARDING[locale].character;
 
   const trimmed = name.trim();
-  const valid = trimmed.length >= 1 && trimmed.length <= 12;
+  const valid = trimmed.length >= 2 && trimmed.length <= 12;
+
+  // Real-time availability check (debounced). 'taken' blocks submit; submit()
+  // still guards against a race via the unique-index error.
+  const [check, setCheck] = useState<"idle" | "checking" | "ok" | "taken">("idle");
+  useEffect(() => {
+    if (trimmed.length < 2 || trimmed.length > 12) { setCheck("idle"); return; }
+    setCheck("checking");
+    let cancelled = false;
+    const id = setTimeout(async () => {
+      try {
+        const sb = browserClient();
+        const { data: sess } = await sb.auth.getSession();
+        if (cancelled || !sess.session) return;
+        const r = await fetch(
+          `/api/character/handle-available?handle=${encodeURIComponent(trimmed)}`,
+          { headers: { Authorization: `Bearer ${sess.session.access_token}` } },
+        );
+        const j = await r.json();
+        if (!cancelled) setCheck(j.available ? "ok" : "taken");
+      } catch {
+        if (!cancelled) setCheck("idle");
+      }
+    }, 400);
+    return () => { cancelled = true; clearTimeout(id); };
+  }, [trimmed]);
 
   async function submit() {
     if (!valid || submitting) return;
@@ -556,14 +581,22 @@ function NamingView(props: { imageUrl: string; onDone: () => void }) {
           </span>
         </div>
 
-        {err && <p className="text-accent text-[11.5px]">{err}</p>}
+        {err ? (
+          <p className="text-accent text-[11.5px]">{err}</p>
+        ) : check === "checking" ? (
+          <p className="text-dim text-[11.5px]">{t.nameChecking}</p>
+        ) : check === "ok" ? (
+          <p className="text-[11.5px] text-[#6FBF9B]">✓ {t.nameAvailable}</p>
+        ) : check === "taken" ? (
+          <p className="text-[11.5px] text-[#E08A7E]">{t.nameErrDup}</p>
+        ) : null}
       </section>
 
       <footer className="mt-auto flex flex-col gap-2.5 pb-2">
         <PixelButton
           block
           size="lg"
-          disabled={!valid || submitting}
+          disabled={!valid || submitting || check === "taken"}
           onClick={submit}
         >
           {submitting ? t.nameSubmitting : t.nameSubmit}
