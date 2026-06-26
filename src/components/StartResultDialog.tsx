@@ -59,9 +59,16 @@ export function StartResultDialog(props: {
                 initial={{ scale: 0.6, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: 0.08, type: "spring", stiffness: 240, damping: 16 }}
-                className="bg-accent/15 mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full"
+                className="border-line mx-auto mb-5 h-24 w-full max-w-[220px] overflow-hidden rounded-xl border shadow-[0_0_30px_-4px_rgba(232,155,108,0.45)]"
               >
-                <span className="bg-accent h-5 w-5 rounded-full shadow-[0_0_24px_4px_rgba(232,155,108,0.55)]" />
+                {/* A small plaza sample — a glimpse of the place they're about to build. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/sprites/rooms/plaza_afternoon.png"
+                  alt=""
+                  className="pixelated h-full w-full object-cover"
+                  draggable={false}
+                />
               </motion.div>
             ) : (
               <div className="border-line text-sub mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full border text-[22px]">
