@@ -66,9 +66,11 @@ export function CelestialLayer({ bucket }: { bucket: TimeBucket }) {
   const size = 34;
   const R = size / 2;
   const lit = bucket === "evening" ? "#e3c489" : "#e4dab4";
-  // Carve the shadow as a TRANSPARENT cut (same-size circle) so the dark side
-  // shows the sky behind it instead of a dark disc with a visible outline.
-  // cutCx: illum 0 → centered (all cut = new); illum 1 → off the disc (full).
+  // The lit disc is masked to the illuminated lune (a same-size circle carves
+  // the terminator). It sits OVER a dim full disc (rendered below) so the
+  // unlit side reads as the moon's dark body — always a round moon — rather
+  // than a transparent bite out of the disc (which looked gnawed at gibbous).
+  // cutCx: illum 0 → centered (all dark = new); illum 1 → off the disc (full).
   const dir = phase.waxing ? -1 : 1;
   const cutCx = R + dir * phase.illum * 2 * R;
   const mask = `radial-gradient(circle ${R}px at ${cutCx}px ${R}px, transparent 0 ${R - 0.5}px, #000 ${R}px)`;
@@ -87,6 +89,19 @@ export function CelestialLayer({ bucket }: { bucket: TimeBucket }) {
             background:
               "radial-gradient(circle, rgba(245,232,175,0.28) 0%, rgba(242,228,165,0.12) 42%, rgba(240,225,160,0) 72%)",
             filter: "blur(2px)",
+          }}
+        />
+        {/* Dark side — the full lunar disc, dimly visible, so the moon always
+            reads as a round body and the unlit part isn't a missing bite.
+            Cool grey at partial opacity sits naturally over both the night and
+            the warmer evening sky. */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            borderRadius: "50%",
+            background: "rgba(74,78,96,0.62)",
+            boxShadow: "inset 0 0 3px rgba(255,255,255,0.10)",
           }}
         />
         <div
