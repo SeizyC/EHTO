@@ -82,6 +82,13 @@ export type OnboardingCopy = {
     entering: string;
     failed: string;
   };
+  // /intro — the "now make your character" interstitial shown right after
+  // sign-up, before the character builder.
+  intro: {
+    title: string;
+    sub: string;
+    cta: string;
+  };
   invite: {
     title: string;
     status: string; // "{used}/{total} …"
@@ -212,6 +219,11 @@ const ko: OnboardingCopy = {
   callback: {
     entering: "들어가는 중…",
     failed: "로그인을 완료하지 못했어요.",
+  },
+  intro: {
+    title: "이제 당신의 캐릭터를 만들어요",
+    sub: "광장에서 함께 지낼 당신의 모습을 골라보세요.",
+    cta: "캐릭터 만들기",
   },
   invite: {
     title: "초대",
@@ -351,6 +363,11 @@ const en: OnboardingCopy = {
     entering: "Entering…",
     failed: "Couldn't complete the login.",
   },
+  intro: {
+    title: "Now, make your character",
+    sub: "Choose the look that'll spend time with you in your plaza.",
+    cta: "Make your character",
+  },
   invite: {
     title: "Invites",
     status: "{used}/{total} used",
@@ -488,6 +505,11 @@ const ja: OnboardingCopy = {
   callback: {
     entering: "入っています…",
     failed: "ログインを完了できませんでした。",
+  },
+  intro: {
+    title: "さあ、あなたのキャラクターを作りましょう",
+    sub: "広場で一緒に過ごすあなたの姿を選びましょう。",
+    cta: "キャラクターを作る",
   },
   invite: {
     title: "招待",

@@ -100,7 +100,7 @@ export async function landingPathForSession(accessToken: string): Promise<string
     if (!r.ok) return "/character";
     const j = await r.json();
     const ch = j.character;
-    if (!ch) return "/character";
+    if (!ch) return "/intro"; // brand-new user → the make-your-character intro
     // Hydrate LS so subsequent navigations don't re-fetch.
     saveCharacter({
       id: ch.id,

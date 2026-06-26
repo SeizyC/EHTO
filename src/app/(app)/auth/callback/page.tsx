@@ -41,7 +41,7 @@ export default function AuthCallbackPage() {
         });
         if (!cancelled && r.ok) {
           clearDraft();
-          router.replace("/character");
+          router.replace("/intro");
           return;
         }
         if (!cancelled && r.status === 409) {

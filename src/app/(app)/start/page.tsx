@@ -79,7 +79,7 @@ export default function StartPage() {
         setErr(j.error ?? t.finalizeFail); return;
       }
       clearDraft();
-      router.replace("/character");
+      router.replace("/intro");
     } catch {
       setErr(t.netErr);
     } finally {
