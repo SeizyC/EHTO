@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { AnimatePresence } from "framer-motion";
 import { PlazaCanvas, type PlazaCharacter } from "@/components/PlazaCanvas";
+import { Portal } from "@/components/plaza/Portal";
 import { PLAZA_PRESETS, type PlazaState, type PlazaObject } from "@/lib/plaza-objects";
 import { currentBucket } from "@/lib/time-of-day";
 import { browserClient } from "@/lib/supabase";
@@ -36,6 +38,61 @@ export default function DemoPlaza() {
   // waiting for plaza-grow milestone gates. Admin-only fetch.
   const [catalog, setCatalog] = useState<PlazaState | null>(null);
   const [loadingCat, setLoadingCat] = useState(false);
+
+  // ── Wormhole demo ──
+  // left portal = arrival (a friend walks out), right portal = departure
+  // (you get swallowed travelling to another plaza). A single "event" friend
+  // is driven through PlazaCanvas's normal character slide so the walk in/out
+  // reads naturally; the portal sits on top at the edge to mask the spawn/pop.
+  const [arrival, setArrival] = useState(false);
+  const [departure, setDeparture] = useState(false);
+  const [departPos, setDepartPos] = useState<{ x: number; y: number }>({ x: 50, y: 80 });
+  const [eventChar, setEventChar] = useState<PlazaCharacter | null>(null);
+  const timers = useRef<number[]>([]);
+
+  function clearTimers() {
+    for (const t of timers.current) window.clearTimeout(t);
+    timers.current = [];
+  }
+  const after = (ms: number, fn: () => void) => {
+    timers.current.push(window.setTimeout(fn, ms));
+  };
+  useEffect(() => () => clearTimers(), []);
+
+  function resetDemo() {
+    clearTimers();
+    setArrival(false);
+    setDeparture(false);
+    setEventChar(null);
+  }
+
+  // Friend arrives: left rift opens, friend spawns hidden behind it, then
+  // walks out onto the floor; rift closes once they're clear.
+  function playArrival() {
+    clearTimers();
+    setDeparture(false);
+    setArrival(true);
+    // the rift forms FIRST (warm-up → grow, ~2.0s) so you see the wormhole
+    // being made, THEN the friend rises out and strolls off slowly.
+    after(2050, () => setEventChar({ id: "evt", src: "/sprites/hero/test_02.png", x: 17, y: 77, name: "하루" }));
+    after(2900, () => setEventChar((c) => (c ? { ...c, x: 38, y: 80 } : c))); // stroll off after emerging
+    after(3700, () => setArrival(false)); // rift closes behind them
+  }
+
+  // You leave: a rift opens RIGHT WHERE YOU STAND and you sink into it on the
+  // spot — no walking to an edge. The character's smooth exit (fade + shrink
+  // to the feet) reads as being drawn down into the wormhole.
+  function playDeparture() {
+    clearTimers();
+    setArrival(false);
+    const here = eventChar ?? { id: "evt", src: "/sprites/hero/test_02.png", x: 50, y: 80, name: "하루" };
+    setEventChar(here);
+    setDepartPos({ x: here.x, y: here.y }); // wormhole opens at my feet
+    setDeparture(true);
+    // rift forms first (warm-up → grow, ~2.0s), THEN you sink into it in place
+    after(2050, () => setEventChar(null));
+    after(3200, () => setDeparture(false));
+  }
 
   async function loadCatalog() {
     setLoadingCat(true);
@@ -93,12 +150,25 @@ export default function DemoPlaza() {
 
       {/* Stage */}
       <section className="border-line overflow-hidden rounded-lg border">
-        <PlazaCanvas
-          state={state}
-          bgOverride={bgPath}
-          bucket={bucket as "dawn" | "morning" | "afternoon" | "evening" | "night"}
-          characters={showChars ? DEMO_CHARACTERS : []}
-        />
+        <div className="relative">
+          <PlazaCanvas
+            state={state}
+            bgOverride={bgPath}
+            bucket={bucket as "dawn" | "morning" | "afternoon" | "evening" | "night"}
+            characters={[
+              ...(showChars ? DEMO_CHARACTERS : []),
+              ...(eventChar ? [eventChar] : []),
+            ]}
+            walkMs={4000}
+          />
+          {/* Wormhole overlay — floor portals near the left/right edges. */}
+          <div className="pointer-events-none absolute inset-0">
+            <AnimatePresence>
+              {arrival && <Portal key="arrival" side="left" x={17} y={77} />}
+              {departure && <Portal key="departure" side="right" x={departPos.x} y={departPos.y} />}
+            </AnimatePresence>
+          </div>
+        </div>
       </section>
 
       {/* Controls */}
@@ -129,6 +199,12 @@ export default function DemoPlaza() {
         <ControlRow label="캐릭터">
           <Pill active={showChars} onClick={() => setShowChars(true)}>표시</Pill>
           <Pill active={!showChars} onClick={() => setShowChars(false)}>숨기기</Pill>
+        </ControlRow>
+
+        <ControlRow label="웜홀">
+          <Pill active={arrival} onClick={playArrival}>친구 등장 (좌·쿨)</Pill>
+          <Pill active={departure} onClick={playDeparture}>내가 이동 (우·웜)</Pill>
+          <Pill active={false} onClick={resetDemo}>리셋</Pill>
         </ControlRow>
 
         <p className="text-sub text-[11px] leading-relaxed">

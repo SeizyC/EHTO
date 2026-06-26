@@ -9,7 +9,7 @@ import { PlazaPausedOverlay } from "@/components/PlazaPausedOverlay";
 import { MeGlyph } from "@/components/MeGlyph";
 import { EhtoBadge } from "@/components/EhtoBadge";
 import { RandomPlazaDice } from "@/components/RandomPlazaDice";
-import { PlazaCanvas, type PlazaCharacter } from "@/components/PlazaCanvas";
+import { PlazaCanvas, type PlazaCharacter, type PlazaPortal } from "@/components/PlazaCanvas";
 import { AmbientFeed } from "@/components/AmbientFeed";
 import { Composer } from "@/components/Composer";
 import { MeSheet } from "@/components/MeSheet";
@@ -122,6 +122,26 @@ export default function WorldPage() {
   const [meOpen, setMeOpen] = useState(false);
   const [roomOpen, setRoomOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  // ── Wormhole portals ──
+  // A newly-arriving member gets a cool rift at its spot; leaving for another
+  // plaza opens a warm rift at your feet, then we navigate. `departing` hides
+  // your avatar so it sinks (PlazaCanvas exit) into the rift.
+  const [portals, setPortals] = useState<PlazaPortal[]>([]);
+  const [departing, setDeparting] = useState(false);
+  const portalSeenRef = useRef<Set<string> | null>(null);
+  const portalTimersRef = useRef<number[]>([]);
+  const latestMemberIdsRef = useRef<string[]>([]);
+  useEffect(() => {
+    // Seed ~1.5s after mount: whoever's already here at boot is treated as
+    // "already arrived" (no rift). Only members who show up afterward animate.
+    // `timers` is the same array object the arrival effect pushes into, so the
+    // cleanup clears every scheduled removal on unmount.
+    const timers = portalTimersRef.current;
+    const t = window.setTimeout(() => { portalSeenRef.current = new Set(latestMemberIdsRef.current); }, 1500);
+    timers.push(t);
+    return () => { timers.forEach((x) => window.clearTimeout(x)); };
+  }, []);
 
   // Admin-only entry points (e.g. the 🌐 plaza-home jump is hidden from regular
   // users for now). Lightweight probe; defaults to non-admin.
@@ -242,7 +262,39 @@ export default function WorldPage() {
       };
     }
   }
-  if (me?.imageUrl) {
+  // Detect newly-arrived members → spawn a cool arrival rift at their spot.
+  // The very first roster is seeded silently so only later arrivals animate.
+  const memberIdKey = visibleMembers.map((m) => m.id).join(",");
+  latestMemberIdsRef.current = visibleMembers.map((m) => m.id);
+  useEffect(() => {
+    const seen = portalSeenRef.current;
+    if (seen === null) return; // not seeded yet — treat the boot roster as already here
+    const fresh = visibleMembers.filter((m) => !seen.has(m.id));
+    if (fresh.length === 0) return;
+    fresh.forEach((m) => seen.add(m.id));
+    const added: PlazaPortal[] = fresh.map((m) => ({
+      id: `arr-${m.id}-${Date.now()}`,
+      side: "left",
+      x: m.x,
+      y: m.y,
+    }));
+    setPortals((p) => [...p, ...added]);
+    const ids = new Set(added.map((a) => a.id));
+    const t = window.setTimeout(() => setPortals((p) => p.filter((x) => !ids.has(x.id))), 3200);
+    portalTimersRef.current.push(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memberIdKey]);
+
+  // Leaving for another plaza: open a warm rift where you stand, let your
+  // avatar sink into it, then navigate.
+  function beginDeparture(href: string) {
+    if (departing) return;
+    setDeparting(true);
+    setPortals((p) => [...p, { id: `dep-${Date.now()}`, side: "right", x: mePos.x, y: mePos.y }]);
+    window.setTimeout(() => router.push(href), 1100);
+  }
+
+  if (me?.imageUrl && !departing) {
     const myBubble = activeBubbleOf("me", chat);
     const myName = me.handle ?? "나";
     // While composing, the user's bubble shows "..." (overrides any prior
@@ -385,7 +437,7 @@ export default function WorldPage() {
               <span className="bg-line block h-[18px] w-28 animate-pulse rounded-md" />
             )}
           </button>
-          <RandomPlazaDice />
+          <RandomPlazaDice onDepart={beginDeparture} />
         </div>
         <AmbientHeader mood={mood.label} onPeek={() => setRoomOpen(true)} />
       </div>
@@ -452,6 +504,7 @@ export default function WorldPage() {
                 <PlazaCanvas
                   state={state}
                   characters={characters}
+                  portals={portals}
                   // Mobile plaza is fixed 1200×800 inside a scroll
                   // container (3:2 ratio kept for bg image). PC plaza
                   // is fluid, typically rendering ~500-600px tall in
@@ -511,6 +564,7 @@ export default function WorldPage() {
                 <PlazaCanvas
                   state={state}
                   characters={characters}
+                  portals={portals}
                   onFloorClick={handleFloorClick}
                   onCharacterClick={(id) => {
                     if (id === "me") return;

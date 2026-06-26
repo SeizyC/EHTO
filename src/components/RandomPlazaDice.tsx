@@ -10,7 +10,7 @@ import { EhtoPurchaseModal } from "@/components/EhtoPurchaseModal";
 // 🎲 header button next to the plaza name. Rolls EHTO to teleport to a random
 // OTHER public plaza. Shows an EHTO-usage confirm modal first; on insufficient
 // balance, offers to top up.
-export function RandomPlazaDice() {
+export function RandomPlazaDice({ onDepart }: { onDepart?: (href: string) => void } = {}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -33,7 +33,11 @@ export function RandomPlazaDice() {
       });
       const j = await r.json();
       if (r.ok && j.id) {
-        router.push(`/plaza/${j.id}`); // leaves this page
+        const href = `/plaza/${j.id}`;
+        // Hand off to the page's departure wormhole (closes this confirm so
+        // the rift is visible); it navigates after the sink animation.
+        if (onDepart) { setOpen(false); onDepart(href); }
+        else router.push(href); // leaves this page
         return;
       }
       if (r.status === 402) { setErr("EHTO가 부족해요."); setLowEhto(true); }

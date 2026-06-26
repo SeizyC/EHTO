@@ -1,17 +1,26 @@
 "use client";
 
-import { useEffect, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { OBJECT_CATALOG, type PlazaObjectType, type PlazaState } from "@/lib/plaza-objects";
 import { currentBucket, type TimeBucket } from "@/lib/time-of-day";
 import { hasEmbed, renderMessage } from "@/lib/message-render";
 import { CelestialLayer } from "@/components/plaza/CelestialLayer";
 import { AerialLayer, classifyAerial, type AerialDef } from "@/components/plaza/AerialLayer";
+import { Portal, type PortalSide } from "@/components/plaza/Portal";
+
+// A wormhole to render over the floor — a member arriving (left/cool) or you
+// departing (right/warm). Positioned in plaza % coords like characters.
+export type PlazaPortal = { id: string; side: PortalSide; x: number; y: number };
 
 // Shell that adds the downward-pointing triangle tail under any bubble.
 // Used by both the idle name tag and the active message bubble so the
 // transition between them feels continuous.
-function BubbleShell({ children }: { children: React.ReactNode }) {
+// tailLeft (px from the bubble's left edge) lets the caller re-aim the tail
+// at the speaker when the bubble body was horizontally clamped to stay
+// inside the plaza. Defaults to centered (50%) when omitted.
+function BubbleShell({ children, tailLeft }: { children: React.ReactNode; tailLeft?: number }) {
+  const tail = tailLeft != null ? `${tailLeft}px` : "50%";
   return (
     <div style={{ position: "relative", display: "inline-block" }}>
       {children}
@@ -19,7 +28,7 @@ function BubbleShell({ children }: { children: React.ReactNode }) {
       <div
         style={{
           position: "absolute",
-          left: "50%",
+          left: tail,
           top: "100%",
           marginTop: -1,
           transform: "translateX(-50%)",
@@ -35,7 +44,7 @@ function BubbleShell({ children }: { children: React.ReactNode }) {
       <div
         style={{
           position: "absolute",
-          left: "50%",
+          left: tail,
           top: "100%",
           marginTop: -2,
           transform: "translateX(-50%)",
@@ -95,6 +104,118 @@ function IdleNameTag({ name }: { name: string }) {
         }}
       />
     </div>
+  );
+}
+
+// Active message bubble. Positioned above the speaker, then horizontally
+// clamped so the body never bleeds past the plaza edge when the speaker
+// stands near a wall (common on the narrow mobile plaza). The tail is
+// re-aimed at the speaker so the clamp stays legible — you still know who
+// said it. Measures the plaza width (plazaW) and its own body width to do
+// the clamp in real pixels rather than guessing.
+function PlazaBubble({
+  cx,
+  topPct,
+  plazaW,
+  bubble,
+  embed,
+  onDismiss,
+}: {
+  cx: number;
+  topPct: number;
+  plazaW: number;
+  bubble: { id: string; text: string; layoutId?: string; speakerName?: string; createdAt?: number };
+  embed: boolean;
+  onDismiss?: (id: string) => void;
+}) {
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [bw, setBw] = useState(0);
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    setBw(el.offsetWidth);
+    const ro = new ResizeObserver(() => setBw(el.offsetWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const PAD = 6; // px gutter kept between the bubble and the plaza edge
+  const TAIL_INSET = 14; // keep the tail tucked under the rounded body
+  const charPx = (cx / 100) * plazaW;
+  // Default (unmeasured) — center on the speaker, exactly like before.
+  let xOffset: number | string = "-50%";
+  let tailLeft: number | undefined;
+  if (plazaW > 0 && bw > 0) {
+    const minLeft = PAD;
+    const maxLeft = plazaW - bw - PAD;
+    let left = charPx - bw / 2;
+    // When the bubble is wider than the plaza there's no valid range —
+    // center it and accept symmetric bleed (unavoidable).
+    left =
+      maxLeft >= minLeft
+        ? Math.min(Math.max(left, minLeft), maxLeft)
+        : (plazaW - bw) / 2;
+    xOffset = left - charPx; // framer x in px, replacing the -50% center
+    tailLeft = Math.min(Math.max(charPx - left, TAIL_INSET), bw - TAIL_INSET);
+  }
+
+  return (
+    <motion.div
+      style={{
+        position: "absolute",
+        left: `${cx}%`,
+        top: `${topPct}%`,
+        marginTop: -8,
+        zIndex: 50,
+        cursor: onDismiss ? "pointer" : undefined,
+      }}
+      // x/y as framer-motion props (NOT CSS `transform`) so the anchor
+      // offset composes cleanly with scale + rotate during enter/exit.
+      initial={{ x: xOffset, y: "-100%", opacity: 0, scale: 0.92 }}
+      animate={{ x: xOffset, y: "-100%", opacity: 1, scale: 1 }}
+      exit={{ x: xOffset, y: "-100%", opacity: 0, scale: 1.55, rotate: -3 }}
+      transition={{
+        duration: 0.2,
+        exit: { duration: 0.28, ease: [0.4, 0, 0.2, 1] },
+      }}
+      onClick={
+        onDismiss
+          ? (e) => {
+              e.stopPropagation();
+              onDismiss(bubble.id);
+            }
+          : undefined
+      }
+    >
+      <BubbleShell tailLeft={tailLeft}>
+        <motion.div
+          ref={bodyRef}
+          layoutId={bubble.layoutId}
+          className={
+            "border-line bg-surface text-ink rounded-2xl border shadow-[0_4px_14px_-6px_rgba(0,0,0,0.5)] " +
+            (embed ? "p-1.5" : "px-3 py-1.5")
+          }
+          style={{
+            width: embed ? 260 : "max-content",
+            maxWidth: embed ? 280 : 200,
+            whiteSpace: "pre-wrap",
+            wordBreak: "keep-all",
+          }}
+          transition={{
+            layout: { duration: 0.9, ease: [0.22, 1, 0.36, 1] },
+          }}
+        >
+          {bubble.speakerName && (
+            <div className="text-sub mb-0.5 text-[10px] font-medium leading-none">
+              {bubble.speakerName}
+            </div>
+          )}
+          <div className="text-ink text-[11.5px] leading-snug">
+            {renderMessage(bubble.text)}
+          </div>
+        </motion.div>
+      </BubbleShell>
+    </motion.div>
   );
 }
 
@@ -242,6 +363,14 @@ type Props = {
    * scale lets us normalize the absolute pixel size across devices.
    */
   characterScale?: number;
+  /**
+   * Duration (ms) of the character walk tween when x/y changes. Default 2000
+   * — a calm, deliberate stroll across the plaza. Raise it further (e.g. the
+   * wormhole demo) for an even slower walk.
+   */
+  walkMs?: number;
+  /** Wormhole portals to overlay on the floor (arrivals / your departure). */
+  portals?: PlazaPortal[];
 };
 
 // Layered plaza scene:
@@ -256,6 +385,8 @@ export function PlazaCanvas({
   bucket: bucketProp,
   characters,
   characterScale = 1,
+  walkMs = 2000,
+  portals,
   onFloorClick,
   onCharacterClick,
   onBubbleDismiss,
@@ -266,6 +397,19 @@ export function PlazaCanvas({
   const objectFilter = lightingFilter(bucket);
   const charFilter = characterLightingFilter(bucket);
   const [ripple, setRipple] = useState<{ x: number; y: number; key: number } | null>(null);
+
+  // Plaza pixel width — used to clamp message bubbles inside the edges.
+  // Tracked live so the clamp stays correct across resize / orientation.
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [plazaW, setPlazaW] = useState(0);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    setPlazaW(el.clientWidth);
+    const ro = new ResizeObserver(() => setPlazaW(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // ── Dog wander (client-side drift) ──
   // Dogs are living scenery — stationary placements read as taxidermy.
@@ -446,6 +590,7 @@ export function PlazaCanvas({
 
   return (
     <div
+      ref={containerRef}
       className="relative"
       style={{ ...defaultStyle, ...style, cursor: onFloorClick ? "pointer" : undefined }}
       onClick={handleClick}
@@ -483,8 +628,9 @@ export function PlazaCanvas({
         />
       )}
 
+        <AnimatePresence initial={false}>
         {items.map((it) => (
-          <div
+          <motion.div
             key={it.key}
             onClick={
               it.kind === "char" && onCharacterClick
@@ -500,22 +646,44 @@ export function PlazaCanvas({
                   }
                 : undefined
             }
+            // Characters emerge/vanish smoothly — fade + grow/shrink anchored
+            // at the feet — so wormhole arrivals rise out of the ground and
+            // departures sink in, instead of popping. AnimatePresence
+            // initial={false} keeps the first-render roster static; only
+            // later add/removes (a member arriving or leaving) animate.
+            //
+            // The WALK (left/top change) is animated by framer too — a motion
+            // component overrides any inline `style.transition`, so a CSS
+            // transition on left/top would be dropped and the character would
+            // teleport. left/top get the slow walkMs tween; opacity/scale
+            // (emerge) get the quick default.
+            initial={it.kind === "char" ? { opacity: 0, scale: 0.5, x: "-50%", y: "-100%", left: `${it.x}%`, top: `${it.y}%` } : false}
+            animate={it.kind === "char" ? { opacity: 1, scale: 1, x: "-50%", y: "-100%", left: `${it.x}%`, top: `${it.y}%` } : undefined}
+            exit={it.kind === "char" ? { opacity: 0, scale: 0.45, x: "-50%", y: "-100%" } : undefined}
+            transition={
+              it.kind === "char"
+                ? {
+                    default: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
+                    left: { duration: walkMs / 1000, ease: "easeOut" },
+                    top: { duration: walkMs / 1000, ease: "easeOut" },
+                  }
+                : undefined
+            }
             style={{
               position: "absolute",
-              left: `${it.x}%`,
-              top: `${it.y}%`,
+              // chars: left/top owned by framer (walk tween). objects: CSS.
+              left: it.kind === "char" ? undefined : `${it.x}%`,
+              top: it.kind === "char" ? undefined : `${it.y}%`,
               height: `${it.h}%`,
-              transform: "translate(-50%, -100%)",
+              transformOrigin: "50% 100%",
+              transform: it.kind === "char" ? undefined : "translate(-50%, -100%)",
               cursor: it.kind === "char" && onCharacterClick ? "pointer" : undefined,
-              // Smooth slide when position changes. Characters: 1.2s
-              // ease-out (deliberate walk). Wandering dogs: 1.8s ease-
-              // in-out (slower, smoother — feels like a relaxed amble).
+              // Wandering dogs keep their CSS amble (objects aren't framer-
+              // animated, so their inline transition is preserved).
               transition:
-                it.kind === "char"
-                  ? "left 1.2s ease-out, top 1.2s ease-out"
-                  : it.kind === "obj" && it.wandering
-                    ? "left 1.8s ease-in-out, top 1.8s ease-in-out, height 1.8s ease-in-out"
-                    : undefined,
+                it.kind === "obj" && it.wandering
+                  ? "left 1.8s ease-in-out, top 1.8s ease-in-out, height 1.8s ease-in-out"
+                  : undefined,
             }}
           >
             {/* foot shadow — only for characters, anchors them to the floor */}
@@ -583,8 +751,20 @@ export function PlazaCanvas({
                 </div>
               )}
             </div>
-        </div>
-      ))}
+          </motion.div>
+        ))}
+        </AnimatePresence>
+
+      {/* Wormhole layer — member arrivals / your departure. Sits above the
+          floor items (its own zIndex) and below the bubble layer. Shares the
+          plaza % coordinate system with the characters. */}
+      {portals && portals.length > 0 && (
+        <AnimatePresence>
+          {portals.map((p) => (
+            <Portal key={p.id} side={p.side} x={p.x} y={p.y} />
+          ))}
+        </AnimatePresence>
+      )}
 
       {/* Bubble layer — rendered AFTER all positional items so it sits at
           the top of the plaza's stacking order regardless of where each
@@ -602,67 +782,15 @@ export function PlazaCanvas({
           const topPct = bubbleTops.get(c.id) ?? (c.y - CHARACTER_HEIGHT_PCT);
           const embed = hasEmbed(c.bubble!.text);
           return (
-            <motion.div
+            <PlazaBubble
               key={`bubble-${c.id}`}
-              style={{
-                position: "absolute",
-                left: `${c.x}%`,
-                top: `${topPct}%`,
-                marginTop: -8,
-                zIndex: 50,
-                cursor: onBubbleDismiss ? "pointer" : undefined,
-              }}
-              // x/y as framer-motion props (NOT CSS `transform`) so the
-              // -50%/-100% anchor offset composes cleanly with scale +
-              // rotate during enter/exit. With a CSS transform string
-              // framer-motion would clobber it once the animated scale
-              // kicks in, dropping the bubble at the wrong spot.
-              initial={{ x: "-50%", y: "-100%", opacity: 0, scale: 0.92 }}
-              animate={{ x: "-50%", y: "-100%", opacity: 1, scale: 1 }}
-              // Burst exit: scale up + rotate + fade. Quick (~0.28s) so
-              // the click feels responsive, not slow.
-              exit={{ x: "-50%", y: "-100%", opacity: 0, scale: 1.55, rotate: -3 }}
-              transition={{
-                duration: 0.2,
-                exit: { duration: 0.28, ease: [0.4, 0, 0.2, 1] },
-              }}
-              onClick={
-                onBubbleDismiss
-                  ? (e) => {
-                      e.stopPropagation();
-                      onBubbleDismiss(c.id);
-                    }
-                  : undefined
-              }
-            >
-              <BubbleShell>
-                <motion.div
-                  layoutId={c.bubble!.layoutId}
-                  className={
-                    "border-line bg-surface text-ink rounded-2xl border shadow-[0_4px_14px_-6px_rgba(0,0,0,0.5)] " +
-                    (embed ? "p-1.5" : "px-3 py-1.5")
-                  }
-                  style={{
-                    width: embed ? 260 : "max-content",
-                    maxWidth: embed ? 280 : 200,
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "keep-all",
-                  }}
-                  transition={{
-                    layout: { duration: 0.9, ease: [0.22, 1, 0.36, 1] },
-                  }}
-                >
-                  {c.bubble!.speakerName && (
-                    <div className="text-sub mb-0.5 text-[10px] font-medium leading-none">
-                      {c.bubble!.speakerName}
-                    </div>
-                  )}
-                  <div className="text-ink text-[11.5px] leading-snug">
-                    {renderMessage(c.bubble!.text)}
-                  </div>
-                </motion.div>
-              </BubbleShell>
-            </motion.div>
+              cx={c.x}
+              topPct={topPct}
+              plazaW={plazaW}
+              bubble={c.bubble!}
+              embed={embed}
+              onDismiss={onBubbleDismiss}
+            />
           );
         })}
       </AnimatePresence>
