@@ -64,12 +64,12 @@ export function StartResultDialog(props: {
                 {/* A small plaza sample — a glimpse of the place they're about to build. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/sprites/rooms/plaza_afternoon_thumb.webp"
+                  src="/og_ehto_thumb.webp"
                   alt=""
                   width={480}
-                  height={320}
+                  height={291}
                   loading="eager"
-                  className="pixelated h-full w-full object-cover"
+                  className="h-full w-full object-cover"
                   draggable={false}
                 />
               </motion.div>
