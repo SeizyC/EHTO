@@ -8,6 +8,7 @@ const KEY = "ehto:character:v3";
 
 export type SavedCharacter = {
   id: string;
+  userId?: string;        // owner — the auth user this cache belongs to
   imageUrl: string;       // public URL from Supabase Storage
   gender: GenderId;
   skin: SkinId;
@@ -18,6 +19,21 @@ export type SavedCharacter = {
   tickets?: number;
   createdAt: number;
 };
+
+/** Auth user id (sub) from a Supabase access token, decoded locally (no
+ *  network). Used to verify a cached character actually belongs to the
+ *  currently signed-in user — a different account (or a legacy cache with no
+ *  userId) must not be trusted. Returns null if the token can't be parsed. */
+export function uidFromToken(token: string): string | null {
+  try {
+    const part = token.split(".")[1];
+    if (!part) return null;
+    const json = atob(part.replace(/-/g, "+").replace(/_/g, "/"));
+    return (JSON.parse(json) as { sub?: string }).sub ?? null;
+  } catch {
+    return null;
+  }
+}
 
 // ───────── reactive store via pub/sub ─────────
 const listeners = new Set<() => void>();
@@ -69,8 +85,13 @@ export function clearCharacter() {
  *  hits /api/character/me once — adds ~1 RTT but only on first sign-in
  *  on that device, which is the right place to spend the latency. */
 export async function landingPathForSession(accessToken: string): Promise<string> {
+  const uid = uidFromToken(accessToken);
   const cached = loadCharacter();
-  if (cached?.handle) return "/world";
+  // Only trust the cache fast-path if it belongs to THIS user. A stale cache
+  // from a previously signed-in account (e.g. after a Google sign-in on a
+  // browser that was someone else) must not route us into their plaza.
+  if (cached?.handle && uid && cached.userId === uid) return "/world";
+  if (cached && cached.userId !== uid) clearCharacter(); // drop foreign/legacy cache
 
   try {
     const r = await fetch("/api/character/me", {
@@ -83,6 +104,7 @@ export async function landingPathForSession(accessToken: string): Promise<string
     // Hydrate LS so subsequent navigations don't re-fetch.
     saveCharacter({
       id: ch.id,
+      userId: uid ?? undefined,
       imageUrl: ch.imageUrl,
       gender: ch.gender,
       skin: ch.skin,
@@ -129,6 +151,12 @@ export function useCharacter(): SavedCharacter | null {
       if (!sess.session) return;
       const uid = sess.session.user.id;
 
+      // Defense-in-depth: if the cached character belongs to a different (or
+      // unknown/legacy) user, drop it now so we never render someone else's
+      // identity while the server sync below resolves.
+      const stale = loadCharacter();
+      if (stale && stale.userId !== uid) clearCharacter();
+
       const [{ data: charRow }, { data: profRow }] = await Promise.all([
         sb.from("characters")
           .select("id,image_path,gender,skin,outfit,rolled_hair,created_at")
@@ -147,6 +175,7 @@ export function useCharacter(): SavedCharacter | null {
       const cached = loadCharacter();
       const fromServer: SavedCharacter = {
         id: charRow.id,
+        userId: uid,
         imageUrl: publicSpriteUrl(charRow.image_path),
         gender: charRow.gender,
         skin: charRow.skin,

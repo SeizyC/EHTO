@@ -17,7 +17,7 @@ import {
   type HairColorId,
   type AccessoryId,
 } from "@/lib/prompts";
-import { saveCharacter, loadCharacter, saveHandle } from "@/lib/character-store";
+import { saveCharacter, loadCharacter, clearCharacter, saveHandle } from "@/lib/character-store";
 import { browserClient } from "@/lib/supabase";
 import { PixelButton } from "@/components/PixelButton";
 import { MeGlyph } from "@/components/MeGlyph";
@@ -81,23 +81,27 @@ function CharacterPageInner() {
     // Skip all redirects that would send them away from the select stage.
     if (change) return;
 
-    const cached = loadCharacter();
-    if (cached) {
-      if (cached.handle) {
-        router.replace("/home");
-        return;
-      }
-      setImageUrl(cached.imageUrl);
-      setCharacterId(cached.id);
-      setStage("naming");
-      return;
-    }
-
-    // No LS — try to recover from server.
     let cancelled = false;
     (async () => {
       const sb = browserClient();
       const { data: sess } = await sb.auth.getSession();
+      if (cancelled) return;
+      const uid = sess.session?.user.id;
+
+      // Trust the LS cache only if it belongs to THIS user. A stale cache from
+      // a previously signed-in account (e.g. a Google sign-in on a browser that
+      // was someone else) would otherwise bounce us into their identity.
+      let cached = loadCharacter();
+      if (cached && cached.userId !== uid) { clearCharacter(); cached = null; }
+      if (cached) {
+        if (cached.handle) { router.replace("/home"); return; }
+        setImageUrl(cached.imageUrl);
+        setCharacterId(cached.id);
+        setStage("naming");
+        return;
+      }
+
+      // No (owned) LS cache — recover from server.
       if (!sess.session) return;
       const r = await fetch("/api/character/me", {
         headers: { Authorization: `Bearer ${sess.session.access_token}` },
@@ -108,6 +112,7 @@ function CharacterPageInner() {
       if (!ch) return; // user really has no character yet → stay on select
       saveCharacter({
         id: ch.id,
+        userId: sess.session.user.id,
         imageUrl: ch.imageUrl,
         gender: ch.gender,
         skin: ch.skin,
@@ -172,10 +177,13 @@ function CharacterPageInner() {
     }
   }
 
-  function confirmEnter() {
+  async function confirmEnter() {
     if (!imageUrl || !characterId) return;
+    const sb = browserClient();
+    const { data: sess } = await sb.auth.getSession();
     saveCharacter({
       id: characterId,
+      userId: sess.session?.user.id,
       imageUrl,
       gender,
       skin,
