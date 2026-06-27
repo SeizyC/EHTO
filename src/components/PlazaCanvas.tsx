@@ -8,10 +8,14 @@ import { hasEmbed, renderMessage } from "@/lib/message-render";
 import { CelestialLayer } from "@/components/plaza/CelestialLayer";
 import { AerialLayer, classifyAerial, type AerialDef } from "@/components/plaza/AerialLayer";
 import { Portal, type PortalSide } from "@/components/plaza/Portal";
+import { FirstFriendPointer } from "@/components/plaza/FirstFriendPointer";
 
 // A wormhole to render over the floor — a member arriving (left/cool) or you
 // departing (right/warm). Positioned in plaza % coords like characters.
 export type PlazaPortal = { id: string; side: PortalSide; x: number; y: number };
+
+// A one-time coachmark arrow pointing at a friend (x,y = the friend's feet).
+export type PlazaPointer = { x: number; y: number; label: string };
 
 // Shell that adds the downward-pointing triangle tail under any bubble.
 // Used by both the idle name tag and the active message bubble so the
@@ -371,6 +375,8 @@ type Props = {
   walkMs?: number;
   /** Wormhole portals to overlay on the floor (arrivals / your departure). */
   portals?: PlazaPortal[];
+  /** One-time coachmark arrow pointing at a friend (null = hidden). */
+  pointer?: PlazaPointer | null;
 };
 
 // Layered plaza scene:
@@ -387,6 +393,7 @@ export function PlazaCanvas({
   characterScale = 1,
   walkMs = 2000,
   portals,
+  pointer,
   onFloorClick,
   onCharacterClick,
   onBubbleDismiss,
@@ -764,6 +771,24 @@ export function PlazaCanvas({
             <Portal key={p.id} side={p.side} x={p.x} y={p.y} />
           ))}
         </AnimatePresence>
+      )}
+
+      {/* First-friend coachmark — a bobbing arrow above the friend's head.
+          Anchored at the head (feet y minus character height) and drawn above
+          the bubble layer so the nudge is always visible. */}
+      {pointer && (
+        <div
+          style={{
+            position: "absolute",
+            left: `${pointer.x}%`,
+            top: `${pointer.y - CHARACTER_HEIGHT_PCT * perspectiveScale(pointer.y) * characterScale}%`,
+            transform: "translate(-50%, -100%)",
+            zIndex: 55,
+            pointerEvents: "none",
+          }}
+        >
+          <FirstFriendPointer label={pointer.label} />
+        </div>
       )}
 
       {/* Bubble layer — rendered AFTER all positional items so it sits at

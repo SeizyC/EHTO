@@ -9,7 +9,7 @@ import { PlazaPausedOverlay } from "@/components/PlazaPausedOverlay";
 import { MeGlyph } from "@/components/MeGlyph";
 import { EhtoBadge } from "@/components/EhtoBadge";
 import { RandomPlazaDice } from "@/components/RandomPlazaDice";
-import { PlazaCanvas, type PlazaCharacter, type PlazaPortal } from "@/components/PlazaCanvas";
+import { PlazaCanvas, type PlazaCharacter, type PlazaPortal, type PlazaPointer } from "@/components/PlazaCanvas";
 import { AmbientFeed } from "@/components/AmbientFeed";
 import { Composer } from "@/components/Composer";
 import { MeSheet } from "@/components/MeSheet";
@@ -132,6 +132,19 @@ export default function WorldPage() {
   const portalSeenRef = useRef<Set<string> | null>(null);
   const portalTimersRef = useRef<number[]>([]);
   const latestMemberIdsRef = useRef<string[]>([]);
+
+  // ── First-friend coachmark ──
+  // A one-time arrow nudging the user to tap a friend and chat. Shown while a
+  // friend is present and not yet dismissed; cleared once they tap any friend.
+  const [guideSeen, setGuideSeen] = useState(true); // default true → no flash before LS read
+  useEffect(() => {
+    try { setGuideSeen(window.localStorage.getItem("ehto:friend-guide-seen") === "1"); } catch { /* ignore */ }
+  }, []);
+  function dismissGuide() {
+    setGuideSeen(true);
+    try { window.localStorage.setItem("ehto:friend-guide-seen", "1"); } catch { /* ignore */ }
+  }
+
   useEffect(() => {
     // Seed ~1.5s after mount: whoever's already here at boot is treated as
     // "already arrived" (no rift). Only members who show up afterward animate.
@@ -238,6 +251,11 @@ export default function WorldPage() {
   // layout because the layout IS the DB state.
   const visibleMembers = members
     .filter((m) => m.activity_weight >= 0.3 && m.status !== "ghost");
+  // Point the coachmark at the first friend present until the user dismisses it.
+  const guideTarget = !guideSeen && visibleMembers.length > 0 ? visibleMembers[0] : null;
+  const guidePointer: PlazaPointer | null = guideTarget
+    ? { x: guideTarget.x, y: guideTarget.y, label: "친구를 선택해 대화를 해보세요" }
+    : null;
   const characters: PlazaCharacter[] = visibleMembers.map((m) => ({
     id: m.id,
     src: m.persona.sprite,
@@ -505,6 +523,7 @@ export default function WorldPage() {
                   state={state}
                   characters={characters}
                   portals={portals}
+                  pointer={guidePointer}
                   // Mobile plaza is fixed 1200×800 inside a scroll
                   // container (3:2 ratio kept for bg image). PC plaza
                   // is fluid, typically rendering ~500-600px tall in
@@ -517,6 +536,7 @@ export default function WorldPage() {
                   onCharacterClick={(id) => {
                     // Tap-to-summon: drop "@{name} " in composer + focus.
                     if (id === "me") return;
+                    dismissGuide();
                     const m = characters.find((c) => c.id === id);
                     if (m?.name) summonInComposer(m.name);
                   }}
@@ -565,9 +585,11 @@ export default function WorldPage() {
                   state={state}
                   characters={characters}
                   portals={portals}
+                  pointer={guidePointer}
                   onFloorClick={handleFloorClick}
                   onCharacterClick={(id) => {
                     if (id === "me") return;
+                    dismissGuide();
                     const m = characters.find((c) => c.id === id);
                     if (m?.name) summonInComposer(m.name);
                   }}

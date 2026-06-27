@@ -184,13 +184,14 @@ export async function seedMembersIfEmpty(
 
 // Per-world activation schedule generator.
 //
-// Retention-first pacing: a brand-new room should feel alive within the
-// first hour (one arrival validates "the world is real"), but every
-// arrival after that is spaced 6–12 hours apart. With 15 members in a
-// roster, this stretches the full population over ~6–10 days, giving the
-// owner a steady drip-feed reason to come back daily.
+// Retention-first pacing: the FIRST friend should show up almost right away
+// (~1 min) so a brand-new owner witnesses an arrival — the warm-up moment that
+// proves "the world is alive" and kicks off ambient chatter. Every arrival
+// after that is spaced 6–12 hours apart so the full roster drips in over
+// ~6–10 days, giving a steady reason to come back daily.
 //
-//   p1     : 10–60 min after world creation
+//   p1     : ~1 min after world creation (onboarding lands on /world right
+//            after creation, so this reads as "a minute after you arrive")
 //   p2..pN : cumulative, each 6–12 h further than the previous one
 //
 // Generated all at once so monotonicity is guaranteed across priorities
@@ -198,8 +199,8 @@ export async function seedMembersIfEmpty(
 export function generateActivationOffsets(n: number): number[] {
   if (n <= 0) return [];
   const offsets: number[] = [];
-  // p1: 10-60 min — soon enough to confirm the room isn't empty
-  let cum = 600 + Math.floor(Math.random() * (3600 - 600));
+  // p1: ~1 min (45-90s) — the first friend arrives while the owner is looking.
+  let cum = 45 + Math.floor(Math.random() * 45);
   offsets.push(cum);
   for (let i = 2; i <= n; i++) {
     const gapHrs = 6 + Math.random() * 6;   // 6–12 h between arrivals
