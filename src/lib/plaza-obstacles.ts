@@ -36,3 +36,23 @@ export function clearOfObstacles(
 ): boolean {
   return obstacles.every((o) => isoDist(pt, o) >= o.radius);
 }
+
+/** True when `pt` would be BURIED behind a tall object. The base keep-out
+ *  above is a circle, but a tall sprite (building/fountain/tree) also paints
+ *  over anyone standing behind it (lower y → drawn earlier in the y-sort)
+ *  within its horizontal span — even outside that circle. This forbids that
+ *  vertical "shadow" wedge so a character never disappears behind an object.
+ *  Depth of the wedge scales with the object's keep-out radius (∝ height). */
+export function occludedBehind(
+  pt: { x: number; y: number },
+  obstacles: Obstacle[],
+): boolean {
+  for (const o of obstacles) {
+    if (o.radius <= 0) continue;      // short objects don't hide anyone
+    if (pt.y >= o.y) continue;        // level with / in front of the base → visible
+    const halfWidth = o.radius;       // horizontal cover ≈ keep-out radius
+    const shadowDepth = o.radius * 2.5; // how far back a tall sprite reaches
+    if (Math.abs(pt.x - o.x) <= halfWidth && o.y - pt.y <= shadowDepth) return true;
+  }
+  return false;
+}

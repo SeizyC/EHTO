@@ -18,6 +18,7 @@ import {
   obstacleRadius,
   isoDist,
   clearOfObstacles,
+  occludedBehind,
   type Obstacle,
 } from "@/lib/plaza-obstacles";
 
@@ -92,7 +93,7 @@ export function pickClearSpot(
   let bestClearMinD = -1;
   for (let i = 0; i < attempts; i++) {
     const cand = sample();
-    const clear = clearOfObstacles(cand, obstacles);
+    const clear = clearOfObstacles(cand, obstacles) && !occludedBehind(cand, obstacles);
     const minD = taken.length === 0
       ? Infinity
       : Math.min(...taken.map((t) => isoDist(cand, t)));
@@ -124,7 +125,7 @@ function isUninitialized(r: Row): boolean {
 // Build object keep-out obstacles for a world. Static types resolve
 // their display height from the TS catalog; dynamic types from the DB
 // catalog (by variant id). Short objects (radius 0) are dropped.
-async function buildObstacles(
+export async function buildObstacles(
   sb: SupabaseClient,
   worldId: string,
 ): Promise<Obstacle[]> {
@@ -250,6 +251,7 @@ export async function tickMemberPositions(
       const ny = clamp(curY + dy, FLOOR_Y_MIN, FLOOR_Y_MAX);
       const cand = { x: nx, y: ny };
       if (!clearOfObstacles(cand, obstacles)) continue; // never drift into an object
+      if (occludedBehind(cand, obstacles)) continue;    // nor behind a tall one
       const minD = others.length === 0
         ? Infinity
         : Math.min(...others.map((o) => isoDist(cand, o)));

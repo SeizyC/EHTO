@@ -12,6 +12,7 @@ import { memberCap, type Plan } from "@/lib/energy";
 import type { Locale } from "@/lib/language";
 import { sysMemberJoined } from "@/lib/system-messages";
 import { localizeIdentity } from "@/lib/member-identity";
+import { pickClearSpot, buildObstacles } from "@/lib/position-drift";
 
 // How many AI characters a brand-new world initially recruits from the pool.
 // They land as dormant rows; lazy activation reveals them on schedule, capped
@@ -26,6 +27,16 @@ const SEED_COUNT = 12;
 // them in one at a time (one per ~30s poll) so arrivals feel like people
 // walking in, not a crowd materializing at once with a burst of greetings.
 const MAX_ACTIVATIONS_PER_TICK = 1;
+
+// Minimum real-time gap between two arrivals in the same world. This is the
+// anti-"우르르" spacing: even if a big scheduled backlog is all "overdue" —
+// e.g. an owner created the world long ago but rarely logged in, so every
+// created_at-anchored offset has elapsed — we still admit at most ONE new
+// friend per this gap. Because activation only ticks while the owner is on
+// /world, arrivals become engagement-paced (a friend trickles in during a
+// visit, ~one per gap) instead of the whole roster materializing at once.
+// 6h matches the design's minimum inter-arrival spacing.
+const MIN_ARRIVAL_GAP_MS = 6 * 3600 * 1000;
 
 export async function ensureWorld(
   sb: SupabaseClient,
@@ -249,11 +260,28 @@ export async function tickMemberActivations(
   // sprites ship.)
   const { data: active } = await sb
     .from("members")
-    .select("persona")
+    .select("persona, activated_at, x, y")
     .eq("current_location_world_id", worldId)
     .not("activated_at", "is", null)
     .not("status", "in", "(ghost,banned)");
   const activeCount = active?.length ?? 0;
+
+  // Anti-"우르르" spacing: once at least one friend is here, admit no more
+  // than one per MIN_ARRIVAL_GAP_MS of real time — even if a big scheduled
+  // backlog is all overdue. Activation only ticks while the owner is on
+  // /world, so arrivals become engagement-paced instead of dumping the whole
+  // roster the moment a long-absent owner logs back in.
+  if (activeCount > 0) {
+    const latestActivatedMs = Math.max(
+      0,
+      ...(active ?? []).map((m) =>
+        m.activated_at ? new Date(m.activated_at as string).getTime() : 0,
+      ),
+    );
+    if (Date.now() - latestActivatedMs < MIN_ARRIVAL_GAP_MS) {
+      return { activated: [] };
+    }
+  }
   const usedSprites = new Set(
     (active ?? [])
       .map((m) => (m.persona as { sprite?: string } | null)?.sprite)
@@ -281,16 +309,44 @@ export async function tickMemberActivations(
     .slice(0, Math.min(free, MAX_ACTIVATIONS_PER_TICK))
     .map((m) => m.id);
 
-  // Race-safe activation: only flip rows that are still dormant.
-  const { data: justActivated, error } = await sb
-    .from("members")
-    .update({ activated_at: nowIso, last_seen_at: nowIso })
-    .in("id", ids)
-    .is("activated_at", null)
-    .select("id, name, persona, backstory, activity_weight");
+  // Placement inputs: keep newcomers off the fountain/objects and off each
+  // other + the owner avatar. Built once and reused (taken grows as we place).
+  const obstacles = await buildObstacles(sb, worldId);
+  const { data: wpos } = await sb
+    .from("worlds")
+    .select("owner_x, owner_y")
+    .eq("id", worldId)
+    .maybeSingle();
+  const taken: Array<{ x: number; y: number }> = [
+    { x: (wpos?.owner_x as number | null) ?? 50, y: (wpos?.owner_y as number | null) ?? 60 },
+    ...(active ?? [])
+      .filter((m) => typeof m.x === "number" && typeof m.y === "number")
+      .map((m) => ({ x: m.x as number, y: m.y as number })),
+  ];
 
-  if (error) throw new Error(`activate: ${error.message}`);
-  if (!justActivated || justActivated.length === 0) return { activated: [] };
+  // Race-safe activation, one row at a time. Each newcomer is placed at a
+  // scattered, obstacle-clear floor spot IN the same update, so the realtime
+  // "activated" event already carries a real position — instead of the
+  // (50,60) center default that made every arrival's wormhole open on the
+  // fountain until a later drift tick nudged them apart.
+  type Activated = { id: string; name: string; persona: unknown; backstory: string | null; activity_weight: number };
+  const justActivated: Activated[] = [];
+  for (const id of ids) {
+    const spot = pickClearSpot(taken, obstacles);
+    const flip = spot.x > 50; // face inward (left of center → face right)
+    const { data: rows, error } = await sb
+      .from("members")
+      .update({ activated_at: nowIso, last_seen_at: nowIso, x: spot.x, y: spot.y, flip, pos_updated_at: nowIso })
+      .eq("id", id)
+      .is("activated_at", null)
+      .select("id, name, persona, backstory, activity_weight");
+    if (error) throw new Error(`activate: ${error.message}`);
+    if (rows && rows[0]) {
+      justActivated.push(rows[0] as Activated);
+      taken.push(spot);
+    }
+  }
+  if (justActivated.length === 0) return { activated: [] };
 
   // Log each fresh activation as a visit so the room's visit counts
   // include AI arrivals (today / week / cumulative).
