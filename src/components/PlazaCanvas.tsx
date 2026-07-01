@@ -119,24 +119,21 @@ function IdleNameTag({ name }: { name: string }) {
 // the clamp in real pixels rather than guessing.
 function PlazaBubble({
   cx,
-  topPct,
   plazaW,
-  walkMs,
   xMv,
+  topMv,
   bubble,
   embed,
   onDismiss,
 }: {
   cx: number;
-  topPct: number;
   plazaW: number;
-  /** Character walk duration — the bubble lerps its top over the SAME time so
-   *  it stays glued above the walking speaker. */
-  walkMs: number;
-  /** Shared per-character X MotionValue ("x%"). The bubble reads the SAME
-   *  animated x as the sprite, so even a bubble that mounts mid-walk lands on
-   *  the character's current position instead of jumping to the destination. */
+  /** Shared per-character X + head-top MotionValues ("x%"). The bubble reads
+   *  the SAME animated position as the sprite, so it's glued to the speaker in
+   *  every case — including a bubble that mounts mid-walk (it reads the current
+   *  animated position, not the data destination) — with no independent float. */
   xMv?: MotionValue<string>;
+  topMv?: MotionValue<string>;
   bubble: { id: string; text: string; layoutId?: string; speakerName?: string; createdAt?: number };
   embed: boolean;
   onDismiss?: (id: string) => void;
@@ -176,23 +173,22 @@ function PlazaBubble({
     <motion.div
       style={{
         position: "absolute",
-        // left = the SAME shared MotionValue the sprite uses → glued to the
-        // walking speaker in every case, including a bubble that mounts
-        // mid-walk (it reads the current animated x, not the destination).
+        // left/top = the SAME shared MotionValues the sprite uses → the bubble
+        // is glued to the speaker's head in every case (including mounting
+        // mid-walk), with no independent float. x/y below are framer props
+        // (NOT CSS transform) so the anchor/clamp offset composes with scale +
+        // rotate during enter/exit.
         left: xMv ?? `${cx}%`,
+        top: topMv,
         marginTop: -8,
         zIndex: 50,
         cursor: onDismiss ? "pointer" : undefined,
       }}
-      // top is framer-animated over walkMs so vertical follows the walk; x/y
-      // are framer props (NOT CSS transform) so the anchor/clamp offset
-      // composes with scale + rotate during enter/exit.
-      initial={{ x: xOffset, y: "-100%", opacity: 0, scale: 0.92, top: `${topPct}%` }}
-      animate={{ x: xOffset, y: "-100%", opacity: 1, scale: 1, top: `${topPct}%` }}
+      initial={{ x: xOffset, y: "-100%", opacity: 0, scale: 0.92 }}
+      animate={{ x: xOffset, y: "-100%", opacity: 1, scale: 1 }}
       exit={{ x: xOffset, y: "-100%", opacity: 0, scale: 1.55, rotate: -3 }}
       transition={{
         duration: 0.2,
-        top: { duration: walkMs / 1000, ease: "easeOut" },
         exit: { duration: 0.28, ease: [0.4, 0, 0.2, 1] },
       }}
       onClick={
@@ -438,22 +434,30 @@ export function PlazaCanvas({
   // make it jump ahead of the still-walking sprite). Created lazily during
   // render (so it's available on first paint) and tweened over walkMs in the
   // effect below whenever the data x changes.
+  // Head-top (%) for a character = feet y minus the drawn character height —
+  // where its speech bubble should sit. Shared like x so the bubble is glued
+  // vertically too (no independent "float up" from anti-overlap re-stacking).
+  const headTopOf = (c: { y: number; scale?: number }) =>
+    c.y - CHARACTER_HEIGHT_PCT * (c.scale ?? 1) * perspectiveScale(c.y) * characterScale;
   const xMvRef = useRef<Map<string, MotionValue<string>>>(new Map());
+  const topMvRef = useRef<Map<string, MotionValue<string>>>(new Map());
   for (const c of characters ?? []) {
     if (!xMvRef.current.has(c.id)) xMvRef.current.set(c.id, motionValue(`${c.x}%`));
+    if (!topMvRef.current.has(c.id)) topMvRef.current.set(c.id, motionValue(`${headTopOf(c)}%`));
   }
-  const charXSig = (characters ?? []).map((c) => `${c.id}:${c.x}`).join(",");
+  const charPosSig = (characters ?? []).map((c) => `${c.id}:${c.x}:${c.y}`).join(",");
   useEffect(() => {
-    const m = xMvRef.current;
+    const xm = xMvRef.current, tm = topMvRef.current;
     const present = new Set<string>();
+    const tween = { duration: walkMs / 1000, ease: [0, 0, 0.2, 1] as const };
     for (const c of characters ?? []) {
       present.add(c.id);
-      const mv = m.get(c.id);
-      if (mv) animate(mv, `${c.x}%`, { duration: walkMs / 1000, ease: [0, 0, 0.2, 1] });
+      const x = xm.get(c.id); if (x) animate(x, `${c.x}%`, tween);
+      const t = tm.get(c.id); if (t) animate(t, `${headTopOf(c)}%`, tween);
     }
-    for (const id of [...m.keys()]) if (!present.has(id)) m.delete(id);
+    for (const id of [...xm.keys()]) if (!present.has(id)) { xm.delete(id); tm.delete(id); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [charXSig, walkMs]);
+  }, [charPosSig, walkMs]);
 
   // ── Dog wander (client-side drift) ──
   // Dogs are living scenery — stationary placements read as taxidermy.
@@ -598,36 +602,10 @@ export function PlazaCanvas({
     .filter((c) => c.bubble)
     .sort((a, b) => (a.bubble!.createdAt ?? 0) - (b.bubble!.createdAt ?? 0));
 
-  // ── Bubble anti-overlap stacking ──
-  // When two characters stand near each other, their bubbles naturally
-  // overlap above their heads and only the topmost (newest) one catches
-  // clicks — older bubbles become un-dismissable. We pre-compute each
-  // bubble's vertical position with overlap detection: if a bubble's
-  // anchor point is too close to a previously-placed bubble (in % of
-  // plaza), shift it up enough that the rectangles don't intersect.
-  // The result is a small cascading column when characters cluster.
-  const BUBBLE_W_PCT = 18;  // approximate bubble width as % of plaza width
-  const BUBBLE_H_PCT = 5;   // approximate bubble height as % of plaza height
-  const placed: Array<{ x: number; topPct: number }> = [];
-  const bubbleTops = new Map<string, number>();
-  for (const c of speakingChars) {
-    const charH = CHARACTER_HEIGHT_PCT * (c.scale ?? 1) * perspectiveScale(c.y) * characterScale;
-    let topPct = c.y - charH; // natural top — above the character's head
-    // Keep nudging up until no overlap with already-placed bubbles. The
-    // x-distance check uses half-widths from both sides (so total
-    // horizontal overlap window = BUBBLE_W_PCT). Cap shifts so a bubble
-    // can't escape the plaza ceiling.
-    let safety = 8;
-    while (safety-- > 0 && placed.some((p) =>
-      Math.abs(p.x - c.x) < BUBBLE_W_PCT &&
-      Math.abs(p.topPct - topPct) < BUBBLE_H_PCT,
-    )) {
-      topPct -= BUBBLE_H_PCT;
-      if (topPct < 2) break;
-    }
-    placed.push({ x: c.x, topPct });
-    bubbleTops.set(c.id, topPct);
-  }
+  // Bubbles sit directly above each speaker's head via the shared topMv (see
+  // headTopOf), glued to the character's animated position in x AND y — no
+  // anti-overlap re-stacking, which caused bubbles to visibly "float up" on
+  // their own whenever a neighbour moved or a new bubble appeared.
 
   // Default sizing: fill parent width, aspect 3:2. Caller may override via style.
   const defaultStyle: React.CSSProperties = { width: "100%", aspectRatio: "3 / 2" };
@@ -839,21 +817,14 @@ export function PlazaCanvas({
           removed from speakingChars. */}
       <AnimatePresence>
         {speakingChars.map((c) => {
-          // Use the pre-computed top from the anti-overlap pass above,
-          // not the raw "above character head" coordinate. This makes
-          // clustered bubbles cascade vertically instead of stacking
-          // exactly on top of each other (which made only the newest
-          // clickable).
-          const topPct = bubbleTops.get(c.id) ?? (c.y - CHARACTER_HEIGHT_PCT);
           const embed = hasEmbed(c.bubble!.text);
           return (
             <PlazaBubble
               key={`bubble-${c.id}`}
               cx={c.x}
-              topPct={topPct}
               plazaW={plazaW}
-              walkMs={walkMs}
               xMv={xMvRef.current.get(c.id)}
+              topMv={topMvRef.current.get(c.id)}
               bubble={c.bubble!}
               embed={embed}
               onDismiss={onBubbleDismiss}
