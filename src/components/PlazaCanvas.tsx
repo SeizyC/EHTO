@@ -679,26 +679,27 @@ export function PlazaCanvas({
             // transition on left/top would be dropped and the character would
             // teleport. left/top get the slow walkMs tween; opacity/scale
             // (emerge) get the quick default.
-            // left comes from the shared per-character MotionValue (so the
-            // bubble can read the exact same animated x); top + emerge stay on
-            // framer. Objects use plain CSS.
-            initial={it.kind === "char" ? { opacity: 0, scale: 0.5, x: "-50%", y: "-100%", top: `${it.y}%` } : false}
-            animate={it.kind === "char" ? { opacity: 1, scale: 1, x: "-50%", y: "-100%", top: `${it.y}%` } : undefined}
-            exit={it.kind === "char" ? { opacity: 0, scale: 0.45, x: "-50%", y: "-100%" } : undefined}
+            // BOTH left and top come from the SAME shared per-character
+            // MotionValues that the speech bubble reads — so sprite and bubble
+            // move in perfect lockstep on every axis (the bubble never leads,
+            // lags, or drifts). The sprite is anchored at its HEAD (top = the
+            // head-top MotionValue) with height = charH, so its bottom lands on
+            // the feet y — no translateY needed. Only emerge (scale/opacity)
+            // and the horizontal centering (x:-50%) stay on framer.
+            initial={it.kind === "char" ? { opacity: 0, scale: 0.5, x: "-50%" } : false}
+            animate={it.kind === "char" ? { opacity: 1, scale: 1, x: "-50%" } : undefined}
+            exit={it.kind === "char" ? { opacity: 0, scale: 0.45, x: "-50%" } : undefined}
             transition={
               it.kind === "char"
-                ? {
-                    default: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
-                    top: { duration: walkMs / 1000, ease: "easeOut" },
-                  }
+                ? { default: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } }
                 : undefined
             }
             style={{
               position: "absolute",
-              // chars: left = shared MotionValue (walk tween), top owned by
-              // framer. objects: plain CSS.
+              // chars: left/top = shared MotionValues (walk tween, glued to the
+              // bubble). objects: plain CSS anchored at feet.
               left: it.kind === "char" ? xMvRef.current.get(it.charId) : `${it.x}%`,
-              top: it.kind === "char" ? undefined : `${it.y}%`,
+              top: it.kind === "char" ? topMvRef.current.get(it.charId) : `${it.y}%`,
               height: `${it.h}%`,
               transformOrigin: "50% 100%",
               transform: it.kind === "char" ? undefined : "translate(-50%, -100%)",
