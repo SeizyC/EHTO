@@ -206,10 +206,10 @@ export async function generateGreeting(
         : "[방금 광장에 들어왔어요. 자연스럽게 한마디.]";
   const footer =
     language === "en"
-      ? "One short sentence. A greeting is fine, or a quick read of the room."
+      ? "One short sentence. You already know everyone here — greet them like old friends or just slip into whatever they're talking about. No \"who are you / first time here / do you come here often\"."
       : language === "ja"
-        ? "1文で短く。挨拶でも、雰囲気を見たひとことでもOK。"
-        : "1문장, 짧게. 인사도 좋고 분위기 보고 한마디도 좋아요.";
+        ? "1文で短く。ここは知ってる友達ばかり — 旧知みたいに挨拶するか、話してる流れにそっと混ざる。「誰?/初めて?/よく来る?」はナシ。"
+        : "1문장, 짧게. 여긴 이미 다 아는 친구들이야 — 오랜만인 듯 인사하거나 하던 얘기에 슬쩍 끼면 됨. '누구세요/처음이야/자주 와?' X.";
 
   const userPrompt = [header, ...scene, "", footer].join("\n");
 
@@ -227,6 +227,17 @@ export async function generateMemberReply(
   const system = buildSystemPrompt(member, { language });
   const text = await callChat(system, userText, MAX_TOKENS);
   return text ? clean(text) : null;
+}
+
+// Tidy a member/character display name: strip stray leading/trailing colons
+// and whitespace (a pool entry like "minim:" showed the colon in bubbles and
+// broke @-mention matching). Legit stylized handles ("_chaos_", "lofi.library")
+// keep their inner punctuation. Falls back to the raw value if sanitizing
+// would empty it.
+export function sanitizeMemberName(name: string | null | undefined): string {
+  const raw = (name ?? "").trim();
+  const cleaned = raw.replace(/^[:：\s]+|[:：\s]+$/g, "").trim();
+  return cleaned || raw;
 }
 
 export type ConvoTurn = { speaker: string; text: string; isSelf?: boolean };
@@ -563,8 +574,17 @@ function clean(text: string): string {
     /(^|\s)(\[(형식|상황|최근 대화|최근 자주 떠올랐던 결|광장 정체성|회피|장면|뉴스|기억)\]|예시( 안 좋은)? 결\s*[:：])/,
   );
   if (scaffold !== -1) text = text.slice(0, scaffold);
+  // Separator/topic-injection leak: the model sometimes appends a second
+  // fragment after a "---" divider (observed: "...뭘 봐 --- 베이징 빌딩에
+  // 비행기가 충돌했대" — its reply glued to an injected headline). Keep only
+  // the part before the divider.
+  const divider = text.search(/\s-{2,}(\s|$)/);
+  if (divider !== -1) text = text.slice(0, divider);
   return text
     .replace(/^["'`]+|["'`]+$/g, "")
+    // Leading "지금 상태:" / "상태:" / "[상태]" label bleed from the mood
+    // intent ("지금 자기 상태 한 줄") — keep the content, drop the label.
+    .replace(/^\s*\[?\s*(지금\s*)?상태\s*\]?\s*[:：]\s*/, "")
     .replace(/^[가-힣A-Za-z_]+\s*[:：]\s*/, "")
     .replace(/https?:\/\/\S*/g, "")
     // Stray tool-call syntax the model sometimes emits as plain text

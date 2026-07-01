@@ -53,15 +53,28 @@ const MAJOR_OUTLETS = [
   "xportsnews.com", "newsen.com", "isplus.com",
 ];
 
-// Search queries — incidents, issues, multiple entertainment angles.
-// We fire all in parallel + merge so the AIs see a mix of human-
-// interest stuff rather than tech/economy headlines they'd never
-// naturally bring up. Entertainment got expanded into three buckets
-// (연예 / K-pop / 드라마) to lift entertainment representation from
-// ~1.3% to a more visible share — single-query "연예" was getting
-// crowded out by news-cycle-active 사건사고 items in the final TOP_N.
-const QUERIES = ["사건사고", "이슈", "연예", "K-pop", "드라마"] as const;
+// Search queries — light, human-interest topics. We fire all in parallel
+// + merge so the AIs see a mix of stuff they'd naturally bring up rather
+// than tech/economy headlines. The "사건사고" (incidents/accidents) query
+// was DROPPED (2026-07-01): it flooded the room with 부고/사망/충돌 and
+// dragged this cozy loneliness-relief plaza dark. Replaced with "라이프"
+// (lifestyle). A HEAVY_RX filter (below) still catches grim items that
+// slip through the remaining queries.
+const QUERIES = ["이슈", "연예", "K-pop", "드라마", "라이프"] as const;
 type Query = (typeof QUERIES)[number];
+
+// Grim/heavy register — death, accidents, crime, disaster, courts, war.
+// Dropped at the source so the AIs never fixate on them and pull the whole
+// room's mood down. Applied to every tier (even a bias/theme query's
+// results) since heavy K-pop/celeb news is just as tone-breaking here.
+const HEAVY_RX =
+  /(사망|숨져|숨진|숨졌|별세|부고|빈소|영결|참사|참변|사고|충돌|추락|붕괴|화재|폭발|실종|익사|압사|피살|살해|살인|자살|극단적|시신|사체|부상|중상|중태|테러|성폭|성범|강간|폭행|음주운전|마약|유죄|무죄|기소|구속|체포|징역|재판|판결|법정|고소|고발|사기|횡령|전쟁|공습|미사일|포격|지진|태풍|홍수|산불)/;
+// English counterpart for the Google-News (non-ko) path.
+const HEAVY_RX_EN =
+  /\b(dead|death|dies|died|killed|kill|murder|suicide|crash|collision|fatal|injur|wounded|shooting|shoot|stabb|assault|rape|arrest|indict|convict|court|trial|verdict|lawsuit|fraud|scandal|war|missile|bomb|explosion|earthquake|wildfire|flood|disaster|victim|corpse|funeral|obituary)\b/i;
+function isHeavy(title: string): boolean {
+  return HEAVY_RX.test(title) || HEAVY_RX_EN.test(title);
+}
 
 type CacheEntry = { headlines: string[]; at: number };
 // Per-bias cache. Key: stable JSON of the bias object (or "_none" for
@@ -186,6 +199,7 @@ async function _fetch(
       if (!isMajorOutlet(it.originallink)) continue;
       const title = clean(it.title);
       if (!title) continue;
+      if (isHeavy(title)) continue; // drop grim headlines at the source
       const key = title.slice(0, 24);
       if (seen.has(key)) continue;
       seen.add(key);
@@ -197,7 +211,7 @@ async function _fetch(
 
   // Interleave order: bias → implicit → general (entertainment first,
   // then 사건사고/이슈). Preserves bias and implicit input order.
-  const generalOrder: Query[] = ["연예", "K-pop", "드라마", "이슈", "사건사고"];
+  const generalOrder: Query[] = ["연예", "K-pop", "드라마", "라이프", "이슈"];
   const tierRank = { bias: 0, implicit: 1, general: 2 } as const;
   const sorted = perCategory.sort((a, b) => {
     if (tierRank[a.tier] !== tierRank[b.tier]) return tierRank[a.tier] - tierRank[b.tier];
@@ -265,7 +279,7 @@ export async function getNewsHeadlines(
     } else {
       // Non-Korean plazas: Google News RSS in the plaza language.
       const queries = [...biasNewsQueries(bias, language), ...(topicTop ? [topicTop] : [])];
-      headlines = await fetchGoogleNews(queries, language);
+      headlines = (await fetchGoogleNews(queries, language)).filter((h) => !isHeavy(h));
       _caches.set(key, { headlines, at: Date.now() });
       _inFlightByKey.delete(key);
       console.log(`[news] google fetched ${headlines.length} headlines key=${key} (${Date.now() - t0}ms)`);

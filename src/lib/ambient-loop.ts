@@ -16,6 +16,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   formatJoinedAgo,
   generateAmbientLine,
+  sanitizeMemberName,
   type ConvoTurn,
   type LineShape,
   type SpeechIntent,
@@ -60,15 +61,18 @@ const AMBIENT_CLAIM_COOLDOWN_MS = 4_000;
 // the next 60s safety poll refreshes the stamp and ambient resumes.
 const OWNER_OFFLINE_MUTE_MS = 5 * 60_000;
 
-// Minimum gap between two AI→owner check-ins on the same world. With an
-// 8h cooldown a 24h day can hold at most 3 check-ins, matching the design
-// goal of "두어번 / 하루". When eligible we roll a moderate probability
-// inside the ambient branch so the cadence is irregular, not clocklike.
-const OWNER_CHECKIN_COOLDOWN_MS = 8 * 3600 * 1000;
+// Minimum gap between two AI→owner check-ins on the same world. Lowered
+// 8h → 5h (2026-07-01): the ambient stream read as a closed AI-to-AI loop
+// that never turned to the user — the whole point (loneliness relief) needs
+// the friends to *notice the owner* more often. 5h → up to ~4-5 check-ins
+// across a waking day. When eligible we roll a probability inside the
+// ambient branch so the cadence is irregular, not clocklike.
+const OWNER_CHECKIN_COOLDOWN_MS = 5 * 3600 * 1000;
 // Probability of upgrading an eligible quiet-moment tick into an owner
-// check-in. Kept at the long-standing live value (0.20) — raise toward
-// ~0.35 if check-ins feel too rare.
-const OWNER_CHECKIN_ROLL = 0.2;
+// check-in. Raised 0.20 → 0.30 alongside the shorter cooldown so the room
+// turns to the user more — without becoming a barrage (still gated by the
+// cooldown + owner-online + quiet-moment conditions).
+const OWNER_CHECKIN_ROLL = 0.3;
 
 export async function tickAmbientConversation(
   sb: SupabaseClient,
@@ -133,13 +137,15 @@ export async function tickAmbientConversation(
   if (membersErr) {
     return { spoke: null, reason: `members-err: ${membersErr.message}` };
   }
-  const members = (allMembers ?? []).filter(
-    (m) =>
-      m.activated_at !== null &&
-      m.status !== "ghost" &&
-      m.status !== "banned" &&
-      m.activity_weight >= 0.3,
-  );
+  const members = (allMembers ?? [])
+    .filter(
+      (m) =>
+        m.activated_at !== null &&
+        m.status !== "ghost" &&
+        m.status !== "banned" &&
+        m.activity_weight >= 0.3,
+    )
+    .map((m) => ({ ...m, name: sanitizeMemberName(m.name) }));
   if (members.length === 0) {
     return { spoke: null, reason: `no-active (raw=${allMembers?.length ?? 0})` };
   }
@@ -382,7 +388,12 @@ export async function tickAmbientConversation(
   // once here so news-fetch and the system-prompt nudge share the
   // exact same snapshot.
   const implicit = await aggregateImplicit(sb, worldId);
-  const newsHeadlines = await getNewsHeadlines(worldBias, implicit, language);
+  const rawHeadlines = await getNewsHeadlines(worldBias, implicit, language);
+  // Dedupe against what's already on screen: drop any headline whose key
+  // tokens already appeared in the recent transcript, so multiple members
+  // don't each "just saw" the same story (the Beijing-crash-×6 failure).
+  const recentBlob = recentDesc.map((r) => r.text).join(" ");
+  const newsHeadlines = rawHeadlines.filter((h) => !headlineAlreadyDiscussed(h, recentBlob));
   const biasHint = biasPromptLine(worldBias, language);
   // implicitHint — top 1-2 keywords, joined. Empty when cold-start or
   // below the panel floor.
@@ -585,6 +596,18 @@ const NEWS_STOP_WORDS = new Set([
   // very common verbs/adverbs that survive bare-stem extraction
   "있다", "없다", "한다", "된다", "받다",
 ]);
+
+// Has this headline already been talked about in the recent transcript?
+// Same token approach as detectNewsCitation, but headline-vs-transcript:
+// if any 3+-char content token of the headline already appears in the
+// recent messages, it's "discussed" and shouldn't be re-injected (so a
+// second member doesn't independently "just see" the same story).
+function headlineAlreadyDiscussed(headline: string, recentBlob: string): boolean {
+  const tokens = Array.from(headline.matchAll(/[가-힣]{3,}/g))
+    .map((m) => m[0])
+    .filter((t) => !NEWS_STOP_WORDS.has(t));
+  return tokens.some((t) => recentBlob.includes(t));
+}
 
 function detectNewsCitation(text: string, headlines: string[]): string | null {
   if (headlines.length === 0) return null;

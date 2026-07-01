@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { userClient, serviceClient } from "@/lib/supabase";
 import { seedMembersIfEmpty, tickMemberActivations } from "@/lib/world-seed";
+import { sanitizeMemberName } from "@/lib/member-reply";
 import { tickAmbientConversation } from "@/lib/ambient-loop";
 import { tickRotation } from "@/lib/rotation";
 import { maybeInsertAbsenceRecap } from "@/lib/absence-recap";
@@ -104,7 +105,8 @@ export async function GET(req: NextRequest) {
   if (memErr) return NextResponse.json({ error: memErr.message }, { status: 500 });
   const members = (allMembers ?? [])
     .filter((m) => m.activated_at !== null && m.status === "active")
-    .sort((a, b) => b.activity_weight - a.activity_weight);
+    .sort((a, b) => b.activity_weight - a.activity_weight)
+    .map((m) => ({ ...m, name: sanitizeMemberName(m.name) }));
 
   // Energy view for the top-bar meter. Read *after* the ambient tick so a
   // moment consumed this poll is reflected. Apply the KST daily reset for
