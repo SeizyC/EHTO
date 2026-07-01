@@ -108,6 +108,12 @@ function buildSystemPrompt(
      *  emit `[share_youtube_video(query="…")]` as plain text, and that
      *  ugly tool-call syntax lands in the message. */
     allowVideoTool?: boolean;
+    /** Objects currently placed on THIS plaza — surfaced as shared-space
+     *  backdrop ("we're in the same place"), NOT as metaphor fuel. */
+    plazaObjects?: string[];
+    /** The owner's most recent line — lets a friend reference "아까 네가
+     *  말한 거" instead of talking past the user. */
+    userRecentLine?: string | null;
   },
 ): string {
   const affinity = m.persona.affinity?.join(", ") ?? "";
@@ -153,6 +159,25 @@ function buildSystemPrompt(
     newsLines,
     allowVideoTool: opts.allowVideoTool,
   });
+
+  // Plaza-specific grounding so the room feels like THIS plaza, not a generic
+  // chatroom. Kept thin and *explicitly backdrop, not metaphor fuel* so it
+  // doesn't trigger the "가로등=라면스프" forced-simile failure. (scene/time
+  // vibe + memory + peer + implicit interests already flow through the frame.)
+  const ctx: string[] = [];
+  if ((opts.plazaObjects?.length ?? 0) > 0) {
+    const objs = (opts.plazaObjects ?? []).slice(0, 6).join(", ");
+    if (opts.language === "en") ctx.push(`Here in this plaza right now: ${objs}. Shared-space backdrop only — don't force similes out of the objects.`);
+    else if (opts.language === "ja") ctx.push(`今この広場にあるもの: ${objs}。同じ空間にいる背景なだけ — オブジェで無理な比喩を作らない。`);
+    else ctx.push(`지금 이 광장에 있는 것들: ${objs}. 같은 공간에 있다는 배경일 뿐 — 오브제로 억지 비유 만들지 말 것.`);
+  }
+  if (opts.userRecentLine) {
+    const q = opts.userRecentLine.slice(0, 60);
+    if (opts.language === "en") ctx.push(`The host's most recent line: "${q}" — you can pick it up naturally ("what you said earlier…"), don't talk past them.`);
+    else if (opts.language === "ja") ctx.push(`部屋主の直近の一言:「${q}」— 自然に拾ってOK（「さっき言ってたやつ」）、無視して進めない。`);
+    else ctx.push(`방장이 방금 한 말: "${q}" — 자연스럽게 이어받아도 됨('아까 네가 말한 거'), 무시하고 자기 얘기만 하지 말 것.`);
+  }
+  if (ctx.length > 0) lines.push("", ...ctx);
 
   // Output-language directive. The ko frame already implies Korean (it's
   // written in Korean and ends with the ko bad-output examples), so to
@@ -370,6 +395,10 @@ export async function generateAmbientLine(
     /** Video ids recently shared in this world — passed to the share tool
      *  so a fulfilled "영상 공유해줘" never repeats a thumbnail already up. */
     excludeVideoIds?: Set<string>;
+    /** Objects on this plaza + the owner's last line — plaza-uniqueness
+     *  grounding so the room reads as THIS plaza, not a generic chatroom. */
+    plazaObjects?: string[];
+    userRecentLine?: string | null;
   },
 ): Promise<string | null> {
   // For user-driven turns we expose the YouTube share tool so the model
@@ -394,6 +423,8 @@ export async function generateAmbientLine(
     biasHint: opts.biasHint,
     implicitHint: opts.implicitHint,
     allowVideoTool,
+    plazaObjects: opts.plazaObjects,
+    userRecentLine: opts.userRecentLine,
   });
 
   const transcript = recent
@@ -473,7 +504,14 @@ export async function generateAmbientLine(
       situation = "본인 페르소나가 특히 잘 드러나는 한 줄. 관심사·습관·취향 한 자락 — 단, 자기소개 어조 X, 그냥 흘리듯.";
       break;
     case "check-in":
-      situation = `${intent.userName}님에게 슬쩍 안부를 묻거나 가벼운 한마디. 챗봇식 "어떻게 지내세요?" X — 본인 결대로.`;
+      // NOT an "안부 챗봇". The user is your long-time friend — poke them the
+      // way you'd poke someone you already know, not interview them.
+      situation = [
+        `${intent.userName}님(이 광장 방장, 너랑 *이미 아는 사이*)에게 슬쩍 말을 건다.`,
+        "이미 아는 사람처럼 건드리는 결로 — 인터뷰·빈 안부 X:",
+        '- "너 이거 좋아할 것 같던데" / "아까 네가 말한 거 생각났어" / "이거 보면 너 또 웃을 듯" / "오늘 조용하네, 바쁜가"',
+        "- 네 관심사·최근 광장 흐름·저 사람이 예전에 하던 얘기에서 자연스럽게 엮어. '어떻게 지내세요?' 같은 챗봇 안부 절대 X.",
+      ].join("\n");
       break;
     case "mood":
       situation = [
@@ -580,7 +618,7 @@ function clean(text: string): string {
   // the part before the divider.
   const divider = text.search(/\s-{2,}(\s|$)/);
   if (divider !== -1) text = text.slice(0, divider);
-  return text
+  const out = text
     .replace(/^["'`]+|["'`]+$/g, "")
     // Leading "지금 상태:" / "상태:" / "[상태]" label bleed from the mood
     // intent ("지금 자기 상태 한 줄") — keep the content, drop the label.
@@ -599,6 +637,32 @@ function clean(text: string): string {
     .replace(/share_youtube_video\s*\([^)]*\)/gi, "")
     .replace(/\s+/g, " ")
     .trim();
+  // Hard length guard. Casual lines run ~30-45 chars; anything way over is a
+  // run-on the length rule failed to stop. A URL-bearing share line (music/
+  // youtube) is intentionally longer — leave those alone. Otherwise trim to
+  // the last natural break before the cap so a bubble never shows a wall.
+  const CAP = 90;
+  if (out.length <= CAP || out.includes("http")) return out;
+  const head = out.slice(0, CAP);
+  const brk = head.lastIndexOf(" ");
+  return (brk > 40 ? head.slice(0, brk) : head).trim();
+}
+
+// Safety net for AMBIENT lines: does this read like a truncated fragment or a
+// reaction to a glitch (the model noticing a cut/garbled prior line)? Such
+// lines shatter the "they're real" illusion, so the caller drops the turn
+// (a fresh one comes on the next tick). NOT applied to direct replies to the
+// user — there, silence reads as being ignored, which is worse.
+export function looksGlitchy(text: string): boolean {
+  const t = text.trim();
+  if (!t) return true;
+  // Reacting to a broken/cut/garbled message.
+  if (/(뒤에\s*(뭐라고|무슨|뭐)|말\s*잘렸|잘린\s*거|뭐라고\s*했어|뭐라\s*한\s*거|메시지가\s*(잘|안|깨)|글자가\s*깨|안\s*보이는데)/.test(t)) return true;
+  // Ends on a dangling connector → the sentence was cut mid-thought.
+  if (/(그리고|그래서|근데|그런데|하지만|그러면|왜냐면|아니면|그리구|그래가지고)$/.test(t)) return true;
+  // Ends on a trailing comma / open connector punctuation.
+  if (/[,·]$/.test(t)) return true;
+  return false;
 }
 
 /** Pick one currently-active member from the world to respond. */

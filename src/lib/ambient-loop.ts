@@ -16,6 +16,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   formatJoinedAgo,
   generateAmbientLine,
+  looksGlitchy,
   sanitizeMemberName,
   type ConvoTurn,
   type LineShape,
@@ -27,6 +28,7 @@ import { peerHintLine } from "@/lib/prompt-i18n";
 import { fetchRecentMemory } from "@/lib/memory-engine";
 import { extractTopic, fetchPeerRelations, recordInteraction } from "@/lib/member-relations";
 import { getNewsHeadlines } from "@/lib/news-fetch";
+import { dayStart } from "@/lib/day-rollover";
 import { OBJECT_CATALOG, type PlazaObjectType } from "@/lib/plaza-objects";
 import { currentBucket, SCENE_BY_BUCKET, type SceneOfDay } from "@/lib/time-of-day";
 import { biasPromptLine, type WorldBias } from "@/lib/world-bias";
@@ -61,18 +63,18 @@ const AMBIENT_CLAIM_COOLDOWN_MS = 4_000;
 // the next 60s safety poll refreshes the stamp and ambient resumes.
 const OWNER_OFFLINE_MUTE_MS = 5 * 60_000;
 
-// Minimum gap between two AI→owner check-ins on the same world. Lowered
-// 8h → 5h (2026-07-01): the ambient stream read as a closed AI-to-AI loop
-// that never turned to the user — the whole point (loneliness relief) needs
-// the friends to *notice the owner* more often. 5h → up to ~4-5 check-ins
-// across a waking day. When eligible we roll a probability inside the
-// ambient branch so the cadence is irregular, not clocklike.
-const OWNER_CHECKIN_COOLDOWN_MS = 5 * 3600 * 1000;
-// Probability of upgrading an eligible quiet-moment tick into an owner
-// check-in. Raised 0.20 → 0.30 alongside the shorter cooldown so the room
-// turns to the user more — without becoming a barrage (still gated by the
-// cooldown + owner-online + quiet-moment conditions).
-const OWNER_CHECKIN_ROLL = 0.3;
+// User-nudge cadence. The spec wants ~20-30% of ambient (AI-idle) lines to
+// gently pull the owner in — not a rare "안부" but a running "they notice
+// you" presence. So this is a SHORT anti-repeat (3 min) rather than a
+// day-long gate: at ~1 ambient line / 30s a 3-min floor + 0.25 roll lands
+// roughly 1 user-nudge per few minutes ≈ the 20-30% band, without back-to-
+// back neediness. Owner-online is already required by the tick's mute gate.
+const OWNER_CHECKIN_COOLDOWN_MS = 3 * 60 * 1000;
+// Probability of turning an eligible quiet-moment tick into a user-nudge.
+const OWNER_CHECKIN_ROLL = 0.25;
+// News is a spice: only ~1 in 5 ambient lines may carry a headline, so the
+// room reads as friends together rather than an AI news-comment feed.
+const NEWS_INJECT_ROLL = 0.2;
 
 export async function tickAmbientConversation(
   sb: SupabaseClient,
@@ -182,6 +184,20 @@ export async function tickAmbientConversation(
     ownerHandle = prof?.handle ?? null;
   }
 
+  // Objects placed on this plaza — used both for the (rare) object-interaction
+  // intent AND as always-on plaza-uniqueness backdrop in every system prompt.
+  const { data: objRows } = await sb
+    .from("plaza_objects")
+    .select("type")
+    .eq("world_id", worldId);
+  const objectLabels = (objRows ?? [])
+    .map((o) => OBJECT_CATALOG[o.type as PlazaObjectType]?.label)
+    .filter((s): s is string => !!s);
+  // The owner's most recent line — plaza-uniqueness grounding so a friend can
+  // pick up "아까 네가 말한 거" instead of talking past them. recentDesc is
+  // newest-first, so the first user row is the latest thing they said.
+  const userRecentLine = recentDesc.find((r) => r.owner_user_id)?.text ?? null;
+
   const last = recentDesc[0];
   const silentMs = Date.now() - new Date(last.created_at).getTime();
   const userIsLast = !!last.owner_user_id;
@@ -284,18 +300,9 @@ export async function tickAmbientConversation(
         ? new Date(world.last_owner_checkin_at).getTime()
         : 0) > OWNER_CHECKIN_COOLDOWN_MS;
 
-    // Look up what's actually placed on this plaza so the Director can
-    // occasionally point a speaker at an object ("벤치 비었네 …"). Empty
-    // list → object-interaction is impossible and the picker falls back
-    // to the existing intent mix.
-    const { data: objs } = await sb
-      .from("plaza_objects")
-      .select("type")
-      .eq("world_id", worldId);
-    const objectLabels = (objs ?? [])
-      .map((o) => OBJECT_CATALOG[o.type as PlazaObjectType]?.label)
-      .filter((s): s is string => !!s);
-
+    // objectLabels was fetched once above (also used for the plaza-uniqueness
+    // backdrop). Empty list → object-interaction is impossible and the picker
+    // falls back to the existing intent mix.
     intent = pickAmbientIntent({
       peerJustSpoke,
       peerName,
@@ -388,12 +395,29 @@ export async function tickAmbientConversation(
   // once here so news-fetch and the system-prompt nudge share the
   // exact same snapshot.
   const implicit = await aggregateImplicit(sb, worldId);
-  const rawHeadlines = await getNewsHeadlines(worldBias, implicit, language);
-  // Dedupe against what's already on screen: drop any headline whose key
-  // tokens already appeared in the recent transcript, so multiple members
-  // don't each "just saw" the same story (the Beijing-crash-×6 failure).
-  const recentBlob = recentDesc.map((r) => r.text).join(" ");
-  const newsHeadlines = rawHeadlines.filter((h) => !headlineAlreadyDiscussed(h, recentBlob));
+  // News is a *spice*, not a staple. Two guards keep EHTO a "friends together"
+  // room, not an AI news-comment feed:
+  //   (a) only sprinkle news into ~1 in 5 ambient lines (never into a reply to
+  //       the user — a reply should answer them, not pivot to a headline), and
+  //   (b) same-headline once per world per DAY: scan today's messages and drop
+  //       any headline already talked about today (not just the last 8 lines),
+  //       killing the "everyone independently just saw the same story" repeat.
+  const newsAllowed =
+    intent.type !== "check-in" &&
+    intent.type !== "reply-user" &&
+    intent.type !== "reply-user-mention" &&
+    Math.random() < NEWS_INJECT_ROLL;
+  let newsHeadlines: string[] = [];
+  if (newsAllowed) {
+    const raw = await getNewsHeadlines(worldBias, implicit, language);
+    const { data: todayMsgs } = await sb
+      .from("messages")
+      .select("text")
+      .eq("world_id", worldId)
+      .gte("created_at", new Date(dayStart().getTime()).toISOString());
+    const todayBlob = (todayMsgs ?? []).map((r) => r.text).join(" ");
+    newsHeadlines = raw.filter((h) => !headlineAlreadyDiscussed(h, todayBlob)).slice(0, 3);
+  }
   const biasHint = biasPromptLine(worldBias, language);
   // implicitHint — top 1-2 keywords, joined. Empty when cold-start or
   // below the panel floor.
@@ -429,10 +453,21 @@ export async function tickAmbientConversation(
     biasHint,
     implicitHint,
     excludeVideoIds,
+    plazaObjects: objectLabels,
+    userRecentLine,
   });
   if (!text) {
     console.warn(`[ambient] gen returned null for ${speaker.name}`);
     return { spoke: null, reason: `gen-null for ${speaker.name}` };
+  }
+  // Validation net: drop truncated / glitch-reaction ambient lines so a
+  // broken fragment never reaches the room. Skipped for direct user replies
+  // (silence there reads as being ignored — worse than a slightly-off line).
+  const isUserReply =
+    intent.type === "reply-user" || intent.type === "reply-user-mention";
+  if (!isUserReply && looksGlitchy(text)) {
+    console.log(`[ambient] glitchy-dropped ${speaker.name}: ${text.slice(0, 24)}`);
+    return { spoke: null, reason: `glitchy-dropped | ${dbg}` };
   }
 
   const { error } = await sb.from("messages").insert({
