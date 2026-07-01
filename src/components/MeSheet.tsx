@@ -134,8 +134,9 @@ export function MeSheet({ open, onClose }: Props) {
               <HandleEditor initial={character?.handle ?? null} />
             </section>
 
-            {/* EHTO wallet — balance + spend (먼저 부르기 / 이어서 보기) */}
-            <EhtoWallet />
+            {/* EHTO wallet — balance + spend (먼저 부르기 / 이어서 보기).
+                Summoning a friend closes this sheet so the arrival is visible. */}
+            <EhtoWallet onSummon={onClose} />
 
             {/* My invite codes — a personal/account thing, so it lives in the
                 profile menu (was previously buried in the room-info sheet). */}

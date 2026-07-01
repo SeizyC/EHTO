@@ -10,7 +10,7 @@ import { EhtoPurchaseModal } from "@/components/EhtoPurchaseModal";
 // EHTO currency wallet for the /me sheet. Lists the EHTO action catalog with
 // the user's current balance. Tappable rows spend EHTO via the spend API.
 // Mirrors TicketWallet's row idiom: label + desc on left, price + chevron on right.
-export function EhtoWallet() {
+export function EhtoWallet({ onSummon }: { onSummon?: () => void } = {}) {
   const router = useRouter();
   const [balance, setBalance] = useState<number | null>(null);
   const [busy, setBusy] = useState<EhtoAction | null>(null);
@@ -59,6 +59,9 @@ export function EhtoWallet() {
       const j = await r.json();
       if (r.ok && j.ok) {
         setBalance(j.balance);
+        // Summoning a friend brings them into the plaza now — close the profile
+        // sheet so the user watches them arrive instead of staying in the menu.
+        if (action === "member_invite") onSummon?.();
       } else {
         alert(j.error ?? "오류가 생겼어요. 잠시 후 다시 시도해주세요.");
         // Refetch to get accurate balance (server may have refunded)
