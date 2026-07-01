@@ -121,6 +121,7 @@ function PlazaBubble({
   cx,
   topPct,
   plazaW,
+  walkMs,
   bubble,
   embed,
   onDismiss,
@@ -128,6 +129,10 @@ function PlazaBubble({
   cx: number;
   topPct: number;
   plazaW: number;
+  /** Character walk duration — the bubble lerps its left/top over the SAME
+   *  time so it stays glued above the walking speaker instead of jumping to
+   *  the destination while the sprite is still en route. */
+  walkMs: number;
   bubble: { id: string; text: string; layoutId?: string; speakerName?: string; createdAt?: number };
   embed: boolean;
   onDismiss?: (id: string) => void;
@@ -167,19 +172,22 @@ function PlazaBubble({
     <motion.div
       style={{
         position: "absolute",
-        left: `${cx}%`,
-        top: `${topPct}%`,
         marginTop: -8,
         zIndex: 50,
         cursor: onDismiss ? "pointer" : undefined,
       }}
-      // x/y as framer-motion props (NOT CSS `transform`) so the anchor
-      // offset composes cleanly with scale + rotate during enter/exit.
-      initial={{ x: xOffset, y: "-100%", opacity: 0, scale: 0.92 }}
-      animate={{ x: xOffset, y: "-100%", opacity: 1, scale: 1 }}
+      // left/top are framer-animated (not static style) so when the speaker
+      // walks, the bubble lerps over the SAME walkMs and stays above them
+      // instead of teleporting to the destination first. x/y are framer props
+      // (NOT CSS transform) so the anchor/clamp offset composes with scale +
+      // rotate during enter/exit.
+      initial={{ x: xOffset, y: "-100%", opacity: 0, scale: 0.92, left: `${cx}%`, top: `${topPct}%` }}
+      animate={{ x: xOffset, y: "-100%", opacity: 1, scale: 1, left: `${cx}%`, top: `${topPct}%` }}
       exit={{ x: xOffset, y: "-100%", opacity: 0, scale: 1.55, rotate: -3 }}
       transition={{
         duration: 0.2,
+        left: { duration: walkMs / 1000, ease: "easeOut" },
+        top: { duration: walkMs / 1000, ease: "easeOut" },
         exit: { duration: 0.28, ease: [0.4, 0, 0.2, 1] },
       }}
       onClick={
@@ -812,6 +820,7 @@ export function PlazaCanvas({
               cx={c.x}
               topPct={topPct}
               plazaW={plazaW}
+              walkMs={walkMs}
               bubble={c.bubble!}
               embed={embed}
               onDismiss={onBubbleDismiss}
