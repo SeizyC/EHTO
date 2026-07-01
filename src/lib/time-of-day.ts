@@ -34,6 +34,24 @@ function kstHour(now: Date = new Date()): number {
   return h === "24" ? 0 : Number(h);
 }
 
+// Natural current-time phrase in the plaza language, so chat can be
+// time-appropriate ("새벽 3시쯤" → no "밥 먹었어?"). KST-based like everything
+// else here. Computed server-side per generation so it's always current.
+export function kstTimeLabel(language: "ko" | "en" | "ja" = "ko", now: Date = new Date()): string {
+  const h = kstHour(now);
+  const h12 = ((h + 11) % 12) + 1;
+  if (language === "en") {
+    const period = h < 5 ? "late night" : h < 7 ? "early morning" : h < 11 ? "morning" : h < 17 ? "afternoon" : h < 20 ? "evening" : "night";
+    return `${period}, around ${h12}${h < 12 ? "am" : "pm"} KST`;
+  }
+  if (language === "ja") {
+    const period = h < 5 ? "深夜" : h < 7 ? "早朝" : h < 11 ? "朝" : h < 17 ? "昼" : h < 20 ? "夕方" : "夜";
+    return `${period}${h}時ごろ`;
+  }
+  const period = h < 5 ? "새벽" : h < 7 ? "이른 아침" : h < 11 ? "아침" : h < 17 ? "낮" : h < 20 ? "저녁" : "밤";
+  return `${period} ${h12}시쯤`;
+}
+
 export function currentBucket(now: Date = new Date()): BucketInfo {
   const h = kstHour(now);
   // Night wraps midnight: 20 → next day 5

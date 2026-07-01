@@ -13,6 +13,7 @@ import { chatComplete, chatCompleteWithVideo, CHAT_MODEL, FILLER_CHAT_MODEL } fr
 import type { Locale } from "@/lib/language";
 import { PROMPT_FRAME, languageDirective, joinedAgoLabel } from "@/lib/prompt-i18n";
 import { inWheelhouse } from "@/lib/wheelhouse";
+import { kstTimeLabel } from "@/lib/time-of-day";
 
 type Member = {
   id: string;
@@ -165,6 +166,16 @@ function buildSystemPrompt(
   // doesn't trigger the "가로등=라면스프" forced-simile failure. (scene/time
   // vibe + memory + peer + implicit interests already flow through the frame.)
   const ctx: string[] = [];
+  // Current KST time so remarks/greetings fit the hour — no "밥 먹었어?" at
+  // 새벽. Computed per generation (server-side) so it's always current.
+  const timeLabel = kstTimeLabel(opts.language);
+  if (opts.language === "en") {
+    ctx.push(`It's currently ${timeLabel}. Keep remarks time-appropriate — late night/night: don't ask "did you eat?"/"what's for lunch?"; "still up?"/"what brings you here this late" fit. Morning → a morning tone is fine.`);
+  } else if (opts.language === "ja") {
+    ctx.push(`今は${timeLabel}。時間帯に合わない挨拶・質問はナシ — 深夜・夜に「ご飯食べた?」「昼何食べる?」はダメ、「まだ起きてる?」「こんな時間にどうしたの」系で。朝なら朝の挨拶OK。`);
+  } else {
+    ctx.push(`지금 시각: ${timeLabel} (KST). 시간대에 안 맞는 인사·질문 X — 새벽·밤엔 '밥 먹었어?'·'점심 뭐 먹어?' 대신 '안 자?'·'이 시간에 웬일'·'다들 아직 안 자네' 결. 아침이면 굿모닝 톤 OK.`);
+  }
   if ((opts.plazaObjects?.length ?? 0) > 0) {
     const objs = (opts.plazaObjects ?? []).slice(0, 6).join(", ");
     if (opts.language === "en") ctx.push(`Here in this plaza right now: ${objs}. Shared-space backdrop only — don't force similes out of the objects.`);
