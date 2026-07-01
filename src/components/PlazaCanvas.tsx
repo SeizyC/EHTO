@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, motionValue, animate, type MotionValue } from "framer-motion";
 import { OBJECT_CATALOG, type PlazaObjectType, type PlazaState } from "@/lib/plaza-objects";
 import { currentBucket, type TimeBucket } from "@/lib/time-of-day";
 import { hasEmbed, renderMessage } from "@/lib/message-render";
@@ -122,6 +122,7 @@ function PlazaBubble({
   topPct,
   plazaW,
   walkMs,
+  xMv,
   bubble,
   embed,
   onDismiss,
@@ -129,10 +130,13 @@ function PlazaBubble({
   cx: number;
   topPct: number;
   plazaW: number;
-  /** Character walk duration — the bubble lerps its left/top over the SAME
-   *  time so it stays glued above the walking speaker instead of jumping to
-   *  the destination while the sprite is still en route. */
+  /** Character walk duration — the bubble lerps its top over the SAME time so
+   *  it stays glued above the walking speaker. */
   walkMs: number;
+  /** Shared per-character X MotionValue ("x%"). The bubble reads the SAME
+   *  animated x as the sprite, so even a bubble that mounts mid-walk lands on
+   *  the character's current position instead of jumping to the destination. */
+  xMv?: MotionValue<string>;
   bubble: { id: string; text: string; layoutId?: string; speakerName?: string; createdAt?: number };
   embed: boolean;
   onDismiss?: (id: string) => void;
@@ -172,21 +176,22 @@ function PlazaBubble({
     <motion.div
       style={{
         position: "absolute",
+        // left = the SAME shared MotionValue the sprite uses → glued to the
+        // walking speaker in every case, including a bubble that mounts
+        // mid-walk (it reads the current animated x, not the destination).
+        left: xMv ?? `${cx}%`,
         marginTop: -8,
         zIndex: 50,
         cursor: onDismiss ? "pointer" : undefined,
       }}
-      // left/top are framer-animated (not static style) so when the speaker
-      // walks, the bubble lerps over the SAME walkMs and stays above them
-      // instead of teleporting to the destination first. x/y are framer props
-      // (NOT CSS transform) so the anchor/clamp offset composes with scale +
-      // rotate during enter/exit.
-      initial={{ x: xOffset, y: "-100%", opacity: 0, scale: 0.92, left: `${cx}%`, top: `${topPct}%` }}
-      animate={{ x: xOffset, y: "-100%", opacity: 1, scale: 1, left: `${cx}%`, top: `${topPct}%` }}
+      // top is framer-animated over walkMs so vertical follows the walk; x/y
+      // are framer props (NOT CSS transform) so the anchor/clamp offset
+      // composes with scale + rotate during enter/exit.
+      initial={{ x: xOffset, y: "-100%", opacity: 0, scale: 0.92, top: `${topPct}%` }}
+      animate={{ x: xOffset, y: "-100%", opacity: 1, scale: 1, top: `${topPct}%` }}
       exit={{ x: xOffset, y: "-100%", opacity: 0, scale: 1.55, rotate: -3 }}
       transition={{
         duration: 0.2,
-        left: { duration: walkMs / 1000, ease: "easeOut" },
         top: { duration: walkMs / 1000, ease: "easeOut" },
         exit: { duration: 0.28, ease: [0.4, 0, 0.2, 1] },
       }}
@@ -425,6 +430,30 @@ export function PlazaCanvas({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // ── Shared per-character X position (framer MotionValue) ──
+  // The sprite AND its speech bubble both read this same animated "x%" value,
+  // so they stay glued even when a bubble MOUNTS mid-walk: a fresh bubble reads
+  // the character's CURRENT animated x, not the data destination (which used to
+  // make it jump ahead of the still-walking sprite). Created lazily during
+  // render (so it's available on first paint) and tweened over walkMs in the
+  // effect below whenever the data x changes.
+  const xMvRef = useRef<Map<string, MotionValue<string>>>(new Map());
+  for (const c of characters ?? []) {
+    if (!xMvRef.current.has(c.id)) xMvRef.current.set(c.id, motionValue(`${c.x}%`));
+  }
+  const charXSig = (characters ?? []).map((c) => `${c.id}:${c.x}`).join(",");
+  useEffect(() => {
+    const m = xMvRef.current;
+    const present = new Set<string>();
+    for (const c of characters ?? []) {
+      present.add(c.id);
+      const mv = m.get(c.id);
+      if (mv) animate(mv, `${c.x}%`, { duration: walkMs / 1000, ease: [0, 0, 0.2, 1] });
+    }
+    for (const id of [...m.keys()]) if (!present.has(id)) m.delete(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [charXSig, walkMs]);
 
   // ── Dog wander (client-side drift) ──
   // Dogs are living scenery — stationary placements read as taxidermy.
@@ -672,22 +701,25 @@ export function PlazaCanvas({
             // transition on left/top would be dropped and the character would
             // teleport. left/top get the slow walkMs tween; opacity/scale
             // (emerge) get the quick default.
-            initial={it.kind === "char" ? { opacity: 0, scale: 0.5, x: "-50%", y: "-100%", left: `${it.x}%`, top: `${it.y}%` } : false}
-            animate={it.kind === "char" ? { opacity: 1, scale: 1, x: "-50%", y: "-100%", left: `${it.x}%`, top: `${it.y}%` } : undefined}
+            // left comes from the shared per-character MotionValue (so the
+            // bubble can read the exact same animated x); top + emerge stay on
+            // framer. Objects use plain CSS.
+            initial={it.kind === "char" ? { opacity: 0, scale: 0.5, x: "-50%", y: "-100%", top: `${it.y}%` } : false}
+            animate={it.kind === "char" ? { opacity: 1, scale: 1, x: "-50%", y: "-100%", top: `${it.y}%` } : undefined}
             exit={it.kind === "char" ? { opacity: 0, scale: 0.45, x: "-50%", y: "-100%" } : undefined}
             transition={
               it.kind === "char"
                 ? {
                     default: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
-                    left: { duration: walkMs / 1000, ease: "easeOut" },
                     top: { duration: walkMs / 1000, ease: "easeOut" },
                   }
                 : undefined
             }
             style={{
               position: "absolute",
-              // chars: left/top owned by framer (walk tween). objects: CSS.
-              left: it.kind === "char" ? undefined : `${it.x}%`,
+              // chars: left = shared MotionValue (walk tween), top owned by
+              // framer. objects: plain CSS.
+              left: it.kind === "char" ? xMvRef.current.get(it.charId) : `${it.x}%`,
               top: it.kind === "char" ? undefined : `${it.y}%`,
               height: `${it.h}%`,
               transformOrigin: "50% 100%",
@@ -821,6 +853,7 @@ export function PlazaCanvas({
               topPct={topPct}
               plazaW={plazaW}
               walkMs={walkMs}
+              xMv={xMvRef.current.get(c.id)}
               bubble={c.bubble!}
               embed={embed}
               onDismiss={onBubbleDismiss}
