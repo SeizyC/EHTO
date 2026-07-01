@@ -508,10 +508,15 @@ export function PlazaCanvas({
     const rect = el.getBoundingClientRect();
     const px = e.clientX - rect.left;
     const py = e.clientY - rect.top;
-    const x = (px / rect.width) * 100;
-    const y = (py / rect.height) * 100;
-    if (x < FLOOR_X_MIN || x > FLOOR_X_MAX) return;
-    if (y < FLOOR_Y_MIN || y > FLOOR_Y_MAX) return;
+    const rawX = (px / rect.width) * 100;
+    const rawY = (py / rect.height) * 100;
+    // CLAMP into the walkable floor band instead of ignoring out-of-band taps.
+    // The visible floor extends a little above FLOOR_Y_MIN (into the sky-fade),
+    // so a tap up there used to be silently dropped ("위를 눌러도 이동 안 됨").
+    // Now an upward tap walks the avatar to the highest reachable spot; taps
+    // past the sides/front snap to the nearest edge too.
+    const x = Math.min(FLOOR_X_MAX, Math.max(FLOOR_X_MIN, rawX));
+    const y = Math.min(FLOOR_Y_MAX, Math.max(FLOOR_Y_MIN, rawY));
     setRipple({ x, y, key: Date.now() });
     window.setTimeout(() => setRipple(null), 650);
     onFloorClick(x, y);
