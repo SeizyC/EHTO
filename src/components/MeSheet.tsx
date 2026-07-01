@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCharacter, saveHandle, clearCharacter } from "@/lib/character-store";
+import { PixelButton } from "@/components/PixelButton";
 import { EhtoWallet } from "@/components/EhtoWallet";
 import { InvitePanel } from "@/components/InvitePanel";
 import { worldAge } from "@/lib/age";
@@ -21,6 +22,35 @@ export function MeSheet({ open, onClose }: Props) {
   const { signOut, user } = useSession();
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
+  // Plaza reset (destructive) — confirm modal + in-flight state.
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetErr, setResetErr] = useState<string | null>(null);
+
+  async function resetPlaza() {
+    if (resetting) return;
+    setResetting(true);
+    setResetErr(null);
+    try {
+      const sb = browserClient();
+      const { data: sess } = await sb.auth.getSession();
+      if (!sess.session) { setResetErr("세션이 만료됐어요. 다시 로그인해주세요."); setResetting(false); return; }
+      const r = await fetch("/api/world/reset", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${sess.session.access_token}` },
+      });
+      if (r.ok) {
+        // Full reload so every cached store (members/chat/objects) resets.
+        window.location.assign("/world");
+        return;
+      }
+      setResetErr("초기화에 실패했어요. 잠시 후 다시 시도해주세요.");
+      setResetting(false);
+    } catch {
+      setResetErr("요청 중 오류가 생겼어요.");
+      setResetting(false);
+    }
+  }
 
   // Probe admin status once on open. Server-side ADMIN_EMAILS env is the
   // source of truth; we just ask /api/admin/me and show the entry point
@@ -127,8 +157,9 @@ export function MeSheet({ open, onClose }: Props) {
                 hint="옷 · 머리 · 장신구"
               />
               <MenuRow
-                onClick={() => alert("V1.5 · 세계 정체성 카드")}
-                label="세계 정체성"
+                onClick={() => { setResetErr(null); setResetOpen(true); }}
+                label="광장 초기화"
+                hint="친구 · 대화 · 오브제 리셋"
               />
               <MenuRow
                 onClick={() => alert("V1.5 · 설정")}
@@ -159,6 +190,56 @@ export function MeSheet({ open, onClose }: Props) {
             </footer>
             </div>
           </motion.aside>
+
+          {/* Plaza reset confirm — destructive, so an explicit modal (not a
+              bare alert) spelling out exactly what's wiped and kept. */}
+          <AnimatePresence>
+            {resetOpen && (
+              <motion.div
+                className="fixed inset-0 z-[80] flex items-center justify-center p-6"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18 }}
+              >
+                <div
+                  className="absolute inset-0 bg-black/55"
+                  onClick={() => { if (!resetting) setResetOpen(false); }}
+                />
+                <motion.div
+                  className="border-line bg-bg relative w-full max-w-[330px] rounded-2xl border p-6 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.7)]"
+                  initial={{ scale: 0.94, y: 10, opacity: 0 }}
+                  animate={{ scale: 1, y: 0, opacity: 1 }}
+                  exit={{ scale: 0.94, opacity: 0 }}
+                  transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <h2 className="text-ink text-[16px] font-medium leading-snug">광장을 초기화할까요?</h2>
+                  <p className="text-sub mt-2 text-[13px] leading-relaxed">
+                    지금 광장의 <b className="text-ink">친구들 · 대화 기록 · 놓인 오브제</b>가 모두
+                    사라지고 처음 상태로 돌아가요. 잠시 뒤 새 친구가 다시 찾아옵니다.
+                    <br />내 캐릭터와 EHTO는 그대로예요. <b className="text-ink">되돌릴 수 없어요.</b>
+                  </p>
+                  {resetErr && (
+                    <p className="mt-3 text-[12px]" style={{ color: "#e06a6a" }}>{resetErr}</p>
+                  )}
+                  <div className="mt-5 flex items-center gap-2">
+                    <button
+                      onClick={() => { if (!resetting) setResetOpen(false); }}
+                      disabled={resetting}
+                      className="border-line text-sub hover:text-ink flex-1 rounded-xl border py-2.5 text-[13px] transition disabled:opacity-50"
+                    >
+                      취소
+                    </button>
+                    <div className="flex-1">
+                      <PixelButton variant="primary" block onClick={resetPlaza} disabled={resetting}>
+                        {resetting ? "초기화 중…" : "초기화"}
+                      </PixelButton>
+                    </div>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </>
       )}
     </AnimatePresence>
