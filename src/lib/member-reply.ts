@@ -191,8 +191,9 @@ function buildSystemPrompt(
 }
 
 // First-arrival greeting — when a dormant member activates and joins.
-// Room-aware: if peers are already chatting, the greeting can react
-// to that ("다들 음악 얘기 중이구나").
+// Lightly room-aware: it knows WHO's around (friends) and whether the room is
+// lively or quiet, but NOT the specific ongoing topic — a newcomer referencing
+// a subject they never heard ("오자마자 프리랜서 얘기") reads as eavesdropping.
 export async function generateGreeting(
   member: Member,
   context?: { peers?: string[]; transcript?: string[]; language?: Locale },
@@ -203,24 +204,22 @@ export async function generateGreeting(
   const joinedAgo = formatJoinedAgo(new Date(), language) ?? "방금";
   const system = buildSystemPrompt(member, { language, joinedAgo });
   const peers = context?.peers ?? [];
-  const transcript = context?.transcript ?? [];
+  // A newcomer knows WHO's around (they're friends) and whether the room is
+  // lively or quiet — but NOT the specific ongoing topic (they just walked in).
+  // We intentionally do NOT feed the transcript content here, so the greeting
+  // can't reference a subject it never heard ("오자마자 프리랜서 얘기" — weird).
+  const chatting = (context?.transcript?.length ?? 0) > 0;
 
   const scene: string[] = [];
   if (language === "en") {
-    if (peers.length > 0) scene.push(`Already here: ${peers.join(", ")}`);
-    else scene.push("Only the host is in the room.");
-    if (transcript.length > 0) scene.push(`Recent chat:\n${transcript.map((t) => `  ${t}`).join("\n")}`);
-    else scene.push("It's quiet right now.");
+    scene.push(peers.length > 0 ? `Already here: ${peers.join(", ")}` : "Only the host is in the room.");
+    scene.push(chatting ? "People are mid-conversation (you don't know about what yet)." : "It's quiet right now.");
   } else if (language === "ja") {
-    if (peers.length > 0) scene.push(`すでにいる人: ${peers.join(", ")}`);
-    else scene.push("部屋にはホストだけ。");
-    if (transcript.length > 0) scene.push(`最近の会話:\n${transcript.map((t) => `  ${t}`).join("\n")}`);
-    else scene.push("今は静か。");
+    scene.push(peers.length > 0 ? `すでにいる人: ${peers.join(", ")}` : "部屋にはホストだけ。");
+    scene.push(chatting ? "今おしゃべり中（何の話かはまだ知らない）。" : "今は静か。");
   } else {
-    if (peers.length > 0) scene.push(`이미 있는 사람: ${peers.join(", ")}`);
-    else scene.push("방엔 방장만 있음.");
-    if (transcript.length > 0) scene.push(`최근 대화:\n${transcript.map((t) => `  ${t}`).join("\n")}`);
-    else scene.push("최근은 조용함.");
+    scene.push(peers.length > 0 ? `이미 있는 사람: ${peers.join(", ")}` : "방엔 방장만 있음.");
+    scene.push(chatting ? "지금 얘기가 오가는 중(무슨 얘긴지는 아직 모름)." : "최근은 조용함.");
   }
 
   const header =
@@ -231,10 +230,10 @@ export async function generateGreeting(
         : "[방금 광장에 들어왔어요. 자연스럽게 한마디.]";
   const footer =
     language === "en"
-      ? "One short sentence. You already know everyone here — greet them like old friends or just slip into whatever they're talking about. No \"who are you / first time here / do you come here often\"."
+      ? "One short sentence. You already know everyone here — greet them like old friends or drop a light remark. But you JUST arrived, so you DON'T know what they're currently talking about — never act like you caught the ongoing topic (no picking up a specific subject). No \"who are you / first time / do you come here often\"."
       : language === "ja"
-        ? "1文で短く。ここは知ってる友達ばかり — 旧知みたいに挨拶するか、話してる流れにそっと混ざる。「誰?/初めて?/よく来る?」はナシ。"
-        : "1문장, 짧게. 여긴 이미 다 아는 친구들이야 — 오랜만인 듯 인사하거나 하던 얘기에 슬쩍 끼면 됨. '누구세요/처음이야/자주 와?' X.";
+        ? "1文で短く。ここは知ってる友達ばかり — 旧知みたいに挨拶するか軽くひとこと。ただし今来たばかりで今の話題は知らない — 進行中の具体的な話題を知ってるフリで拾わないこと。「誰?/初めて?/よく来る?」もナシ。"
+        : "1문장, 짧게. 여긴 이미 다 아는 친구들 — 오랜만인 듯 인사하거나 가볍게 한마디. 단, *넌 방금 들어와서 지금 무슨 얘기 중인지는 몰라* — 진행 중인 구체 화제를 아는 척 이어받지 말 것(예: 방금 프리랜서 얘기 중이었어도 그걸 아는 척 X). '누구세요/처음이야/자주 와?' 도 X.";
 
   const userPrompt = [header, ...scene, "", footer].join("\n");
 
