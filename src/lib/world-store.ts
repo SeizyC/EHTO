@@ -132,19 +132,29 @@ export async function updateMyPosition(
   const sb = browserClient();
   const { data: sess } = await sb.auth.getSession();
   if (!sess.session) return { error: "no session" };
-  const r = await fetch("/api/world/me/position", {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${sess.session.access_token}`,
-    },
-    body: JSON.stringify({ x, y, flip }),
-  });
-  if (!r.ok) {
-    const j = await r.json().catch(() => ({}));
-    return { error: j.error ?? `HTTP ${r.status}` };
+  // Wrap the round-trip: a network hiccup (offline, dev-server restart, an
+  // aborted request) makes fetch REJECT, not return !ok. The caller fires
+  // this as `void updateMyPosition(...)`, so an uncaught rejection surfaces as
+  // an "Unhandled Runtime Error: Failed to fetch". The optimistic state is
+  // already applied and the next /api/world/info read reconciles, so we just
+  // swallow it and return the error string.
+  try {
+    const r = await fetch("/api/world/me/position", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${sess.session.access_token}`,
+      },
+      body: JSON.stringify({ x, y, flip }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      return { error: j.error ?? `HTTP ${r.status}` };
+    }
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "network" };
   }
-  return {};
 }
 
 /** Pause/resume the plaza's ambient life. Optimistic (the toggle flips
@@ -154,36 +164,44 @@ export async function setWorldPaused(paused: boolean): Promise<{ error?: string 
   const sb = browserClient();
   const { data: sess } = await sb.auth.getSession();
   if (!sess.session) return { error: "no session" };
-  const r = await fetch("/api/world/settings", {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${sess.session.access_token}`,
-    },
-    body: JSON.stringify({ paused }),
-  });
-  if (!r.ok) {
-    const j = await r.json().catch(() => ({}));
-    return { error: j.error ?? `HTTP ${r.status}` };
+  try {
+    const r = await fetch("/api/world/settings", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${sess.session.access_token}`,
+      },
+      body: JSON.stringify({ paused }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      return { error: j.error ?? `HTTP ${r.status}` };
+    }
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "network" };
   }
-  return {};
 }
 
 export async function updateWorldName(name: string): Promise<{ error?: string }> {
   const sb = browserClient();
   const { data: sess } = await sb.auth.getSession();
   if (!sess.session) return { error: "no session" };
-  const r = await fetch("/api/world/name", {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${sess.session.access_token}`,
-    },
-    body: JSON.stringify({ name }),
-  });
-  if (!r.ok) {
-    const j = await r.json().catch(() => ({}));
-    return { error: j.error ?? `HTTP ${r.status}` };
+  try {
+    const r = await fetch("/api/world/name", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${sess.session.access_token}`,
+      },
+      body: JSON.stringify({ name }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      return { error: j.error ?? `HTTP ${r.status}` };
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "network" };
   }
   // refresh shared cache → notifies every useWorld() subscriber
   await fetchWorld();
@@ -201,17 +219,21 @@ export async function updateWorldSettings(args: {
   const sb = browserClient();
   const { data: sess } = await sb.auth.getSession();
   if (!sess.session) return { error: "no session" };
-  const r = await fetch("/api/world/settings", {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${sess.session.access_token}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!r.ok) {
-    const j = await r.json().catch(() => ({}));
-    return { error: j.error ?? `HTTP ${r.status}` };
+  try {
+    const r = await fetch("/api/world/settings", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${sess.session.access_token}`,
+      },
+      body: JSON.stringify(args),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      return { error: j.error ?? `HTTP ${r.status}` };
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "network" };
   }
   await fetchWorld();
   return {};
