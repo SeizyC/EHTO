@@ -80,6 +80,11 @@ export function pickClearSpot(
   obstacles: Obstacle[],
   yBand?: [number, number],
   attempts = 12,
+  /** Extra gap (% units) to keep from every obstacle beyond its keep-out
+   *  radius. Used for arrivals, whose wide floor wormhole (~18% wide) would
+   *  otherwise clip the fountain/objects even when the character's own
+   *  footprint is clear. 0 = plain footprint clearance (drift/scatter). */
+  clearMargin = 0,
 ): { x: number; y: number } {
   const [yMin, yMax] = yBand
     ?? DEPTH_BUCKETS[Math.floor(Math.random() * DEPTH_BUCKETS.length)];
@@ -93,7 +98,10 @@ export function pickClearSpot(
   let bestClearMinD = -1;
   for (let i = 0; i < attempts; i++) {
     const cand = sample();
-    const clear = clearOfObstacles(cand, obstacles) && !occludedBehind(cand, obstacles);
+    const clearOfObj = clearMargin > 0
+      ? obstacles.every((o) => isoDist(cand, o) >= o.radius + clearMargin)
+      : clearOfObstacles(cand, obstacles);
+    const clear = clearOfObj && !occludedBehind(cand, obstacles);
     const minD = taken.length === 0
       ? Infinity
       : Math.min(...taken.map((t) => isoDist(cand, t)));

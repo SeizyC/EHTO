@@ -38,6 +38,12 @@ const MAX_ACTIVATIONS_PER_TICK = 1;
 // 6h matches the design's minimum inter-arrival spacing.
 const MIN_ARRIVAL_GAP_MS = 6 * 3600 * 1000;
 
+// Extra clearance (% units) from objects when placing a NEW arrival. The
+// arrival wormhole is a wide floor ellipse (~18% across), so a spot that only
+// clears an object by a character's footprint still lets the portal clip the
+// fountain/building. This keeps the whole portal footprint off objects.
+const ARRIVAL_OBJECT_CLEARANCE = 10;
+
 export async function ensureWorld(
   sb: SupabaseClient,
   ownerId: string,
@@ -332,7 +338,9 @@ export async function tickMemberActivations(
   type Activated = { id: string; name: string; persona: unknown; backstory: string | null; activity_weight: number };
   const justActivated: Activated[] = [];
   for (const id of ids) {
-    const spot = pickClearSpot(taken, obstacles);
+    // Extra clearance so the WIDE arrival wormhole (not just the character's
+    // footprint) stays off the fountain/buildings.
+    const spot = pickClearSpot(taken, obstacles, undefined, 16, ARRIVAL_OBJECT_CLEARANCE);
     const flip = spot.x > 50; // face inward (left of center → face right)
     const { data: rows, error } = await sb
       .from("members")
