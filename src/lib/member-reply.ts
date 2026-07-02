@@ -506,7 +506,7 @@ export async function generateAmbientLine(
         `${intent.peerName}의 직전 말에 *반응*하세요.`,
         "받는 방법: 동의·반박·되묻기·공감·짧은 정보 보태기 — 본인 페르소나 결대로 하나.",
         "*절대* 상대 말에서 명사 하나 집어와 변주하는 식으로 잇지 말 것. 그건 단어 게임이지 대화가 아님.",
-        "자기 화제로 갈아엎는 것도 X. 페르소나가 'topic-jump' 명시되어 있으면 가끔만 OK.",
+        "다른 화제로 넘겨도 되지만 — *먼저 직전 말에 1비트 응답*하고 나서. 안 듣고 새 화제로 점프하면 회피처럼 들림('없어. 근데…' 처럼 받고 넘어가라).",
       ].join("\n");
       break;
     case "new-topic":
@@ -559,7 +559,7 @@ export async function generateAmbientLine(
   // steer away so it doesn't become a one-topic loop.
   const topicBlock =
     opts.avoidTopics && opts.avoidTopics.length > 0
-      ? `\n[화제 반복 주의] 지금 방이 이 소재에 갇혀 반복 중: ${opts.avoidTopics.join(", ")}. 이 결을 피하고 *완전히 다른 화제*로.`
+      ? `\n[화제 반복 주의] 지금 방이 이 소재에 갇혀 반복 중: ${opts.avoidTopics.join(", ")}. 다른 화제로 넘기되 — *직전 말엔 먼저 1비트 받고 나서* 전환('없어'·'그건 모르겠고' 정도라도). 직전 말 무시하고 새 화제로 점프 X.`
       : "";
 
   const userPrompt = [
