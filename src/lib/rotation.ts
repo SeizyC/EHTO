@@ -12,6 +12,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { pickAvailable } from "@/lib/ai-pool";
 import type { Locale } from "@/lib/language";
+import type { MemberRegion } from "@/lib/member-templates";
 import { localizeIdentity } from "@/lib/member-identity";
 import { sysMemberLeft } from "@/lib/system-messages";
 
@@ -88,7 +89,16 @@ async function refillFromPool(
   worldId: string,
   count: number,
 ): Promise<number> {
-  const candidates = await pickAvailable(sb, count * 3);
+  // Region for the refill mix (local majority + GLOBAL minority), matching
+  // how the world was originally seeded.
+  const { data: wRegion } = await sb
+    .from("worlds")
+    .select("region")
+    .eq("id", worldId)
+    .maybeSingle();
+  const region = ((wRegion?.region ?? "KR") as MemberRegion);
+
+  const candidates = await pickAvailable(sb, count * 3, region);
   if (candidates.length === 0) return 0;
 
   // Skip characters who already have an *active* row in this world (would
@@ -150,6 +160,8 @@ async function refillFromPool(
         sprite: c.sprite,
         affinity: c.base_persona.affinity,
         speech_style: id?.speech_style ?? c.base_persona.speech_style,
+        profile: c.base_persona.profile,   // latent region-native facts
+        region: c.region,
       },
       backstory: id?.backstory ?? c.base_backstory,
       activity_weight: c.default_activity_weight,

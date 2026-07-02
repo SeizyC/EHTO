@@ -10,6 +10,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { ensureAiPool, pickAvailable } from "@/lib/ai-pool";
 import { memberCap, type Plan } from "@/lib/energy";
 import type { Locale } from "@/lib/language";
+import type { MemberRegion } from "@/lib/member-templates";
+import { regionFromTimezone } from "@/lib/region";
 import { sysMemberJoined } from "@/lib/system-messages";
 import { localizeIdentity } from "@/lib/member-identity";
 import { pickClearSpot, buildObstacles } from "@/lib/position-drift";
@@ -49,6 +51,11 @@ export async function ensureWorld(
   ownerId: string,
   name?: string,
   language?: Locale,
+  // Browser IANA timezone (e.g. "America/Los_Angeles"). Used ONLY at first
+  // creation to (a) estimate the friends' life-region and (b) anchor
+  // time-of-day. Omitted → DB defaults (KR / Asia/Seoul) stand, preserving
+  // the existing Korean path exactly. Owner can change region later.
+  timezone?: string,
 ): Promise<string> {
   const { data: existing } = await sb
     .from("worlds")
@@ -64,11 +71,19 @@ export async function ensureWorld(
     return existing.id;
   }
 
-  // Only first-time creation honors `language`; omit it entirely when not
-  // chosen so the DB column default ('ko') stands — preserving the ko path.
+  // Only first-time creation honors `language`/`timezone`; omit them entirely
+  // when not provided so the DB column defaults ('ko' / 'KR' / 'Asia/Seoul')
+  // stand — preserving the ko/KR path.
+  const region: MemberRegion | undefined = timezone ? regionFromTimezone(timezone) : undefined;
   const { data: created, error } = await sb
     .from("worlds")
-    .insert({ owner_id: ownerId, name: name ?? null, ...(language ? { language } : {}) })
+    .insert({
+      owner_id: ownerId,
+      name: name ?? null,
+      ...(language ? { language } : {}),
+      ...(timezone ? { timezone } : {}),
+      ...(region ? { region } : {}),
+    })
     .select("id")
     .single();
   if (error) throw new Error(`world insert: ${error.message}`);
@@ -86,18 +101,22 @@ export async function seedMembersIfEmpty(
 
   if ((count ?? 0) > 0) return { inserted: 0, skipped: true };
 
-  // Plaza language. ko (default) keeps the native Korean pool identities
-  // verbatim; non-ko plazas render each member's identity in-language.
+  // Plaza language + region. ko (default) keeps the native Korean pool
+  // identities verbatim; non-ko plazas render each member's identity
+  // in-language. region decides which life-context pool the roster is drawn
+  // from (KR/US/JP/GLOBAL), independent of language.
   const { data: w } = await sb
     .from("worlds")
-    .select("language")
+    .select("language, region")
     .eq("id", worldId)
     .maybeSingle();
   const language = ((w?.language ?? "ko") as Locale);
+  const region = ((w?.region ?? "KR") as MemberRegion);
 
-  // Make sure the global pool is populated, then draw the least-loaded slice.
+  // Make sure the global pool is populated, then draw a region-mixed slice
+  // (local majority + a GLOBAL minority).
   await ensureAiPool(sb);
-  const picked = await pickAvailable(sb, SEED_COUNT);
+  const picked = await pickAvailable(sb, SEED_COUNT, region);
   if (picked.length === 0) return { inserted: 0, skipped: true };
 
   // Highest default weight activates first.
@@ -184,6 +203,12 @@ export async function seedMembersIfEmpty(
         sprite: c.sprite,
         affinity: c.base_persona.affinity,        // neutral slugs kept as-is
         speech_style: id?.speech_style ?? c.base_persona.speech_style,
+        // Latent, region-native concrete facts (age/home/job/routine/hangout/
+        // hook/ties). Answered consistently when asked; the plaza-language
+        // model references them while speaking the plaza language. Kept as-is
+        // across languages so the friend's life stays anchored to their region.
+        profile: c.base_persona.profile,
+        region: c.region,
       },
       backstory: id?.backstory ?? c.base_backstory,
       activity_weight: c.default_activity_weight,
@@ -253,11 +278,12 @@ export async function tickMemberActivations(
   // Surplus eligibles stay dormant and fill in later as members rotate out.
   const { data: w } = await sb
     .from("worlds")
-    .select("plan, language")
+    .select("plan, language, timezone")
     .eq("id", worldId)
     .maybeSingle();
   const cap = memberCap((w?.plan ?? "free") as Plan);
   const language = ((w?.language ?? "ko") as Locale);
+  const timezone = ((w?.timezone ?? "Asia/Seoul") as string);
   // Pull the active roster (not just a count) so we can both enforce the
   // cap AND avoid admitting a member whose sprite a present resident
   // already wears — two identical-looking characters in one room reads as
@@ -414,7 +440,7 @@ export async function tickMemberActivations(
       for (const m of justActivated) {
         const greeting = await generateGreeting(
           m as Parameters<typeof generateGreeting>[0],
-          { peers: peers.filter((p) => p !== m.name), transcript, language },
+          { peers: peers.filter((p) => p !== m.name), transcript, language, timezone },
         );
         if (!greeting) continue;
         await sb.from("messages").insert({

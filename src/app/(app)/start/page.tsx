@@ -71,7 +71,13 @@ export default function StartPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${sess.session.access_token}`,
         },
-        body: JSON.stringify({ code: code.trim().toUpperCase(), roomName: roomName.trim() }),
+        body: JSON.stringify({
+          code: code.trim().toUpperCase(),
+          roomName: roomName.trim(),
+          // Browser timezone → estimates the friends' life-region (KR/US/JP/
+          // GLOBAL) and anchors time-of-day. Independent of plaza language.
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
       });
       const j = await r.json();
       if (!r.ok) {

@@ -37,7 +37,11 @@ export default function AuthCallbackPage() {
         const r = await fetch("/api/onboarding/finalize", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ code: draft.code, roomName: draft.roomName }),
+          body: JSON.stringify({
+            code: draft.code,
+            roomName: draft.roomName,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          }),
         });
         if (!cancelled && r.ok) {
           clearDraft();

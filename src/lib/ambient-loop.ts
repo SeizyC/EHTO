@@ -164,10 +164,11 @@ export async function tickAmbientConversation(
   // Fetch world+owner info for the check-in path (also used for cooldown).
   const { data: world } = await sb
     .from("worlds")
-    .select("owner_id, last_owner_checkin_at, bias, plan, moments_used, moments_day, interject_used, interject_day, language, ambient_paused")
+    .select("owner_id, last_owner_checkin_at, bias, plan, moments_used, moments_day, interject_used, interject_day, language, timezone, ambient_paused")
     .eq("id", worldId)
     .maybeSingle();
   const language = (world?.language ?? "ko") as Locale;
+  const timezone = (world?.timezone ?? "Asia/Seoul") as string;
 
   // Owner pressed pause: generate nothing (no chatter, no energy spend) until
   // resumed. Checked for every path (poll/cron/message) so it's immediate.
@@ -309,7 +310,7 @@ export async function tickAmbientConversation(
       checkinEligible,
       userName: ownerHandle ? userName : null,
       objectLabels,
-      scene: SCENE_BY_BUCKET[currentBucket().id],
+      scene: SCENE_BY_BUCKET[currentBucket(new Date(), timezone).id],
       // When the user has a clear top implicit topic, the quiet-moment
       // branch boosts `new-topic` so members are more likely to surface
       // something on that thread. Aggregate is cached so this is cheap.
@@ -429,7 +430,7 @@ export async function tickAmbientConversation(
     ? implicit.topics.slice(0, 2).map((t) => t.topic).join(", ")
     : null;
 
-  const sceneHint = SCENE_BY_BUCKET[currentBucket().id].hint;
+  const sceneHint = SCENE_BY_BUCKET[currentBucket(new Date(), timezone).id].hint;
   // Shape picker is for ambient AI-to-AI variety only. When the user
   // actually said something (mention or general reply), the AI's job is
   // to *answer the user* — forcing a "quip / observe / wonder" shape
@@ -462,6 +463,7 @@ export async function tickAmbientConversation(
     excludeVideoIds,
     plazaObjects: objectLabels,
     userRecentLine,
+    timezone,
   });
   if (!text) {
     console.warn(`[ambient] gen returned null for ${speaker.name}`);

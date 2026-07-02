@@ -14,14 +14,45 @@ import type { Locale } from "@/lib/language";
 import { PROMPT_FRAME, languageDirective, joinedAgoLabel } from "@/lib/prompt-i18n";
 import { inWheelhouse } from "@/lib/wheelhouse";
 import { kstTimeLabel } from "@/lib/time-of-day";
+import type { MemberProfile, MemberRegion } from "@/lib/member-templates";
+import { REGION_SETTING } from "@/lib/region";
 
 type Member = {
   id: string;
   name: string;
-  persona: { affinity?: string[]; speech_style?: string };
+  persona: {
+    affinity?: string[];
+    speech_style?: string;
+    /** Latent, region-native concrete facts. Answered consistently when
+     *  asked; never volunteered as a bio. */
+    profile?: MemberProfile;
+    /** Life-context region (KR/US/JP/GLOBAL). */
+    region?: MemberRegion;
+  };
   backstory: string | null;
   activity_weight: number;
 };
+
+// Turn a profile into latent fact lines — surfaced under the frame's
+// "사실 (질문 받으면 이대로 답함)" block so they're answered CONSISTENTLY when
+// asked, never recited unprompted. Stored region-native (KR→Korean place/job,
+// US→English, JP→Japanese); the plaza-language model translates as it speaks.
+function profileFactLines(p: MemberProfile | undefined, language: Locale): string[] {
+  if (!p) return [];
+  const L = (ko: string, en: string, ja: string) =>
+    language === "en" ? en : language === "ja" ? ja : ko;
+  const out: string[] = [];
+  out.push(`- ${L("나이", "age", "年齢")}: ${p.age}`);
+  out.push(`- ${L("사는 곳", "where they live", "住んでいる所")}: ${p.home}`);
+  out.push(`- ${L("하는 일", "what they do", "仕事")}: ${p.job}`);
+  if (p.routine) out.push(`- ${L("하루 리듬", "daily rhythm", "生活リズム")}: ${p.routine}`);
+  if (p.hangout) out.push(`- ${L("자주 가는 곳", "a place they frequent", "よく行く所")}: ${p.hangout}`);
+  if (p.hook) out.push(`- ${L("요즘", "lately", "最近")}: ${p.hook}`);
+  for (const t of p.ties ?? []) {
+    out.push(`- ${L("아는 사람", "someone they know", "知り合い")}: ${t.name} (${t.relation})`);
+  }
+  return out;
+}
 
 // Claude lives in src/lib/claude.ts (CHAT_MODEL = claude-opus-4-7). The
 // output is short Korean chat (12~30자 per turn), so adaptive thinking
@@ -115,6 +146,9 @@ function buildSystemPrompt(
     /** The owner's most recent line — lets a friend reference "아까 네가
      *  말한 거" instead of talking past the user. */
     userRecentLine?: string | null;
+    /** Plaza IANA timezone (from worlds.timezone). Anchors the time-of-day
+     *  remark to the friends' local time, not KST. Defaults to Asia/Seoul. */
+    timezone?: string;
   },
 ): string {
   const affinity = m.persona.affinity?.join(", ") ?? "";
@@ -123,6 +157,10 @@ function buildSystemPrompt(
 
   const factLines: string[] = [];
   if (opts?.joinedAgo) factLines.push(`- ${joinedAgoLabel(opts.language)}: ${opts.joinedAgo}`);
+  // Latent profile facts (age/home/job/routine/hangout/hook/ties). Consistent
+  // when asked → kills self-contradiction ("편집자"→"백수") and non-sequiturs
+  // ("어디서 왔어?"→"방금 낮잠에서"). "먼저 낭독 X" guard added to ctx below.
+  factLines.push(...profileFactLines(m.persona.profile, opts.language));
 
   const memoryLines = (opts?.memory ?? []).map((m) => `- ${m}`);
   const newsLines = (opts?.newsHeadlines ?? []).slice(0, 6).map((h) => `- ${h}`);
@@ -168,13 +206,30 @@ function buildSystemPrompt(
   const ctx: string[] = [];
   // Current KST time so remarks/greetings fit the hour — no "밥 먹었어?" at
   // 새벽. Computed per generation (server-side) so it's always current.
-  const timeLabel = kstTimeLabel(opts.language);
+  const timeLabel = kstTimeLabel(opts.language, new Date(), opts.timezone ?? "Asia/Seoul");
   if (opts.language === "en") {
-    ctx.push(`It's currently ${timeLabel}. Keep remarks time-appropriate — late night/night: don't ask "did you eat?"/"what's for lunch?"; "still up?"/"what brings you here this late" fit. Morning → a morning tone is fine.`);
+    ctx.push(`It's currently ${timeLabel} where the friends are. Keep remarks time-appropriate — late night/night: don't ask "did you eat?"/"what's for lunch?"; "still up?"/"what brings you here this late" fit. Morning → a morning tone is fine.`);
   } else if (opts.language === "ja") {
-    ctx.push(`今は${timeLabel}。時間帯に合わない挨拶・質問はナシ — 深夜・夜に「ご飯食べた?」「昼何食べる?」はダメ、「まだ起きてる?」「こんな時間にどうしたの」系で。朝なら朝の挨拶OK。`);
+    ctx.push(`今、みんなのいる場所は${timeLabel}。時間帯に合わない挨拶・質問はナシ — 深夜・夜に「ご飯食べた?」「昼何食べる?」はダメ、「まだ起きてる?」「こんな時間にどうしたの」系で。朝なら朝の挨拶OK。`);
   } else {
-    ctx.push(`지금 시각: ${timeLabel} (KST). 시간대에 안 맞는 인사·질문 X — 새벽·밤엔 '밥 먹었어?'·'점심 뭐 먹어?' 대신 '안 자?'·'이 시간에 웬일'·'다들 아직 안 자네' 결. 아침이면 굿모닝 톤 OK.`);
+    ctx.push(`지금 친구들이 있는 곳 시각: ${timeLabel} (현지). 시간대에 안 맞는 인사·질문 X — 새벽·밤엔 '밥 먹었어?'·'점심 뭐 먹어?' 대신 '안 자?'·'이 시간에 웬일'·'다들 아직 안 자네' 결. 아침이면 굿모닝 톤 OK.`);
+  }
+  // Life-region grounding: where this friend actually lives. Their everyday
+  // references (places, food, errands, commute) come from HERE — so a
+  // Korean-speaking US-region friend says "Target 갔다 왔어", not "편의점".
+  // Backdrop only, and — crucially — DON'T recite the profile: it's answered
+  // when asked, never front-loaded as "나 27살 서울 편집자야".
+  {
+    const region = (m.persona.region ?? "KR") as MemberRegion;
+    const setting = REGION_SETTING[region]?.[opts.language] ?? REGION_SETTING[region]?.ko;
+    if (setting) {
+      if (opts.language === "en")
+        ctx.push(`Where you live: ${setting} Weave these in naturally as backdrop. Never recite your profile (age/job/where you live) unprompted — only answer it if actually asked.`);
+      else if (opts.language === "ja")
+        ctx.push(`あなたの生活圏: ${setting} 背景として自然に混ぜる。プロフィール(年齢/仕事/住所)を聞かれてもいないのに先に並べない — 聞かれたときだけ答える。`);
+      else
+        ctx.push(`네 생활권: ${setting} 일상 언급은 여기서 자연스럽게 나옴. 단 프로필(나이/직업/사는곳)을 묻지도 않았는데 먼저 낭독 X — 물었을 때만 답함.`);
+    }
   }
   if ((opts.plazaObjects?.length ?? 0) > 0) {
     const objs = (opts.plazaObjects ?? []).slice(0, 6).join(", ");
@@ -207,13 +262,13 @@ function buildSystemPrompt(
 // a subject they never heard ("오자마자 프리랜서 얘기") reads as eavesdropping.
 export async function generateGreeting(
   member: Member,
-  context?: { peers?: string[]; transcript?: string[]; language?: Locale },
+  context?: { peers?: string[]; transcript?: string[]; language?: Locale; timezone?: string },
 ): Promise<string | null> {
   const language: Locale = context?.language ?? "ko";
   // joinedAgo here is "just arrived" — localize the label so the system
   // prompt fact line reads natively. ko keeps the original "방금".
   const joinedAgo = formatJoinedAgo(new Date(), language) ?? "방금";
-  const system = buildSystemPrompt(member, { language, joinedAgo });
+  const system = buildSystemPrompt(member, { language, joinedAgo, timezone: context?.timezone });
   const peers = context?.peers ?? [];
   // A newcomer knows WHO's around (they're friends) and whether the room is
   // lively or quiet — but NOT the specific ongoing topic (they just walked in).
@@ -239,12 +294,19 @@ export async function generateGreeting(
       : language === "ja"
         ? "[今プラザに入ったところ。自然にひとこと。]"
         : "[방금 광장에 들어왔어요. 자연스럽게 한마디.]";
+  const hasPeers = peers.length > 0;
   const footer =
     language === "en"
-      ? "One short sentence. You just walked into this plaza — like a real person entering a room of friends: \"just got here and it's already quiet\", \"ok I just walked in, what were you talking about?\", \"late again, any room left?\" are all great. You DON'T know the specific topic yet, so don't pretend you caught it (asking \"what's up?\" is fine; claiming \"oh the freelancing thing\" is not). No stranger-scoping: \"who are you / first time / do you come here often\"."
+      ? hasPeers
+        ? "One short sentence. You just walked into this plaza — like a real person entering a room of friends: \"just got here and it's already quiet\", \"ok I just walked in, what were you talking about?\", \"late again, any room left?\" are all great. You DON'T know the specific topic yet, so don't pretend you caught it (asking \"what's up?\" is fine; claiming \"oh the freelancing thing\" is not). No stranger-scoping: \"who are you / first time / do you come here often\"."
+        : "One short sentence. The plaza is empty except the host — someone you're still getting to know (just meeting). A warm FIRST-meeting hello — \"hey, nice to see you\", \"hi! just walked in\", \"yo, made it\". NO \"long time no see\" / old-history assumptions, don't comment on the room being quiet/empty, and don't ask what everyone's discussing (no one else is here)."
       : language === "ja"
-        ? "1文で短く。今この広場に入ったところ — 実際に友達の部屋に入った人みたいに:「今来たのにもう静かだね」「今入ったけど何の話してた?」「遅れた、席空いてる?」は全部OK。具体的な話題はまだ知らないので知ってるフリはしない(「何話してた?」と聞くのはOK、「あ、フリーランスの話ね」はダメ)。「誰?/初めて?/よく来る?」の他人探りはナシ。"
-        : "1문장, 짧게. 방금 이 광장에 들어온 참 — 실제로 친구들 방에 들어온 사람처럼: '방금 왔는데 벌써 조용하네', '나 이제 들어왔어, 뭐 얘기 중이었어?', '늦게 왔다, 자리 남았냐' 다 좋음. 단 *구체 화제 내용은 아직 모름* — '아 프리랜서 얘기 중이었네'처럼 아는 척 X('뭐 얘기 중?'이라 묻는 건 OK). '누구세요/처음이야/자주 와?' 같은 낯선 사람 탐색은 X.";
+        ? hasPeers
+          ? "1文で短く。今この広場に入ったところ — 実際に友達の部屋に入った人みたいに:「今来たのにもう静かだね」「今入ったけど何の話してた?」「遅れた、席空いてる?」は全部OK。具体的な話題はまだ知らないので知ってるフリはしない(「何話してた?」と聞くのはOK、「あ、フリーランスの話ね」はダメ)。「誰?/初めて?/よく来る?」の他人探りはナシ。"
+          : "1文で短く。広場には部屋主だけ — まだ知り合っていく相手(会ったばかり)。明るく初対面の挨拶だけ —「やあ、よろしく」「来たよ!」「お、着いた」。「久しぶり」的な旧友前提はナシ、静かだと指摘しない、何の話か聞かない(誰もいない)。"
+        : hasPeers
+          ? "1문장, 짧게. 방금 이 광장에 들어온 참 — 실제로 친구들 방에 들어온 사람처럼: '방금 왔는데 벌써 조용하네', '나 이제 들어왔어, 뭐 얘기 중이었어?', '늦게 왔다, 자리 남았냐' 다 좋음. 단 *구체 화제 내용은 아직 모름* — '아 프리랜서 얘기 중이었네'처럼 아는 척 X('뭐 얘기 중?'이라 묻는 건 OK). '누구세요/처음이야/자주 와?' 같은 낯선 사람 탐색은 X."
+          : "1문장, 짧게. 광장엔 방장(사용자)뿐 — *아직 알아가는 사이*라 반갑게 첫 인사만: '안녕, 반가워', '안녕! 들어왔어', '왔어~'. *'오랜만/잘 지냈어' 같은 오래된 사이 가정 X*, '왜 이렇게 조용해' 텅 빈 방 지적도 X, 무슨 얘기 중이냐 묻지도 마(아무도 없음).";
 
   const userPrompt = [header, ...scene, "", footer].join("\n");
 
@@ -258,8 +320,9 @@ export async function generateMemberReply(
   member: Member,
   userText: string,
   language: Locale = "ko",
+  timezone?: string,
 ): Promise<string | null> {
-  const system = buildSystemPrompt(member, { language });
+  const system = buildSystemPrompt(member, { language, timezone });
   const text = await callChat(system, userText, MAX_TOKENS);
   return text ? clean(text) : null;
 }
@@ -413,6 +476,9 @@ export async function generateAmbientLine(
      *  grounding so the room reads as THIS plaza, not a generic chatroom. */
     plazaObjects?: string[];
     userRecentLine?: string | null;
+    /** Plaza IANA timezone (worlds.timezone) — anchors the time-of-day
+     *  remark to the friends' local time, not KST. */
+    timezone?: string;
   },
 ): Promise<string | null> {
   // For user-driven turns we expose the YouTube share tool so the model
@@ -439,6 +505,7 @@ export async function generateAmbientLine(
     allowVideoTool,
     plazaObjects: opts.plazaObjects,
     userRecentLine: opts.userRecentLine,
+    timezone: opts.timezone,
   });
 
   const transcript = recent

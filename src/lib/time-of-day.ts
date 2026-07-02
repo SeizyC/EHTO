@@ -23,26 +23,37 @@ const BUCKETS: BucketInfo[] = [
   { id: "night",     label: "고요한 밤",      hourStart: 20 },
 ];
 
-// Get hour in Asia/Seoul timezone regardless of viewer's local tz.
-function kstHour(now: Date = new Date()): number {
+// Get hour in a given IANA timezone regardless of viewer's local tz.
+// Defaults to Asia/Seoul so every existing caller is byte-identical; a plaza
+// with a non-KR region passes its own tz so "새벽/낮/밤" follows the friends'
+// local time, not KST.
+function tzHour(now: Date = new Date(), timezone = "Asia/Seoul"): number {
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Seoul",
+    timeZone: timezone,
     hour: "numeric",
     hour12: false,
   }).formatToParts(now);
   const h = parts.find((p) => p.type === "hour")?.value;
   return h === "24" ? 0 : Number(h);
 }
+// Back-compat alias (Asia/Seoul).
+function kstHour(now: Date = new Date()): number {
+  return tzHour(now, "Asia/Seoul");
+}
 
 // Natural current-time phrase in the plaza language, so chat can be
 // time-appropriate ("새벽 3시쯤" → no "밥 먹었어?"). KST-based like everything
 // else here. Computed server-side per generation so it's always current.
-export function kstTimeLabel(language: "ko" | "en" | "ja" = "ko", now: Date = new Date()): string {
-  const h = kstHour(now);
+export function kstTimeLabel(
+  language: "ko" | "en" | "ja" = "ko",
+  now: Date = new Date(),
+  timezone = "Asia/Seoul",
+): string {
+  const h = tzHour(now, timezone);
   const h12 = ((h + 11) % 12) + 1;
   if (language === "en") {
     const period = h < 5 ? "late night" : h < 7 ? "early morning" : h < 11 ? "morning" : h < 17 ? "afternoon" : h < 20 ? "evening" : "night";
-    return `${period}, around ${h12}${h < 12 ? "am" : "pm"} KST`;
+    return `${period}, around ${h12}${h < 12 ? "am" : "pm"} their time`;
   }
   if (language === "ja") {
     const period = h < 5 ? "深夜" : h < 7 ? "早朝" : h < 11 ? "朝" : h < 17 ? "昼" : h < 20 ? "夕方" : "夜";
@@ -52,8 +63,8 @@ export function kstTimeLabel(language: "ko" | "en" | "ja" = "ko", now: Date = ne
   return `${period} ${h12}시쯤`;
 }
 
-export function currentBucket(now: Date = new Date()): BucketInfo {
-  const h = kstHour(now);
+export function currentBucket(now: Date = new Date(), timezone = "Asia/Seoul"): BucketInfo {
+  const h = tzHour(now, timezone);
   // Night wraps midnight: 20 → next day 5
   if (h >= 20 || h < 5) return BUCKETS[4]; // night
   // Walk forward to find the latest bucket whose hourStart <= h

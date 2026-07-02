@@ -17,12 +17,13 @@ export async function POST(req: NextRequest) {
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
   if (!token) return NextResponse.json({ error: "missing auth" }, { status: 401 });
 
-  let body: { code?: string; roomName?: string };
+  let body: { code?: string; roomName?: string; timezone?: string };
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "invalid json" }, { status: 400 }); }
 
   const code = (body.code ?? "").trim().toUpperCase();
   const roomName = (body.roomName ?? "").trim();
+  const timezone = typeof body.timezone === "string" ? body.timezone.slice(0, 64) : undefined;
   if (!code) return NextResponse.json({ error: "missing code" }, { status: 400 });
   if (roomName.length < 1 || roomName.length > 16) {
     return NextResponse.json({ error: "invalid room name" }, { status: 400 });
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
   //    is the one place the plaza language is set — a never-set x-locale
   //    header would have forced every non-KO beta plaza to Korean.
   const language = countryToLocale(req.headers.get("cf-ipcountry"));
-  const worldId = await ensureWorld(svc, uid, roomName, language);
+  const worldId = await ensureWorld(svc, uid, roomName, language, timezone);
   // Member seeding is best-effort: a seed hiccup must not 500 finalize after
   // the code is already consumed. The world exists; the next /world poll's
   // seedMembersIfEmpty backfills. Mirrors generate-character's guarded seed.
