@@ -119,6 +119,7 @@ function IdleNameTag({ name }: { name: string }) {
 // the clamp in real pixels rather than guessing.
 function PlazaBubble({
   cx,
+  charId,
   plazaW,
   xMv,
   topMv,
@@ -127,6 +128,9 @@ function PlazaBubble({
   onDismiss,
 }: {
   cx: number;
+  /** The speaker's character id — onDismiss expects this (it pops the char's
+   *  head bubble), NOT the message id. */
+  charId: string;
   plazaW: number;
   /** Shared per-character X + head-top MotionValues ("x%"). The bubble reads
    *  the SAME animated position as the sprite, so it's glued to the speaker in
@@ -195,7 +199,7 @@ function PlazaBubble({
         onDismiss
           ? (e) => {
               e.stopPropagation();
-              onDismiss(bubble.id);
+              onDismiss(charId); // char id — dismissBubble pops by fromCharId
             }
           : undefined
       }
@@ -828,6 +832,7 @@ export function PlazaCanvas({
             <PlazaBubble
               key={`bubble-${c.id}`}
               cx={c.x}
+              charId={c.id}
               plazaW={plazaW}
               xMv={xMvRef.current.get(c.id)}
               topMv={topMvRef.current.get(c.id)}
