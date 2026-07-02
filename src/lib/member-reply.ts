@@ -241,10 +241,10 @@ export async function generateGreeting(
         : "[방금 광장에 들어왔어요. 자연스럽게 한마디.]";
   const footer =
     language === "en"
-      ? "One short sentence. You already know everyone here — greet them like old friends or drop a light remark. But you JUST arrived, so you DON'T know what they're currently talking about — never act like you caught the ongoing topic (no picking up a specific subject). No \"who are you / first time / do you come here often\"."
+      ? "One short sentence. You just walked into this plaza — like a real person entering a room of friends: \"just got here and it's already quiet\", \"ok I just walked in, what were you talking about?\", \"late again, any room left?\" are all great. You DON'T know the specific topic yet, so don't pretend you caught it (asking \"what's up?\" is fine; claiming \"oh the freelancing thing\" is not). No stranger-scoping: \"who are you / first time / do you come here often\"."
       : language === "ja"
-        ? "1文で短く。ここは知ってる友達ばかり — 旧知みたいに挨拶するか軽くひとこと。ただし今来たばかりで今の話題は知らない — 進行中の具体的な話題を知ってるフリで拾わないこと。「誰?/初めて?/よく来る?」もナシ。"
-        : "1문장, 짧게. 여긴 이미 다 아는 친구들 — 오랜만인 듯 인사하거나 가볍게 한마디. 단, *넌 방금 들어와서 지금 무슨 얘기 중인지는 몰라* — 진행 중인 구체 화제를 아는 척 이어받지 말 것(예: 방금 프리랜서 얘기 중이었어도 그걸 아는 척 X). '누구세요/처음이야/자주 와?' 도 X.";
+        ? "1文で短く。今この広場に入ったところ — 実際に友達の部屋に入った人みたいに:「今来たのにもう静かだね」「今入ったけど何の話してた?」「遅れた、席空いてる?」は全部OK。具体的な話題はまだ知らないので知ってるフリはしない(「何話してた?」と聞くのはOK、「あ、フリーランスの話ね」はダメ)。「誰?/初めて?/よく来る?」の他人探りはナシ。"
+        : "1문장, 짧게. 방금 이 광장에 들어온 참 — 실제로 친구들 방에 들어온 사람처럼: '방금 왔는데 벌써 조용하네', '나 이제 들어왔어, 뭐 얘기 중이었어?', '늦게 왔다, 자리 남았냐' 다 좋음. 단 *구체 화제 내용은 아직 모름* — '아 프리랜서 얘기 중이었네'처럼 아는 척 X('뭐 얘기 중?'이라 묻는 건 OK). '누구세요/처음이야/자주 와?' 같은 낯선 사람 탐색은 X.";
 
   const userPrompt = [header, ...scene, "", footer].join("\n");
 
@@ -490,6 +490,7 @@ export async function generateAmbientLine(
           ? "- **이건 네 관심사 영역이야 — 아는 티 내며 구체적으로 받아라.** 모른 척·되묻기로 빠지지 말 것."
           : "- 들어봤거나 일반 상식으로 아는 거면 아는 만큼 알맹이로 받아라. '그게 뭐야?'식 되묻기는 *정말 생소하고 네 관심사와도 무관할 때만*.",
         "- 명사 변주·자기 얘기로 새기 금지. 사용자 메시지가 *anchor*임. 자동 농담·맞장구 X.",
+        "- 질문엔 그 *의도*에 답해라. '어디서 왔어?'에 '방금 들어왔어'식 동문서답 X — 입장 상태는 곁들여도 좋지만(예: '방금 들어왔고, 출신 묻는 거면 서울 쪽') 실제 물음(출신 등)에 답할 것.",
       ].join("\n");
       break;
     case "reply-peer":
