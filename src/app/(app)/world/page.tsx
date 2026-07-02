@@ -132,6 +132,11 @@ export default function WorldPage() {
   const portalSeenRef = useRef<Set<string> | null>(null);
   const portalTimersRef = useRef<number[]>([]);
   const latestMemberIdsRef = useRef<string[]>([]);
+  // Members whose arrival wormhole is still FORMING — hidden from the plaza
+  // until the rift has grown (~1.8s), so the portal appears first and the
+  // friend then rises out of it (instead of popping in before the wormhole).
+  const [heldArrivals, setHeldArrivals] = useState<string[]>([]);
+  const ARRIVAL_HOLD_MS = 1800;
 
   // ── First-friend coachmark ──
   // A one-time arrow nudging the user to tap a friend and chat. Shown while a
@@ -251,12 +256,19 @@ export default function WorldPage() {
   // layout because the layout IS the DB state.
   const visibleMembers = members
     .filter((m) => m.activity_weight >= 0.3 && m.status !== "ghost");
-  // Point the coachmark at the first friend present until the user dismisses it.
-  const guideTarget = !guideSeen && visibleMembers.length > 0 ? visibleMembers[0] : null;
+  // Point the coachmark at the first friend actually on screen (not one still
+  // held behind a forming rift) until the user dismisses it.
+  const guideTarget = (() => {
+    if (guideSeen) return null;
+    const present = visibleMembers.filter((m) => !heldArrivals.includes(m.id));
+    return present.length > 0 ? present[0] : null;
+  })();
   const guidePointer: PlazaPointer | null = guideTarget
     ? { x: guideTarget.x, y: guideTarget.y, label: "친구를 선택해 대화를 해보세요" }
     : null;
-  const characters: PlazaCharacter[] = visibleMembers.map((m) => ({
+  const characters: PlazaCharacter[] = visibleMembers
+    .filter((m) => !heldArrivals.includes(m.id)) // hidden until their rift forms
+    .map((m) => ({
     id: m.id,
     src: m.persona.sprite,
     x: m.x,
@@ -297,9 +309,17 @@ export default function WorldPage() {
       y: m.y,
     }));
     setPortals((p) => [...p, ...added]);
+    // Hold the newcomers off-screen while their rift forms, then release them
+    // so they emerge FROM the formed portal (portal-first, character-after).
+    const freshIds = fresh.map((m) => m.id);
+    setHeldArrivals((h) => [...h, ...freshIds]);
+    const release = window.setTimeout(
+      () => setHeldArrivals((h) => h.filter((id) => !freshIds.includes(id))),
+      ARRIVAL_HOLD_MS,
+    );
     const ids = new Set(added.map((a) => a.id));
-    const t = window.setTimeout(() => setPortals((p) => p.filter((x) => !ids.has(x.id))), 3200);
-    portalTimersRef.current.push(t);
+    const remove = window.setTimeout(() => setPortals((p) => p.filter((x) => !ids.has(x.id))), 3200);
+    portalTimersRef.current.push(release, remove);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [memberIdKey]);
 
