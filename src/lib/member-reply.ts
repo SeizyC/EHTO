@@ -384,6 +384,10 @@ export async function generateAmbientLine(
      *  statements". */
     shape?: LineShape;
     avoid?: string[];
+    /** Room-level saturated topics (recurring across all recent speakers) —
+     *  the speaker is told to switch away from these so the whole room stops
+     *  circling one theme (the 야식/편의점/배달 loop). */
+    avoidTopics?: string[];
     memory?: string[];
     joinedAgo?: string | null;
     /** Current headlines fetched via Naver Search API. Surfaced in the
@@ -551,9 +555,17 @@ export async function generateAmbientLine(
   // thing the model sees before composing.
   const shapeBlock = opts.shape ? `\n${shapeGuidanceFor(opts.shape)}` : "";
 
+  // Room-topic-saturation nudge: the room has been circling these words —
+  // steer away so it doesn't become a one-topic loop.
+  const topicBlock =
+    opts.avoidTopics && opts.avoidTopics.length > 0
+      ? `\n[화제 반복 주의] 지금 방이 이 소재에 갇혀 반복 중: ${opts.avoidTopics.join(", ")}. 이 결을 피하고 *완전히 다른 화제*로.`
+      : "";
+
   const userPrompt = [
     `[상황] ${situation}`,
     shapeBlock,
+    topicBlock,
     transcript ? `\n[최근 대화]\n${transcript}` : "",
     avoidBlock,
   ].filter(Boolean).join("\n");

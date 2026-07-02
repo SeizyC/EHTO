@@ -367,6 +367,10 @@ export async function tickAmbientConversation(
     .slice(0, 3)
     .map((r) => r.text);
 
+  // Room-level topic saturation (across ALL recent speakers, not just this
+  // one) — so a whole-room loop on one theme gets broken, not just self-repeats.
+  const avoidTopics = saturatedTopics(recentDesc.map((r) => r.text));
+
   // Speaker's past-days diary entries — gives continuity ("어제 ___").
   const memoryTraces = await fetchRecentMemory(sb, speaker.id, 3);
   const memory = memoryTraces.map((t) => `(${t.day}) ${t.text}`);
@@ -445,6 +449,9 @@ export async function tickAmbientConversation(
     intent,
     shape,
     avoid,
+    // Only steer AI↔AI turns off a saturated topic. On a reply to the user we
+    // must answer THEIR topic, not dodge it.
+    avoidTopics: skipShape ? undefined : avoidTopics,
     memory,
     joinedAgo: formatJoinedAgo(speaker.activated_at, language),
     newsHeadlines,
@@ -642,6 +649,36 @@ function headlineAlreadyDiscussed(headline: string, recentBlob: string): boolean
     .map((m) => m[0])
     .filter((t) => !NEWS_STOP_WORDS.has(t));
   return tokens.some((t) => recentBlob.includes(t));
+}
+
+// Common non-topic chat words to ignore when detecting a saturated topic.
+const TOPIC_STOP = new Set([
+  "그냥", "진짜", "정말", "완전", "나도", "너도", "우리", "다들", "오늘", "어제",
+  "지금", "이거", "그거", "저거", "이건", "그건", "근데", "그래", "그럼", "아니",
+  "맞아", "그치", "약간", "조금", "많이", "역시", "그때", "요즘", "가끔", "계속",
+  "사람", "얘기", "생각", "느낌", "기분", "부분", "정도", "그런", "이런", "저런",
+  "하는", "있는", "없는", "하고", "해서", "하니까", "라고", "인데", "거기", "여기",
+]);
+
+// Room-topic saturation: which content words keep recurring across the recent
+// lines. Feeds a "switch topics" nudge so the room doesn't circle one theme
+// (the observed 야식/편의점/삼각김밥/배달 loop) for an hour. A word counts once
+// per message; those in ≥3 of the recent messages are considered saturated.
+function saturatedTopics(texts: string[]): string[] {
+  const docFreq = new Map<string, number>();
+  for (const t of texts) {
+    const toks = new Set(
+      Array.from(t.matchAll(/[가-힣]{2,}/g))
+        .map((m) => m[0])
+        .filter((w) => !TOPIC_STOP.has(w)),
+    );
+    for (const w of toks) docFreq.set(w, (docFreq.get(w) ?? 0) + 1);
+  }
+  return [...docFreq.entries()]
+    .filter(([, c]) => c >= 3)
+    .sort((a, b) => b[1] - a[1])
+    .map(([w]) => w)
+    .slice(0, 4);
 }
 
 function detectNewsCitation(text: string, headlines: string[]): string | null {
