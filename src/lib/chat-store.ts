@@ -553,7 +553,10 @@ export function landedMessages(all: ChatMsg[]): ChatMsg[] {
 
 const SPOTIFY_RE_TEST = /open\.spotify\.com\/(track|album|playlist|episode)\/[a-zA-Z0-9]+/;
 const MUSIC_CARD_LOOKBACK_MS = 12 * 3600_000;
-const MUSIC_CARD_MAX = 3;
+// Only ONE music card at a time: a new share replaces the previous one (the
+// old card animates out + its Spotify controller is destroyed, stopping audio).
+// "새로 공유하면 기존 건 내린다."
+const MUSIC_CARD_MAX = 1;
 const DISMISS_LS_KEY = "ehto:music-dismissed-ids";
 
 function _loadDismissed(): Set<string> {
@@ -590,9 +593,9 @@ export function dismissMusicShare(id: string): void {
   _notifyDismiss();
 }
 
-/** Returns the active (non-dismissed) music shares from the last 12h,
- *  newest first, capped at MUSIC_CARD_MAX. Reactive to both message
- *  inserts and dismissals. */
+/** Returns the active (non-dismissed) music share to show — the single most
+ *  recent one within the last 12h (MUSIC_CARD_MAX = 1), so a new share
+ *  replaces the old. Reactive to both message inserts and dismissals. */
 export function useActiveMusicShares(): ChatMsg[] {
   const all = useChatMessages();
   const [version, setVersion] = useState(0);

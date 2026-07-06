@@ -5,18 +5,20 @@ import { AnimatePresence, motion } from "framer-motion";
 import { dismissMusicShare, useActiveMusicShares, type ChatMsg } from "@/lib/chat-store";
 import { useMembers } from "@/lib/members-store";
 
-// Stacked overlay of recent music shares at plaza bottom-right.
+// Single music-share card at the plaza bottom-right (only the latest one).
 //
-// Each card is a compact pill with a ▶/⏸ button that plays the track
+// The card is a compact pill with a ▶/⏸ button that plays the track
 // in-place via Spotify's IFrame API (no new-tab redirect). The actual
 // iframe is mounted hidden the moment the user clicks ▶ — Spotify's
 // controller then accepts .play()/.pause() calls so we can drive
 // playback from our own pill chrome. Free Spotify users get a 30-sec
 // preview; Premium users get full tracks.
 //
-// Newest on top; each card has its own × dismiss. Dismissal persists in
-// localStorage so closing it sticks across reloads. Cards drop out after
-// 12h naturally (see useActiveMusicShares lookback).
+// Only ONE share shows at a time: a new share replaces the previous card
+// (it animates out + its controller is destroyed, stopping any audio).
+// The × dismiss persists in localStorage so closing it sticks across
+// reloads; the card also drops out after 12h naturally (see
+// useActiveMusicShares lookback + MUSIC_CARD_MAX).
 
 const SPOTIFY_RE =
   /https?:\/\/open\.spotify\.com\/(track|album|playlist|episode)\/([a-zA-Z0-9]+)(?:\?[^\s]*)?/;

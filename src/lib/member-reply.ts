@@ -479,6 +479,9 @@ export async function generateAmbientLine(
     /** Plaza IANA timezone (worlds.timezone) — anchors the time-of-day
      *  remark to the friends' local time, not KST. */
     timezone?: string;
+    /** Room is in an abstract philosophy loop (기준/취향/의미 circling) — this
+     *  turn must pivot HARD to something concrete, not add another musing. */
+    forceConcrete?: boolean;
   },
 ): Promise<string | null> {
   // For user-driven turns we expose the YouTube share tool so the model
@@ -527,6 +530,12 @@ export async function generateAmbientLine(
           "이 라인들의 *주제 영역*과 다른 결로 가세요. 페르소나는 유지하되, 그 안에서 새 각도(다른 사물·다른 활동·다른 감정·다른 관찰)로.",
         ].join("\n")
       : "";
+
+  // Room is circling abstract musings (기준/취향/의미…) — force a concrete pivot
+  // this turn so the philosophy loop breaks instead of gaining another line.
+  const concreteBlock = opts.forceConcrete
+    ? "\n*지금 방이 추상 공회전 중(기준·취향·의미 같은 얘기만 돌고 있음)*. 여기 한 줄 더 보태지 말고, **구체적인 것 하나로 화제를 확 틀어라** — 오늘 본 것·한 일·간 곳·먹은 것·본 영상/사람 같은 실체 있는 소재. 추상어('기준/취향/의미/적응/원래/어차피') 쓰지 말 것."
+    : "";
 
   // Per-intent one-line nudges. Keep them minimal: the system prompt
   // already covers tone + persona + facts + memory. Trust the model.
@@ -586,13 +595,14 @@ export async function generateAmbientLine(
       situation = "본인 페르소나가 특히 잘 드러나는 한 줄. 관심사·습관·취향 한 자락 — 단, 자기소개 어조 X, 그냥 흘리듯.";
       break;
     case "check-in":
-      // NOT an "안부 챗봇". The user is your long-time friend — poke them the
-      // way you'd poke someone you already know, not interview them.
+      // NOT an "안부 챗봇". The owner is someone you're still getting to know
+      // (per the relationship model) — poke them warmly, don't invent old
+      // history and don't interview them.
       situation = [
-        `${intent.userName}님(이 광장 방장, 너랑 *이미 아는 사이*)에게 슬쩍 말을 건다.`,
-        "이미 아는 사람처럼 건드리는 결로 — 인터뷰·빈 안부 X:",
-        '- "너 이거 좋아할 것 같던데" / "아까 네가 말한 거 생각났어" / "이거 보면 너 또 웃을 듯" / "오늘 조용하네, 바쁜가"',
-        "- 네 관심사·최근 광장 흐름·저 사람이 예전에 하던 얘기에서 자연스럽게 엮어. '어떻게 지내세요?' 같은 챗봇 안부 절대 X.",
+        `${intent.userName}님(이 광장 방장, *아직 알아가는 사이*)에게 슬쩍 말을 건다.`,
+        "오래된 사이인 척 X + 인터뷰·빈 안부 X — 가볍게 건드리는 결:",
+        '- "너 이거 좋아할 것 같은데" / "이거 보면 너도 웃을 듯" / "오늘 조용하네, 뭐 해?" / (방장이 방금 뭔가 말했으면) 그걸 자연스럽게 이어받기',
+        "- 지금 광장 흐름·네 관심사에서 자연스럽게 엮어. '어떻게 지내세요?'·'밥 먹었어?' 같은 챗봇 안부 X, '예전에 네가 ___' 같은 없는 과거 지어내기 X.",
       ].join("\n");
       break;
     case "mood":
@@ -633,6 +643,7 @@ export async function generateAmbientLine(
     `[상황] ${situation}`,
     shapeBlock,
     topicBlock,
+    concreteBlock,
     transcript ? `\n[최근 대화]\n${transcript}` : "",
     avoidBlock,
   ].filter(Boolean).join("\n");

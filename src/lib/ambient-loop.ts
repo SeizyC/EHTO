@@ -72,6 +72,12 @@ const OWNER_OFFLINE_MUTE_MS = 5 * 60_000;
 const OWNER_CHECKIN_COOLDOWN_MS = 3 * 60 * 1000;
 // Probability of turning an eligible quiet-moment tick into a user-nudge.
 const OWNER_CHECKIN_ROLL = 0.25;
+// A LIVELY room almost always has "a peer just spoke", so the quiet-moment
+// check-in branch below rarely runs — which is why friends never turned to
+// the owner even once. This lower roll fires a check-in even mid-chatter so
+// the room occasionally addresses the user directly (still gated by the
+// cooldown, so it stays "가끔", not needy).
+const OWNER_CHECKIN_ROLL_ACTIVE = 0.12;
 // News is a spice: only ~1 in 5 ambient lines may carry a headline, so the
 // room reads as friends together rather than an AI news-comment feed.
 const NEWS_INJECT_ROLL = 0.2;
@@ -371,6 +377,10 @@ export async function tickAmbientConversation(
   // Room-level topic saturation (across ALL recent speakers, not just this
   // one) — so a whole-room loop on one theme gets broken, not just self-repeats.
   const avoidTopics = saturatedTopics(recentDesc.map((r) => r.text));
+  // Room-level abstract-idle detection — flips a hard "pivot to concrete" flag
+  // when the last several lines are circling standards/taste/meaning with no
+  // concrete anchor (the 취향/기준 philosophy loop).
+  const forceConcrete = abstractLoopActive(recentDesc.map((r) => r.text));
 
   // Speaker's past-days diary entries — gives continuity ("어제 ___").
   const memoryTraces = await fetchRecentMemory(sb, speaker.id, 3);
@@ -453,6 +463,9 @@ export async function tickAmbientConversation(
     // Only steer AI↔AI turns off a saturated topic. On a reply to the user we
     // must answer THEIR topic, not dodge it.
     avoidTopics: skipShape ? undefined : avoidTopics,
+    // On a user-reply turn we must answer the user (not pivot away), so the
+    // concrete-pivot flag is gated to AI↔AI turns just like avoidTopics.
+    forceConcrete: skipShape ? false : forceConcrete,
     memory,
     joinedAgo: formatJoinedAgo(speaker.activated_at, language),
     newsHeadlines,
@@ -573,6 +586,12 @@ function pickAmbientIntent(args: {
    *  is more likely to surface something on the user's recent thread. */
   implicit?: ImplicitState;
 }): SpeechIntent {
+  // Occasional owner check-in EVEN mid-chatter — otherwise a lively room
+  // (where a peer just spoke almost every tick) never turns to the user.
+  // Cooldown keeps it rare; this just makes it reachable when active.
+  if (args.checkinEligible && args.userName && Math.random() < OWNER_CHECKIN_ROLL_ACTIVE) {
+    return { type: "check-in", userName: args.userName };
+  }
   if (args.peerJustSpoke && args.peerName) {
     // Heavy bias toward reply-peer when a peer just spoke: without this
     // the picker often shifted to new-topic / persona-share, producing
@@ -666,6 +685,24 @@ const TOPIC_STOP = new Set([
 // lines. Feeds a "switch topics" nudge so the room doesn't circle one theme
 // (the observed 야식/편의점/삼각김밥/배달 loop) for an hour. A word counts once
 // per message; those in ≥3 of the recent messages are considered saturated.
+// Abstract-idle words: when a run of recent lines is dominated by these
+// (standards / taste / meaning / adaptation / essence…) with no concrete
+// anchor, the room is in a philosophy loop ("기준이 바뀌는 건가 → 원래 없던 건
+// 아닐까 → 그럼 뭘로 고르지" ×10). The 2-line prompt rule can't see the whole
+// room; this runtime check does, and flips a "pivot to concrete" flag.
+const ABSTRACT_WORDS = [
+  "기준", "취향", "의미", "적응", "본질", "존재", "결국", "어차피",
+  "애초에", "원래", "가치", "개념", "인식", "정의",
+];
+function abstractLoopActive(texts: string[]): boolean {
+  const last = texts.slice(-5);
+  if (last.length < 3) return false;
+  const abstractCount = last.filter((t) =>
+    ABSTRACT_WORDS.some((w) => t.includes(w)),
+  ).length;
+  return abstractCount >= 3;
+}
+
 function saturatedTopics(texts: string[]): string[] {
   const docFreq = new Map<string, number>();
   for (const t of texts) {
