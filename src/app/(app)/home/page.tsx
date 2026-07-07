@@ -41,6 +41,27 @@ export default function HomePage() {
   const [meOpen, setMeOpen] = useState(false);
   const router = useRouter();
 
+  // 광장 홈(공개 광장 디렉토리)은 관리자 전용. 일반 멤버·비로그인은 자기
+  // 광장으로 돌려보낸다 — 직접 URL 진입도 여기서 차단.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const sb = browserClient();
+      const { data: sess } = await sb.auth.getSession();
+      if (!sess.session) { if (!cancelled) router.replace("/world"); return; }
+      try {
+        const r = await fetch("/api/admin/me", {
+          headers: { Authorization: `Bearer ${sess.session.access_token}` },
+        });
+        const j = await r.json();
+        if (!cancelled && !j?.admin) router.replace("/world");
+      } catch {
+        if (!cancelled) router.replace("/world");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [router]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {

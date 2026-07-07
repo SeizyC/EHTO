@@ -94,7 +94,7 @@ function CharacterPageInner() {
       let cached = loadCharacter();
       if (cached && cached.userId !== uid) { clearCharacter(); cached = null; }
       if (cached) {
-        if (cached.handle) { router.replace("/home"); return; }
+        if (cached.handle) { router.replace("/world"); return; }
         setImageUrl(cached.imageUrl);
         setCharacterId(cached.id);
         setStage("naming");
@@ -122,7 +122,7 @@ function CharacterPageInner() {
         createdAt: ch.createdAt,
       });
       if (ch.handle) {
-        router.replace("/home");
+        router.replace("/world");
       } else {
         setImageUrl(ch.imageUrl);
         setCharacterId(ch.id);

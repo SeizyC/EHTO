@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serviceClient } from "@/lib/supabase";
-import { dayStart, dayEnd } from "@/lib/day-rollover";
 import { catalogByVariantId, catalogByTypeKey } from "@/lib/object-catalog";
 
 // GET /api/plaza/[id]
@@ -49,17 +48,16 @@ export async function GET(
     .filter((m) => m.activated_at !== null && m.status === "active")
     .sort((a, b) => b.activity_weight - a.activity_weight);
 
-  // Today's messages (KST 09:00 window) — same shape /api/messages returns
-  const start = dayStart();
-  const end = dayEnd(start);
+  // Recent messages — the plaza's latest conversation regardless of the KST
+  // day window. (A visited plaza that's been quiet *today* still has a real
+  // recent history a visitor should see; the old "today only" filter showed
+  // an empty feed for any plaza idle since 9am KST.)
   const { data: msgData } = await svc
     .from("messages")
     .select("id, owner_user_id, owner_member_id, text, kind, created_at, members(name)")
     .eq("world_id", world.id)
-    .gte("created_at", start.toISOString())
-    .lt("created_at", end.toISOString())
     .order("created_at", { ascending: false })
-    .limit(300);
+    .limit(80);
   type Row = {
     id: string;
     owner_user_id: string | null;

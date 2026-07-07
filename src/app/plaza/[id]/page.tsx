@@ -105,8 +105,8 @@ export default function VisitorPage({
     return (
       <main className="bg-bg text-ink mx-auto flex min-h-dvh max-w-[420px] flex-col items-center justify-center px-5 py-8">
         <p className="text-sub text-[13px]">{err}</p>
-        <Link href="/home" className="text-accent mt-4 text-[12px] underline">
-          광장 홈으로
+        <Link href="/world" className="text-accent mt-4 text-[12px] underline">
+          내 광장으로
         </Link>
       </main>
     );
@@ -186,10 +186,10 @@ export default function VisitorPage({
             </div>
           </div>
           <Link
-            href="/home"
+            href="/world"
             className="text-sub hover:text-ink text-[12px] transition"
           >
-            ← 광장 홈
+            ← 내 광장
           </Link>
         </header>
 
