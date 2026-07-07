@@ -44,7 +44,7 @@ export const TERMS: Record<Locale, LegalDoc> = {
       { h: "제6조 (유료 서비스)", lines: ["일부 기능은 구독 또는 단건 결제(EHTO 재화 등) 형태의 유료로 제공될 수 있습니다. 결제·취소·환불은 관련 법령 및 회사가 별도로 고지하는 정책에 따릅니다."] },
       { h: "제7조 (책임의 한계)", lines: ["서비스는 “있는 그대로” 제공됩니다. 회사는 천재지변, 외부 서비스 장애 등 회사의 합리적 통제를 벗어난 사유로 인한 손해에 대하여 책임을 지지 않습니다."] },
       { h: "제8조 (약관의 변경)", lines: ["회사는 필요 시 본 약관을 변경할 수 있으며, 변경 시 서비스 내 공지 등 적절한 방법으로 알립니다."] },
-      { h: "문의", lines: [], email: "hello@ehto.world" },
+      { h: "문의", lines: [], email: "hans1329@gmail.com" },
     ],
   },
   en: {
@@ -59,7 +59,7 @@ export const TERMS: Record<Locale, LegalDoc> = {
       { h: "6. Paid Services", lines: ["Some features may be offered for a fee, as a subscription or one-time purchase (such as EHTO in-app currency). Payment, cancellation and refunds follow applicable law and any policy the Company separately announces."] },
       { h: "7. Limitation of Liability", lines: ["The Service is provided “as is.” The Company is not liable for damages arising from causes beyond its reasonable control, such as force majeure or failures of external services."] },
       { h: "8. Changes to These Terms", lines: ["The Company may amend these Terms when necessary and will give notice by appropriate means, such as a notice within the Service."] },
-      { h: "Contact", lines: [], email: "hello@ehto.world" },
+      { h: "Contact", lines: [], email: "hans1329@gmail.com" },
     ],
   },
   ja: {
@@ -74,7 +74,7 @@ export const TERMS: Record<Locale, LegalDoc> = {
       { h: "第6条（有料サービス）", lines: ["一部の機能は、サブスクリプションまたは都度課金（EHTO 通貨など）の形で有料提供される場合があります。決済・キャンセル・返金は関係法令および当社が別途告知する方針に従います。"] },
       { h: "第7条（責任の制限）", lines: ["本サービスは「現状有姿」で提供されます。当社は、天災や外部サービスの障害など、当社の合理的な支配を超える事由による損害について責任を負いません。"] },
       { h: "第8条（規約の変更）", lines: ["当社は必要に応じて本規約を変更でき、変更時はサービス内の告知など適切な方法で通知します。"] },
-      { h: "お問い合わせ", lines: [], email: "hello@ehto.world" },
+      { h: "お問い合わせ", lines: [], email: "hans1329@gmail.com" },
     ],
   },
 };
@@ -91,7 +91,7 @@ export const PRIVACY: Record<Locale, LegalDoc> = {
       { h: "4. 처리위탁 및 제3자 제공", lines: ["서비스 운영(인증·데이터 저장·인프라)을 위해 Supabase 등 신뢰할 수 있는 처리수탁자를 이용합니다. 회사는 이용자의 개인정보를 판매하지 않습니다."] },
       { h: "5. 쿠키 및 로컬 저장소", lines: ["로그인 유지와 환경설정 저장을 위해 브라우저의 쿠키·로컬 저장소를 사용합니다."] },
       { h: "6. 이용자의 권리", lines: ["이용자는 자신의 개인정보에 대한 열람·정정·삭제·처리정지를 요청할 수 있습니다."] },
-      { h: "7. 문의처", lines: ["개인정보 관련 문의 (Fantagram Inc.):"], email: "hello@ehto.world" },
+      { h: "7. 문의처", lines: ["개인정보 관련 문의 (Fantagram Inc.):"], email: "hans1329@gmail.com" },
     ],
   },
   en: {
@@ -104,7 +104,7 @@ export const PRIVACY: Record<Locale, LegalDoc> = {
       { h: "4. Processing on Our Behalf and Third Parties", lines: ["To operate the Service (authentication, data storage, infrastructure) we use trusted processors such as Supabase. The Company does not sell users’ personal data."] },
       { h: "5. Cookies and Local Storage", lines: ["We use the browser’s cookies and local storage to keep you signed in and to save preferences."] },
       { h: "6. Your Rights", lines: ["You may request access to, correction of, deletion of, or suspension of the processing of your personal data."] },
-      { h: "7. Contact", lines: ["For privacy inquiries (Fantagram Inc.):"], email: "hello@ehto.world" },
+      { h: "7. Contact", lines: ["For privacy inquiries (Fantagram Inc.):"], email: "hans1329@gmail.com" },
     ],
   },
   ja: {
@@ -117,7 +117,7 @@ export const PRIVACY: Record<Locale, LegalDoc> = {
       { h: "4. 処理の委託および第三者提供", lines: ["サービス運営（認証・データ保存・インフラ）のために、Supabase など信頼できる処理受託者を利用します。当社は利用者の個人情報を販売しません。"] },
       { h: "5. クッキーおよびローカルストレージ", lines: ["ログイン維持や環境設定の保存のために、ブラウザのクッキー・ローカルストレージを使用します。"] },
       { h: "6. 利用者の権利", lines: ["利用者は、自身の個人情報の閲覧・訂正・削除・処理停止を請求できます。"] },
-      { h: "7. お問い合わせ", lines: ["個人情報に関するお問い合わせ（Fantagram Inc.）:"], email: "hello@ehto.world" },
+      { h: "7. お問い合わせ", lines: ["個人情報に関するお問い合わせ（Fantagram Inc.）:"], email: "hans1329@gmail.com" },
     ],
   },
 };
