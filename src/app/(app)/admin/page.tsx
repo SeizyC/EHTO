@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 export default function AdminIndex() {
   const router = useRouter();
   useEffect(() => {
-    router.replace("/admin/characters");
+    router.replace("/admin/stats");
   }, [router]);
   return null;
 }
