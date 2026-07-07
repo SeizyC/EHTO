@@ -127,22 +127,22 @@ export const CONTACT: Record<Locale, LegalDoc> = {
   ko: {
     title: "문의",
     sections: [
-      { h: "이메일", lines: ["제휴·제안·버그 제보 등 무엇이든 편하게 보내주세요."], email: "hello@ehto.world" },
-      { h: "만든 곳", lines: ["Fantagram Inc. — EHTO (Everyone Has Their Own World)"] },
+      { h: "이메일", lines: ["제휴·제안·버그 제보 등 무엇이든 편하게 보내주세요."], email: "hans1329@gmail.com" },
+      { h: "만든 곳", lines: ["Seizy at Fantagram Inc. — EHTO (Everyone Has Their Own World)"] },
     ],
   },
   en: {
     title: "Contact",
     sections: [
-      { h: "Email", lines: ["Partnerships, ideas, bug reports — anything is welcome."], email: "hello@ehto.world" },
-      { h: "Made by", lines: ["Fantagram Inc. — EHTO (Everyone Has Their Own World)"] },
+      { h: "Email", lines: ["Partnerships, ideas, bug reports — anything is welcome."], email: "hans1329@gmail.com" },
+      { h: "Made by", lines: ["Seizy at Fantagram Inc. — EHTO (Everyone Has Their Own World)"] },
     ],
   },
   ja: {
     title: "お問い合わせ",
     sections: [
-      { h: "メール", lines: ["提携・ご提案・バグ報告など、何でもお気軽にどうぞ。"], email: "hello@ehto.world" },
-      { h: "制作", lines: ["Fantagram Inc. — EHTO (Everyone Has Their Own World)"] },
+      { h: "メール", lines: ["提携・ご提案・バグ報告など、何でもお気軽にどうぞ。"], email: "hans1329@gmail.com" },
+      { h: "制作", lines: ["Seizy at Fantagram Inc. — EHTO (Everyone Has Their Own World)"] },
     ],
   },
 };
