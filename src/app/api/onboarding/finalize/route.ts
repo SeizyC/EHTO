@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { userClient, serviceClient } from "@/lib/supabase";
 import { ensureWorld, seedMembersIfEmpty } from "@/lib/world-seed";
 import { consumeCodeAndReward, issueCodesForUser } from "@/lib/beta-codes";
+import { sendAdminEmail } from "@/lib/notify-email";
 import { countryToLocale } from "@/lib/language";
 import { grantEhto, START_GRANT, EHTO_KIND } from "@/lib/ehto";
 
@@ -41,6 +42,17 @@ export async function POST(req: NextRequest) {
   const consumed = await consumeCodeAndReward(svc, uid, code);
   if (!consumed.ok) {
     return NextResponse.json({ error: "code already used or invalid" }, { status: 409 });
+  }
+
+  // Notify the admin when an invite code is freshly used (not on idempotent
+  // re-entry). No-ops unless RESEND_API_KEY is set, and never blocks/fails
+  // onboarding — the internal try/catch swallows any error.
+  if (!consumed.alreadyMine) {
+    const who = userData.user.email ?? uid;
+    await sendAdminEmail(
+      `[EHTO] 초대코드 사용됨: ${code}`,
+      `초대코드 ${code} 가 방금 사용됐어요.\n신규 유저: ${who}\n광장 이름: ${roomName}\n시각(UTC): ${new Date().toISOString()}`,
+    );
   }
 
   // 2. Create the world with the chosen name (+ seed members). Idempotent.
