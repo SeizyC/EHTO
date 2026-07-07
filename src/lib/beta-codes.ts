@@ -12,6 +12,15 @@ export const CODE_RE = /^[2-9A-HJ-NP-Z]{8}$/;
 const CODE_LEN = 8;
 const CODES_PER_USER = 3;
 
+// Every invite code expires 3 days after it was created. Enforced at the gate
+// (validate + atomic consume) via a created_at floor, so no schema change and
+// it applies to ALL codes — existing and newly issued alike.
+export const CODE_LIFETIME_MS = 3 * 24 * 60 * 60 * 1000;
+/** ISO timestamp floor: a code is still alive iff created_at >= this. */
+function liveCutoffIso(): string {
+  return new Date(Date.now() - CODE_LIFETIME_MS).toISOString();
+}
+
 /** A single random code. Uses Math.random — fine for non-secret invite
  *  codes (uniqueness is enforced by the DB primary key + retry on insert). */
 export function generateCode(): string {
@@ -40,6 +49,7 @@ export async function validateCode(svc: SupabaseClient, code: string): Promise<b
     .select("code")
     .eq("code", code)
     .is("used_by", null)
+    .gte("created_at", liveCutoffIso()) // expired (>3 days old) → invalid
     .maybeSingle();
   return !!data;
 }
@@ -54,12 +64,14 @@ export async function consumeCodeAndReward(
   code: string,
 ): Promise<{ ok: boolean; alreadyMine?: boolean }> {
   if (!CODE_RE.test(code)) return { ok: false };
-  // Atomic claim: only succeeds while used_by is null.
+  // Atomic claim: only succeeds while used_by is null AND the code is still
+  // within its 3-day lifetime.
   const { data: claimed } = await svc
     .from("beta_codes")
     .update({ used_by: uid, used_at: new Date().toISOString() })
     .eq("code", code)
     .is("used_by", null)
+    .gte("created_at", liveCutoffIso()) // expired codes can't be consumed
     .select("owner_user_id")
     .maybeSingle();
 
