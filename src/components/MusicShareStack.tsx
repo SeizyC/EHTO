@@ -84,24 +84,22 @@ export function MusicShareStack() {
   const shares = useActiveMusicShares();
   const members = useMembers();
 
-  if (shares.length === 0) return null;
+  // Only ever the single latest share. A fixed slot + mode="wait" guarantees
+  // the old card fully animates out BEFORE the new one animates in — so they
+  // can never stack/overlap, even during the replace transition.
+  const latest = shares[0] ?? null;
 
   return (
-    <div
-      className="pointer-events-none absolute right-3 bottom-3 z-30 flex flex-col-reverse gap-2"
-      style={{
-        maxHeight: "calc(100% - 24px)",
-      }}
-    >
-      <AnimatePresence initial={false}>
-        {shares.map((m) => (
+    <div className="pointer-events-none absolute right-3 bottom-3 z-30">
+      <AnimatePresence initial={false} mode="wait">
+        {latest && (
           <MusicCard
-            key={m.id}
-            msg={m}
-            speakerName={resolveSpeakerName(m, members)}
-            onDismiss={() => dismissMusicShare(m.id)}
+            key={latest.id}
+            msg={latest}
+            speakerName={resolveSpeakerName(latest, members)}
+            onDismiss={() => dismissMusicShare(latest.id)}
           />
-        ))}
+        )}
       </AnimatePresence>
     </div>
   );
