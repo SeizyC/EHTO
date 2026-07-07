@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { browserClient } from "@/lib/supabase";
 
 type StatsData = {
@@ -62,7 +63,7 @@ export default function StatsPage() {
         <div className="space-y-6">
           {/* Summary cards */}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-            <StatCard label="가입자" value={data.signups} />
+            <StatCard label="가입자" value={data.signups} href="/admin/users" />
             <StatCard label="프로필" value={data.profiles} />
             <StatCard label="7일 활성 방문자" value={data.activeVisitors7d} />
             <StatCard label="총 페이지뷰" value={data.pageviewsTotal} />
@@ -124,13 +125,27 @@ export default function StatsPage() {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="border-line bg-surface rounded-lg border p-3">
-      <p className="text-sub text-[10.5px]">{label}</p>
+function StatCard({ label, value, href }: { label: string; value: number; href?: string }) {
+  const inner = (
+    <>
+      <p className="text-sub text-[10.5px]">
+        {label}
+        {href && <span className="text-dim ml-1">›</span>}
+      </p>
       <p className="text-ink mt-1 text-[22px] font-medium tabular-nums">
         {value.toLocaleString()}
       </p>
-    </div>
+    </>
   );
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="border-line bg-surface hover:border-dim block rounded-lg border p-3 transition"
+      >
+        {inner}
+      </Link>
+    );
+  }
+  return <div className="border-line bg-surface rounded-lg border p-3">{inner}</div>;
 }
