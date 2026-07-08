@@ -3,30 +3,31 @@ import Script from "next/script";
 import "./globals.css";
 import PageViewBeacon from "@/components/PageViewBeacon";
 import { FontLoader } from "@/components/FontLoader";
-import { orgNode, websiteNode, graphJson } from "@/lib/structured-data";
-
-const SITE_URL = "https://ehto.world";
-const OG_IMAGE = { url: `${SITE_URL}/og_ehto.jpeg`, width: 1340, height: 813, alt: "EHTO — Everyone Has Their Own World" };
+import { orgNode, websiteNode, graphJson, SITE_URL, OG_IMAGE } from "@/lib/structured-data";
+import { META_DESC } from "@/lib/about-content";
 
 // Site-wide defaults. Individual routes (e.g. /about) may override title,
 // description and images; this provides the Open Graph / Twitter card and
-// canonical base for everything else, including the landing page.
+// canonical base for everything else. English by default — link-preview
+// crawlers (Facebook/X/Slack/Discord) fetch from non-KR IPs, so the static
+// fallback must not be Korean. The landing (/) localises its own metadata
+// per cf-ipcountry in src/app/page.tsx.
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: "EHTO — Everyone Has Their Own World",
-  description: "나를 중심으로 연결되는 작은 세상.",
+  description: META_DESC.en,
   openGraph: {
     type: "website",
     url: SITE_URL,
     siteName: "EHTO",
     title: "EHTO — Everyone Has Their Own World",
-    description: "나를 중심으로 연결되는 작은 세상.",
+    description: META_DESC.en,
     images: [OG_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
     title: "EHTO — Everyone Has Their Own World",
-    description: "나를 중심으로 연결되는 작은 세상.",
+    description: META_DESC.en,
     images: [OG_IMAGE.url],
   },
 };

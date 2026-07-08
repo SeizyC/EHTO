@@ -251,6 +251,23 @@ const ja: AboutContent = {
 
 export const ABOUT: Record<Locale, AboutContent> = { ko, en, ja };
 
+// Meta/OG description per locale — the landing tagline as a sentence. Served
+// per cf-ipcountry by the landing's generateMetadata, so each link-preview
+// crawler (Kakao from KR, LINE from JP, everything else → en) gets its own
+// language. Keep in sync with LANDING.sub below.
+export const META_DESC: Record<Locale, string> = {
+  en: "A small world that connects around you.",
+  ko: "나를 중심으로 연결되는 작은 세상.",
+  ja: "あなたを中心につながる小さな世界。",
+};
+
+/** Open Graph og:locale value per content locale. */
+export const OG_LOCALE: Record<Locale, string> = {
+  ko: "ko_KR",
+  ja: "ja_JP",
+  en: "en_US",
+};
+
 // Landing hero copy. Headline is the constant brand line (EHTO acronym);
 // subcopy + CTA localize.
 export const LANDING: Record<Locale, { headline: [string, string]; sub: string; cta: string }> = {

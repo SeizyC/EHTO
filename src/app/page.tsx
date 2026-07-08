@@ -1,26 +1,50 @@
 import { headers } from "next/headers";
 import { LandingClient } from "@/components/LandingClient";
-import { countryToLocale } from "@/lib/about-content";
+import { countryToLocale, META_DESC, OG_LOCALE } from "@/lib/about-content";
 import { sceneForCountry, sceneSrc } from "@/lib/plaza-scene";
 import type { Metadata } from "next";
-import { webApplicationNode, graphJson, SITE_URL } from "@/lib/structured-data";
+import { webApplicationNode, graphJson, SITE_URL, OG_IMAGE } from "@/lib/structured-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic"; // reads cf-ipcountry per request
 
 // The landing serves one URL for all locales (content localises by IP/​toggle),
 // so canonical is the bare origin with language alternates pointing back to it.
-export const metadata: Metadata = {
-  alternates: {
-    canonical: SITE_URL,
-    languages: {
-      "ko-KR": SITE_URL,
-      "ja-JP": SITE_URL,
-      en: SITE_URL,
-      "x-default": SITE_URL,
+// Metadata localises the same way the page body does: per cf-ipcountry. Each
+// preview crawler fetches from its own region (Kakao → KR → Korean, LINE → JP
+// → Japanese, Facebook/X/Slack/Discord → en), and the worker's edge cache
+// already keys the full document by country, so cached OG stays consistent.
+export function generateMetadata(): Metadata {
+  const locale = countryToLocale(headers().get("cf-ipcountry"));
+  const description = META_DESC[locale];
+  return {
+    description,
+    alternates: {
+      canonical: SITE_URL,
+      languages: {
+        "ko-KR": SITE_URL,
+        "ja-JP": SITE_URL,
+        en: SITE_URL,
+        "x-default": SITE_URL,
+      },
     },
-  },
-};
+    openGraph: {
+      type: "website",
+      url: SITE_URL,
+      siteName: "EHTO",
+      title: "EHTO — Everyone Has Their Own World",
+      description,
+      locale: OG_LOCALE[locale],
+      images: [OG_IMAGE],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "EHTO — Everyone Has Their Own World",
+      description,
+      images: [OG_IMAGE.url],
+    },
+  };
+}
 
 export default function Home() {
   const country = headers().get("cf-ipcountry");

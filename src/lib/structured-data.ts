@@ -13,6 +13,14 @@
 export const SITE_URL = "https://ehto.world";
 export const ABOUT_URL = `${SITE_URL}/about`;
 
+// Shared Open Graph card image (root layout defaults + landing generateMetadata).
+export const OG_IMAGE = {
+  url: `${SITE_URL}/og_ehto.jpeg`,
+  width: 1340,
+  height: 813,
+  alt: "EHTO — Everyone Has Their Own World",
+};
+
 export const ORG_ID = `${SITE_URL}/#org`;
 export const WEBSITE_ID = `${SITE_URL}/#website`;
 export const APP_ID = `${SITE_URL}/#ehto`;
